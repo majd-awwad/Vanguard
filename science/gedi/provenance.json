@@ -1,0 +1,100 @@
+{
+  "case_id": "gedi-cerrado-o01964-beam0101-v1",
+  "selection": {
+    "orbit": 1964,
+    "track": 5337,
+    "beam_group": "BEAM0101",
+    "beam_number": 5,
+    "channel": 2,
+    "collection_release": "V001",
+    "first_shot_number_within_orbit": 108399,
+    "last_shot_number_within_orbit": 108404,
+    "comparison_low_shot": "19640519500108400",
+    "comparison_high_shot": "19640520300108404",
+    "comparison_height_m": [4, 10],
+    "minimum_sensitivity": 0.95
+  },
+  "source_status": "VERIFIED",
+  "distribution": "Checksum-verified rGEDI educational subsets of historical NASA GEDI products. Original granule identities were checked in the embedded NASA HDF5 metadata. The checksums identify the mirrored subsets, not NASA DAAC originals.",
+  "sources": {
+    "L1B": {
+      "doi": "10.5067/GEDI/GEDI01_B.001",
+      "original_granule": "GEDI01_B_2019108080338_O01964_T05337_02_003_01.h5",
+      "member": "GEDI01_B_2019108080338_O01964_T05337_02_003_01_sub.h5",
+      "url": "https://raw.githubusercontent.com/carlos-alberto-silva/rGEDI/d91c170a9088f21dc4e62ba5436b6959860bd43b/inst/extdata/GEDI01_B_2019108080338_O01964_T05337_02_003_01_sub.zip",
+      "zip_bytes": 1029545,
+      "zip_sha256": "ba3d3a396cd073af0337f4c0abb0068c723dc2627d8a26f75e06efc177d0d1ed",
+      "hdf5_bytes": 3798053,
+      "hdf5_sha256": "71b21cd286e3223ba139c995f1970b5ae19682e2b4ec6b56a0133063586d5b6f",
+      "hdf5_version_id": "01",
+      "pge_version": "003",
+      "uuid": "7e3717c3-85b7-4414-8580-705924b21aea"
+    },
+    "L2A": {
+      "doi": "10.5067/GEDI/GEDI02_A.001",
+      "original_granule": "GEDI02_A_2019108080338_O01964_T05337_02_001_01.h5",
+      "member": "GEDI02_A_2019108080338_O01964_T05337_02_001_01_sub.h5",
+      "url": "https://raw.githubusercontent.com/carlos-alberto-silva/rGEDI/d91c170a9088f21dc4e62ba5436b6959860bd43b/inst/extdata/GEDI02_A_2019108080338_O01964_T05337_02_001_01_sub.zip",
+      "zip_bytes": 1184141,
+      "zip_sha256": "f2cacaf9bd903f42d2df671afa4dd3269f5162f3b3300eb0fffb6bffbee05177",
+      "hdf5_bytes": 11442898,
+      "hdf5_sha256": "7f510244ee29757120d108b0825fa8fb9f9fba37bb8e2e24a6cad353f172435c",
+      "hdf5_version_id": "01",
+      "pge_version": "001",
+      "uuid": "799d6490-11cb-4e17-96c3-51cb7244c80a"
+    }
+  },
+  "references": {
+    "r_gedi_input_documentation": "https://cloud.r-project.org/web/packages/rGEDI/refman/rGEDI.html",
+    "l1b_v001_guide": "https://lpdaac.usgs.gov/documents/590/GEDIL01_User_Guide_V1.pdf",
+    "l2a_v001_units_erratum": "https://lpdaac.usgs.gov/documents/650/GEDI02_UserGuide_V1.pdf",
+    "l1b_dictionary": "https://edcftp.cr.usgs.gov/project/lpdaac/GEDI_L1A-L1B/gedi_l1b_product_data_dictionary.html",
+    "l2a_dictionary": "https://edcftp.cr.usgs.gov/project/lpdaac/GEDI_L2/gedi_l2a_product_data_dictionary.html",
+    "waveform_atbd": "https://lpdaac.usgs.gov/documents/581/GEDI_WF_ATBD_v1.0.pdf",
+    "gps_utc_2019": "https://maia.usno.navy.mil/information/eo-values",
+    "v002_subsetting": "https://github.com/nasa/GEDI-Data-Resources/blob/main/guides/gedi-earthdata-search.md"
+  },
+  "eic": {
+    "visualization_id": 4950,
+    "url": "https://svs.gsfc.nasa.gov/4950/",
+    "method_url": "https://svs.gsfc.nasa.gov/images/events/2022/Viz4Climate/1004/vis22w-sub1004-cam-i7.pdf",
+    "asset": "GEDI_global_w_colorbar_0900_print.jpg",
+    "asset_url": "https://svs.gsfc.nasa.gov/vis/a000000/a004900/a004950/GEDI_global_w_colorbar_0900_print.jpg",
+    "asset_bytes": 85390,
+    "asset_sha256": "4d47a7eff90739a53f68b2d3ddaf196fdc6f9592b725410b0f5adc9ba044fe96",
+    "asset_credit": "NASA's Scientific Visualization Studio",
+    "verified_relationship": "Same GEDI mission. SVS identifies RH100 from L2B as its rendered metric. The sample carries the analogous L2A metric and L1B waveforms for independently selected shots.",
+    "frame_to_shot_status": "UNVERIFIED",
+    "frame_to_shot_reason": "Public SVS metadata does not establish a per-frame source granule or shot inventory; rendering filtered a subset of measurements and exaggerated height. Use the still for interpreting coverage and the RH100 legend only."
+  },
+  "v002_candidate": {
+    "catalog_status": "VERIFIED",
+    "waveform_and_shot_join_status": "UNVERIFIED",
+    "access_result": "Both bounded byte-range requests reached Earthdata Login and returned HTTP 401. No full granules were downloaded.",
+    "l1b": {
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G2699305859-LPCLOUD.umm_json",
+      "file": "GEDI01_B_2019170155833_O02932_02_T02267_02_005_01_V002.h5",
+      "cmr_size_mb": 2047.19
+    },
+    "l2a": {
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G2700982893-LPCLOUD.umm_json",
+      "file": "GEDI02_A_2019170155833_O02932_02_T02267_02_003_01_V002.h5",
+      "cmr_size_mb": 1701.98
+    }
+  },
+  "v002_same_orbit_candidate": {
+    "catalog_status": "VERIFIED",
+    "waveform_and_shot_join_status": "UNVERIFIED",
+    "access_result": "HTTP 401 on both bounded probes. Same orbit and track in the catalog; availability of the six shot numbers in this V002 granule pair still needs to be checked.",
+    "l1b": {
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G2164347602-LPCLOUD.umm_json",
+      "file": "GEDI01_B_2019108080339_O01964_01_T05337_02_005_01_V002.h5",
+      "cmr_size_mb": 3468.58
+    },
+    "l2a": {
+      "url": "https://cmr.earthdata.nasa.gov/search/concepts/G2164259609-LPCLOUD.umm_json",
+      "file": "GEDI02_A_2019108080339_O01964_01_T05337_02_003_01_V002.h5",
+      "cmr_size_mb": 2513.16
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "earthpulse-invisible-forest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
