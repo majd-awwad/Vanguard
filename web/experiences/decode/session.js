@@ -7,6 +7,7 @@ const CONDITIONS = ["sound", "text", "both"];
 const PLAY_MODES = ["legend", "sweep", "row", "contrast"];
 const NEXT_PHASE = { intro: "legend", legend: "listen", listen: "decode" };
 const PROBE_PHASES = ["listen", "decode", "reveal"];
+const PLAN_ERROR = "plan-unavailable";
 
 const cellKey = (row, col) => `${row},${col}`;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -45,6 +46,7 @@ export function createDecodeSession({
   let score = null;
   let planKey = null;
   let planMode = null;
+  let planError = null;
   let loadToken = 0;
   let quiet = 0;
   let transportState = transport.snapshot();
@@ -86,6 +88,7 @@ export function createDecodeSession({
       lastProbe: lastProbe ? { ...lastProbe } : null,
       planRevision: transportState.planRevision ?? 0,
       playMode: planMode,
+      error: planError,
       transport: { ...transportState },
       description: description(),
       grid: data ? sessionGrid(evidence) : { rows: 0, cols: 0, cells: [] },
@@ -106,12 +109,40 @@ export function createDecodeSession({
     if (quiet === 0) emit();
   });
 
+  // Plan and transport failures never escape dispatch. They keep the previous plan and playMode and
+  // set a data-free `error` that the next successful plan clears.
+  function guard(action) {
+    try {
+      action();
+      return true;
+    } catch {
+      planError = PLAN_ERROR;
+      return false;
+    }
+  }
+
+  function guardAsync(call) {
+    try {
+      return Promise.resolve(call()).catch(() => {
+        planError = PLAN_ERROR;
+        emit();
+      });
+    } catch {
+      planError = PLAN_ERROR;
+      return undefined;
+    }
+  }
+
   function loadPlan(options) {
-    transport.pause();
-    transport.load(makePlan(data, { level: activeLevel, ...options }), 0);
-    transportState = transport.snapshot();
-    planKey = JSON.stringify(options);
-    planMode = options.mode;
+    return guard(() => {
+      const plan = makePlan(data, { level: activeLevel, ...options });
+      transport.pause();
+      transport.load(plan, 0);
+      transportState = transport.snapshot();
+      planKey = JSON.stringify(options);
+      planMode = options.mode;
+      planError = null;
+    });
   }
 
   function resetAttempt() {
@@ -125,6 +156,7 @@ export function createDecodeSession({
 
   function rebuild() {
     resetAttempt();
+    planKey = null; // a failed rebuild must not let a later play reuse the previous level's plan
     if (data) loadPlan({ mode: "legend" });
   }
 
@@ -143,7 +175,8 @@ export function createDecodeSession({
     if (!cases.includes(id)) return undefined;
     const token = ++loadToken;
     pendingId = id;
-    transport.pause();
+    planError = null;
+    guard(() => transport.pause());
     if (loaded.has(id)) {
       applyCase(loaded.get(id));
       return undefined;
@@ -212,21 +245,31 @@ export function createDecodeSession({
         if (!cell) return undefined;
         focus = cell;
         if (!audible() || (activeMode === "discovery" && !PROBE_PHASES.includes(phase))) return undefined;
-        lastProbe = { row: cell[0], col: cell[1], heard: heardClass(data, activeLevel, cell[0], cell[1]) };
-        loadPlan({ mode: "cell", cells: [cell] });
-        return transport.play(transportState.playback);
+        let heard;
+        if (!guard(() => { heard = heardClass(data, activeLevel, cell[0], cell[1]); })) return undefined;
+        // An unplayed audio probe must not relay a cue, so lastProbe is set only once the plan loaded.
+        if (!loadPlan({ mode: "cell", cells: [cell] })) return undefined;
+        lastProbe = { row: cell[0], col: cell[1], heard };
+        return guardAsync(() => transport.play(transportState.playback));
       }
       case "play": {
         if (!audible() || !PLAY_MODES.includes(intent.mode)) return undefined;
-        const options = intent.mode === "row" ? { mode: "row", row: focus[0] } : { mode: intent.mode };
-        if (JSON.stringify(options) !== planKey) loadPlan(options);
-        return transport.play(transportState.playback);
+        let options = { mode: intent.mode };
+        if (intent.mode === "row") {
+          options = { mode: "row", row: focus[0] };
+        } else if (intent.mode === "contrast") {
+          // Contrast compares the focused cell with the last probed cell; without two different cells it is a no-op.
+          if (!lastProbe || (lastProbe.row === focus[0] && lastProbe.col === focus[1])) return undefined;
+          options = { mode: "contrast", cells: [[...focus], [lastProbe.row, lastProbe.col]] };
+        }
+        if (JSON.stringify(options) !== planKey && !loadPlan(options)) return undefined;
+        return guardAsync(() => transport.play(transportState.playback));
       }
       case "pause":
-        if (audible()) transport.pause();
+        if (audible()) guard(() => transport.pause());
         return undefined;
       case "replay":
-        return audible() ? transport.replay() : undefined;
+        return audible() ? guardAsync(() => transport.replay()) : undefined;
       case "submit":
         if (!data || activeMode !== "discovery" || phase !== "decode" || locked) return undefined;
         score = scoreGuesses(grid().truth, [...guesses.values()]);
@@ -234,7 +277,7 @@ export function createDecodeSession({
         phase = "reveal";
         return undefined;
       case "reset":
-        transport.pause();
+        guard(() => transport.pause());
         rebuild();
         return undefined;
       default:
