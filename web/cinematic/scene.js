@@ -408,6 +408,7 @@ export function createScene({
   let revealStart = 0;
   let lostHandler = null;
   let onFrame = null;
+  let frames = 0;
 
   const frameFor = () => frame ?? createFrame(FALLBACK_FRAME);
   const mobileLayout = () => width / Math.max(1, height) < 0.9;
@@ -594,6 +595,7 @@ export function createScene({
     }
     syncDust();
     renderer.render(scene, camera);
+    frames++;
     onFrame?.({ dt, progress, target, pixelRatio });
     if (continuous()) frameRequest = window.requestAnimationFrame(draw);
   }
@@ -614,7 +616,7 @@ export function createScene({
     canvas,
     get progress() { return progress; },
     get target() { return target; },
-    get stats() { return { pixelRatio, dust: scene.userData.dustStats ?? null }; },
+    get stats() { return { pixelRatio, frames, dust: scene.userData.dustStats ?? null }; },
     onLost(handler) { lostHandler = handler; },
     onFrame(handler) { onFrame = handler; },
     setDirection(isRtl) { if (rtl !== isRtl) { rtl = isRtl; invalidate(); } },

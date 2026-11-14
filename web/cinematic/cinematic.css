@@ -228,7 +228,7 @@ body.cine[data-view="decode"] .cine-hero {
 }
 [dir="rtl"] body.cine[data-view="decode"] .cine-hero { transform: translateX(2.5rem) scale(.985); }
 body.cine[data-view="decode"] :is(.cine-bar-challenge, .cine-bar-challenge-sep) { display: none; }
-body.cine[data-view="decode"] .cine-bar { inset-inline-end: auto; inset-block-end: 1rem; padding: .55rem 1rem; }
+body.cine[data-view="decode"] .cine-bar { inset-inline-end: auto; inset-block-end: 1rem; padding: .55rem 1rem; background: rgb(8 15 24 / .9); }
 
 body.cine[data-view="decode"] #decode-page {
   display: grid;
@@ -334,7 +334,8 @@ body.cine #decode-svs-card figure { max-inline-size: 15rem; }
   .cine-bar { inset-inline-end: var(--cine-pad); inset-block-end: 11rem; }
   body.cine #decode-page button.cine-orbit { inset-inline-end: 50%; transform: translateX(50%); inset-block-end: 1rem; }
   body.cine #decode-page button.cine-orbit:hover { transform: translateX(50%) scale(1.04); }
-  .cine-rail { inset-block-start: auto; inset-block-end: 12rem; transform: none; }
+  .cine-rail { display: none; }
+  #cine-wave { inline-size: 5.2rem; }
   body.cine[data-view="decode"] #decode-page { grid-template-columns: minmax(0, 1fr); grid-template-areas: "map" "dock" "status" "evidence"; padding-block-start: 4.6rem; }
   body.cine[data-view="decode"] #decode-interface { position: static; }
   body.cine[data-view="decode"] .cine-bar { display: none; }
