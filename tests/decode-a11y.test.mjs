@@ -14,9 +14,10 @@ const requiredKeys = [
   'legend.intro', 'legend.direction', 'legend.pitch', 'legend.loudness',
   'legend.beforeSweep', 'legend.started', 'legend.completed',
   'listen.start', 'listen.pause', 'listen.replay', 'listen.started',
-  'listen.completed', 'listen.spatial', 'listen.mutedFallback', 'listen.navigation',
+  'listen.completed', 'listen.rowCompleted', 'listen.contrastCompleted',
+  'listen.spatial', 'listen.mutedFallback', 'listen.navigation',
   'grid.row', 'grid.column', 'grid.position', 'grid.focused',
-  'grid.selected', 'grid.deselected', 'grid.probeRequested', 'grid.noReading',
+  'grid.selected', 'grid.deselected', 'grid.probeRequested', 'grid.probeCompleted', 'grid.noReading',
   'grid.heard.low', 'grid.heard.mid', 'grid.heard.high', 'grid.heard.silent',
   'grid.submitInstructions', 'grid.submit', 'grid.submitted',
   'grid.shortcut.arrows', 'grid.shortcut.space', 'grid.shortcut.enter',
@@ -649,4 +650,70 @@ test('transport completion without a published plan mode cannot identify a Legen
   }
   assert.deepEqual(endedSnapshots[0], endedSnapshots[1]);
   assert.deepEqual(endedSnapshots[1], endedSnapshots[2]);
+});
+
+test('each supported playMode announces a genuine completion in Arabic and English', () => {
+  const cases = [
+    ['legend', 'Sound calibration complete.', 'اكتملت معايرة الصوت.'],
+    ['sweep', 'Spatial sweep complete.', 'اكتمل المسح الصوتي.'],
+    ['row', 'Row playback complete.', 'انتهى تشغيل صوت الصف.'],
+    ['contrast', 'Comparison playback complete.', 'انتهى تشغيل المقارنة الصوتية.'],
+    ['cell', 'Cell probe complete.', 'اكتمل فحص الخلية.'],
+  ];
+
+  for (const [playMode, en, ar] of cases) {
+    for (const lang of languages) {
+      const { announcements, update } = gridHarness({ lang, snapshot: { playMode: 'legend' } });
+      const expected = lang === 'ar' ? ar : en;
+      update({ transport: { status: 'playing', positionS: 0 } });
+      update({ transport: { status: 'playing', positionS: 1 } });
+      assert.deepEqual(announcements, []);
+
+      // The completed mode belongs to the ending snapshot, even if the prior mode differed.
+      update({ playMode, transport: { status: 'ended', positionS: 2 } });
+      update({ transport: { status: 'ended', positionS: 2, muted: true } });
+      assert.deepEqual(announcements, [expected], `${playMode}, ${lang}`);
+
+      update({ transport: { status: 'playing', positionS: 0 } });
+      update({ transport: { status: 'ended', positionS: 2 } });
+      assert.deepEqual(announcements, [expected, expected], `${playMode} replay, ${lang}`);
+    }
+  }
+});
+
+test('mounting, position ticks, pause, reset, and invalid modes do not announce completion', () => {
+  for (const status of ['idle', 'playing', 'ended']) {
+    const { announcements } = gridHarness({ snapshot: { playMode: 'legend', transport: { status } } });
+    assert.deepEqual(announcements, [], `initial ${status}`);
+  }
+
+  const { announcements, update } = gridHarness({ snapshot: { playMode: 'legend' } });
+  update({ transport: { status: 'playing', positionS: 0 } });
+  update({ transport: { status: 'playing', positionS: 2 } });
+  update({ transport: { status: 'paused', positionS: 2 } });
+  update({ transport: { status: 'ended', positionS: 2 } });
+  update({ transport: { status: 'starting', positionS: 0 } });
+  update({ transport: { status: 'ended', positionS: 2 } });
+  update({ transport: { status: 'playing', positionS: 0 } });
+  update({ phase: 'intro', transport: { status: 'idle', positionS: 0 } });
+  update({ transport: { status: 'ended', positionS: 2 } });
+  for (const playMode of [undefined, null, 'unknown', 'constructor']) {
+    update({ playMode, transport: { status: 'playing', positionS: 0 } });
+    update({ transport: { status: 'ended', positionS: 2 } });
+    update({ playMode: 'legend' });
+  }
+  assert.deepEqual(announcements, []);
+});
+
+test('a completion and simultaneous Reveal results share one polite live-region update', () => {
+  const { announcements, update, status } = gridHarness({
+    snapshot: { playMode: 'sweep', transport: { status: 'playing' } },
+  });
+  update({
+    phase: 'reveal', transport: { status: 'ended' }, score: syntheticScore, visualLink: syntheticVisualLink,
+  });
+  assert.deepEqual(announcements, [
+    `Spatial sweep complete. Guesses submitted. Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits. ${syntheticVisualLink.note}`,
+  ]);
+  assert.equal(status.getAttribute('aria-live'), 'polite');
 });

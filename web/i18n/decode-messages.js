@@ -59,6 +59,8 @@ const messages = {
   'listen.replay': { en: 'Replay', ar: 'إعادة التشغيل' },
   'listen.started': { en: 'Spatial sweep started.', ar: 'بدأ المسح الصوتي.' },
   'listen.completed': { en: 'Spatial sweep complete.', ar: 'اكتمل المسح الصوتي.' },
+  'listen.rowCompleted': { en: 'Row playback complete.', ar: 'انتهى تشغيل صوت الصف.' },
+  'listen.contrastCompleted': { en: 'Comparison playback complete.', ar: 'انتهى تشغيل المقارنة الصوتية.' },
   'listen.spatial': {
     en: 'The sweep moves across the map from west to east. Listen for changes in direction, pitch, and loudness as it moves.',
     ar: 'ينتقل المسح عبر الخريطة من الغرب إلى الشرق. انتبه إلى تغيّر اتجاه الصوت ودرجة النغمة وشدّتها خلال المسح.',
@@ -90,6 +92,7 @@ const messages = {
     en: 'Probing row {row}, column {col}.',
     ar: 'جارٍ فحص الخلية في الصف {row}، العمود {col}.',
   },
+  'grid.probeCompleted': { en: 'Cell probe complete.', ar: 'اكتمل فحص الخلية.' },
   'grid.noReading': { en: 'No reading available.', ar: 'ما في قراءة متاحة.' },
   'grid.heard.low': { en: 'Low', ar: 'منخفض' },
   'grid.heard.mid': { en: 'Medium', ar: 'متوسط' },

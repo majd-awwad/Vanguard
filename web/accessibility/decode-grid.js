@@ -8,6 +8,13 @@ const arrowSteps = {
 const heardCategories = new Set(["low", "mid", "high", "silent"]);
 const arabicShortcutKeys = { KeyP: "p", KeyL: "l", KeyR: "r", KeyS: "s" };
 const scoreFields = ["hits", "misses", "falseAlarms", "nearHits"];
+const playbackCompletionKeys = new Map([
+  ["legend", "legend.completed"],
+  ["sweep", "listen.completed"],
+  ["row", "listen.rowCompleted"],
+  ["contrast", "listen.contrastCompleted"],
+  ["cell", "grid.probeCompleted"],
+]);
 const positionKey = ([row, col]) => `${row}:${col}`;
 
 function setAttribute(element, name, value) {
@@ -60,8 +67,7 @@ export function mountDecodeGrid(root, session, { t }) {
     root.replaceChildren(...elements);
   }
 
-  function renderReveal(snapshot, previous) {
-    if (!status) return;
+  function revealMessages(snapshot, previous) {
     const sameReveal = snapshot.phase === "reveal" && previous?.phase === "reveal" &&
       snapshot.caseId === previous.caseId && snapshot.level === previous.level && snapshot.mode === previous.mode;
     if (!sameReveal) {
@@ -70,7 +76,7 @@ export function mountDecodeGrid(root, session, { t }) {
       revealedNote = undefined;
       revealAnnouncement = undefined;
     }
-    if (snapshot.phase !== "reveal") return;
+    if (snapshot.phase !== "reveal") return [];
 
     const parts = [];
     if (previous?.phase === "decode" && snapshot.mode === "discovery") parts.push(t("grid.submitted"));
@@ -90,10 +96,7 @@ export function mountDecodeGrid(root, session, { t }) {
       parts.push(note);
       revealedNote = note;
     }
-    if (parts.length) {
-      revealAnnouncement = parts.join(" ");
-      status.textContent = revealAnnouncement;
-    }
+    return parts;
   }
 
   function render(snapshot) {
@@ -119,13 +122,12 @@ export function mountDecodeGrid(root, session, { t }) {
       }
     }
 
+    const messages = [];
     if (activeCell && (resized || focusChanged)) {
       const target = buttons[focusRow]?.[focusCol];
       if (target && target !== document.activeElement) target.focus();
-      if (focusChanged) announce("grid.focused", { row: focusRow + 1, col: focusCol + 1 });
+      if (focusChanged) messages.push(t("grid.focused", { row: focusRow + 1, col: focusCol + 1 }));
     }
-
-    renderReveal(snapshot, previous);
 
     if (previous?.phase === "decode" && snapshot.phase === "decode" &&
       previous.caseId === snapshot.caseId && previous.level === snapshot.level) {
@@ -134,8 +136,20 @@ export function mountDecodeGrid(root, session, { t }) {
       const removed = previous.guesses.filter((guess) => !selected.has(positionKey(guess)));
       if (added.length + removed.length === 1) {
         const [row, col] = added[0] ?? removed[0];
-        announce(added.length ? "grid.selected" : "grid.deselected", { row: row + 1, col: col + 1 });
+        messages.push(t(added.length ? "grid.selected" : "grid.deselected", { row: row + 1, col: col + 1 }));
       }
+    }
+
+    if (!status) return;
+    if (previous?.transport?.status === "playing" && snapshot.transport?.status === "ended") {
+      const key = playbackCompletionKeys.get(snapshot.playMode);
+      if (key) messages.push(t(key));
+    }
+    const results = revealMessages(snapshot, previous);
+    if (messages.length || results.length) {
+      const text = [...messages, ...results].join(" ");
+      if (results.length) revealAnnouncement = text;
+      status.textContent = text;
     }
   }
 
