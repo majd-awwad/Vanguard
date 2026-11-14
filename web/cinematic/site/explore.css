@@ -52,4 +52,4 @@ body.explore-3d[data-flight="hero"] .xp-grid, body.explore-3d[data-flight="flyin
 .xp-right canvas { width: 100%; height: auto; display: block; border-radius: 8px; background: rgb(5 11 18 / .7); border: 1px solid var(--line); margin-bottom: .5rem; }
 .captions { background: rgb(0 0 0 / .5); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .8rem; color: var(--ink) !important; min-height: 2.4rem; }
 @media (max-width: 1180px) { .xp-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .xp-centre { order: -1; grid-column: 1 / -1; } }
-@media (max-width: 720px) { .xp-layout { grid-template-columns: 1fr; } .xp-stage-box { padding: 2.4rem .4rem 1rem; } .xp-tools { position: static; transform: none; display: flex; justify-content: center; margin-top: .6rem; } .xp-stage-box { display: block; } }
+@media (max-width: 720px) { .xp-layout { grid-template-columns: 1fr; } .xp-stage-box { padding: 2.4rem .4rem 1rem; min-height: 0; } .xp-tools { position: static; transform: none; display: flex; justify-content: center; margin-top: .6rem; } .xp-stage-box { display: block; } }
