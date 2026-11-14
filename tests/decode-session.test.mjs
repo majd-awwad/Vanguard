@@ -290,6 +290,54 @@ test("playMode names the loaded plan and survives the end of playback", async ()
   assert.equal(slow.getState().playMode, null);
 });
 
+test("activeCell resolves the playhead for silent and sounding events, and only for the current plan", async () => {
+  // Legend events sit on synthetic calibration cells, like Andreh's, and must never resolve.
+  const makePlan = (data, options) => {
+    const plan = fakePlan(data, options);
+    if (options.mode === "legend") {
+      plan.events = [{ id: "ev-0", onsetS: 0, row: 1, col: 0, tone: {}, evidence: {} }, { id: "ev-1", onsetS: 1, row: 1, col: 3, tone: {}, evidence: {} }];
+    }
+    return plan;
+  };
+  const { session, transport } = await setup({ makePlan });
+  const playhead = (patch) => {
+    transport.emitRaw({ ...transport.snapshot(), status: "playing", ...patch });
+    return session.getState().activeCell;
+  };
+
+  assert.equal(session.getState().activeCell, null, "idle: no playhead");
+  assert.equal(session.getState().playMode, "legend");
+  assert.equal(playhead({ activeEventId: "ev-0" }), null, "legend events are calibration, not grid cells");
+  assert.equal(playhead({ activeEventId: "ev-1" }), null);
+
+  session.dispatch({ type: "play", mode: "sweep" });
+  const grid = fixtures[0].levels.quick;
+  const visited = [];
+  for (let index = 0; index < grid.cells.length; index++) {
+    const cell = playhead({ activeEventId: `ev-${index}` });
+    assert.deepEqual(cell, [grid.cells[index].row, grid.cells[index].col], `event ${index} resolves in sweep order`);
+    visited.push(cell);
+    assertRedacted(session.getState());
+  }
+  assert.equal(new Set(visited.map(([row, col]) => `${row},${col}`)).size, grid.cells.length, "every cell is visited once");
+  assert.ok(visited.some(([row, col]) => grid.cells[row * grid.cols + col].status === "missing"), "silent cells resolve too");
+
+  assert.equal(playhead({ activeEventId: "ev-999" }), null, "unknown id");
+  assert.equal(playhead({ activeEventId: null }), null);
+  assert.equal(playhead({ activeEventId: "ev-3", status: "idle" }), null, "idle");
+  const { planRevision } = transport.snapshot();
+  assert.equal(playhead({ activeEventId: "ev-3", planRevision: planRevision + 1 }), null, "stale revision: plan was replaced");
+  assert.equal(playhead({ activeEventId: "ev-3", planRevision }), null, "an older revision snapshot is dropped, not resurrected");
+  session.dispatch({ type: "play", mode: "row" });
+  assert.equal(session.getState().playMode, "row");
+  assert.deepEqual(playhead({ activeEventId: "ev-1" }), [0, 1], "a freshly loaded plan resolves again");
+
+  const state = session.getState();
+  state.activeCell[0] = 99;
+  assert.notEqual(session.getState().activeCell[0], 99, "snapshots do not expose internal state");
+  assert.ok(!JSON.stringify(state).includes("evidence"));
+});
+
 // Throws like Andreh's makeSpatialPlan when contrast is requested without exactly two cells.
 function strictPlan(data, options) {
   if (options.mode === "contrast" && options.cells?.length !== 2) throw new RangeError("contrast requires 2 cell(s).");

@@ -46,6 +46,8 @@ export function createDecodeSession({
   let score = null;
   let planKey = null;
   let planMode = null;
+  let planCells = null; // event id -> [row, col] of the loaded plan; never evidence or tones
+  let planRevision = null;
   let planError = null;
   let loadToken = 0;
   let quiet = 0;
@@ -72,6 +74,16 @@ export function createDecodeSession({
     return textCache.get(id);
   }
 
+  // Playhead position. Silent and sounding events resolve identically, and legend events are synthetic
+  // calibration cells, not grid cells, so they never resolve.
+  function activeCell() {
+    const id = transportState.activeEventId;
+    if (!planCells || planMode === "legend" || id === null || id === undefined) return null;
+    if (transportState.status === "idle" || transportState.planRevision !== planRevision) return null;
+    const cell = planCells.get(id);
+    return cell ? [...cell] : null;
+  }
+
   function snapshot() {
     const evidence = data !== null && (activeMode === "learning" || phase === "reveal");
     const revealed = phase === "reveal";
@@ -89,6 +101,7 @@ export function createDecodeSession({
       planRevision: transportState.planRevision ?? 0,
       playMode: planMode,
       error: planError,
+      activeCell: activeCell(),
       transport: { ...transportState },
       description: description(),
       grid: data ? sessionGrid(evidence) : { rows: 0, cols: 0, cells: [] },
@@ -141,6 +154,8 @@ export function createDecodeSession({
       transportState = transport.snapshot();
       planKey = JSON.stringify(options);
       planMode = options.mode;
+      planCells = new Map(plan.events.map((event) => [event.id, [event.row, event.col]]));
+      planRevision = transportState.planRevision;
       planError = null;
     });
   }
@@ -183,6 +198,8 @@ export function createDecodeSession({
     }
     data = null;
     planMode = null;
+    planCells = null;
+    planRevision = null;
     resetAttempt();
     return Promise.resolve().then(() => loadCase(id)).then((next) => {
       if (!next?.levels?.quick || !next.levels.advanced) throw new TypeError(`Case ${id} has no Decode levels.`);
