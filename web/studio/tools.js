@@ -52,7 +52,7 @@ export function mountTools(api) {
   const speedSelect = h(document, "select", { id: "st-speed", "aria-label": c.scan.speed });
   for (const speed of SPEEDS) speedSelect.append(h(document, "option", { value: speed, text: speed + "×", selected: speed === 1 }));
   el.summary = h(document, "div", { class: "st-summary", hidden: true, tabindex: "-1" });
-  const runPanel = h(document, "section", { class: "panel", "aria-labelledby": "st-run-title" }, h(document, "h2", { id: "st-run-title", text: c.scan.title }),
+  const runPanel = h(document, "section", { class: "panel", "aria-labelledby": "st-run-title" }, h(document, "h2", { id: "st-run-title", text: c.scan.playback }),
     h(document, "div", { class: "st-tools-row" }, playPause, stopButton, h(document, "label", { class: "st-speed", for: "st-speed" }, h(document, "span", { text: c.scan.speed }), speedSelect)), el.runState, el.reading, el.summary);
 
   function drawSummary(run) {
