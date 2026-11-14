@@ -114,7 +114,6 @@ const systemCopy = {
     context: "سياق الحدث من NASA SVS 5669",
     frame: "افتح إطار SVS المنفصل",
     evidence: "نتائج نموذج GEOS-FP من {start} إلى {end} بالتوقيت العالمي UTC.",
-    contextNote: "قيم الشبكة والصوت من تشغيل GEOS-FP القياسي لاستيعاب البيانات، بدقّة 0.25 درجة عرض و0.3125 درجة طول. القيم متوسط ثلاث ساعات من 18:00 إلى 21:00 بالتوقيت العالمي في 19 آب 2025، ومركز الفترة 19:30. يعرض SVS 5669 إطارًا منفصلًا من تشغيل GEOS-FP Replay بدقّة ٢ كم عند الساعة 20:00 بالتوقيت العالمي. الإطار للسياق العلمي، وله بياناته الخاصة وتوقيته اللحظي.",
   },
 };
 
@@ -273,15 +272,6 @@ export async function mountDecode(root, {
     },
   });
 
-  function localizedVisualNote(link) {
-    if (caseData.fixture) return text.fixtureNote;
-    if (language === "ar" && caseData.id === dustCaseId &&
-      link.svs === "https://svs.gsfc.nasa.gov/5669/" && link.relation === "RELATED_CONTEXT") {
-      return text.contextNote;
-    }
-    return link.note;
-  }
-
   function setPhase(snapshot) {
     const { phase } = snapshot;
     const phaseIndex = phaseOrder.indexOf(phase);
@@ -352,7 +342,8 @@ export async function mountDecode(root, {
     byId("svs-card").hidden = !visualLink.svs;
     figure.hidden = !showFrame;
     if (showFrame) image.src = dustFrame.href;
-    byId("context-note").textContent = language === "en" && showFrame ? text.contextNote : localizedVisualNote(visualLink);
+    const contextNote = language === "ar" ? t("note." + dustCaseId) : text.contextNote;
+    byId("context-note").textContent = showFrame ? contextNote : visualLink.note;
 
     // Pair the one-shot renderer callback with this exact, locked submission.
     const applyReveal = visual?.prepareReveal?.();
@@ -436,18 +427,14 @@ export async function mountDecode(root, {
       getState: () => playback.withActiveCell(session.getState()),
       subscribe: listener => session.subscribe(snapshot => listener(playback.withActiveCell(snapshot))),
     };
-    function accessibilitySnapshot(snapshot) {
-      const { visualLink } = snapshot;
-      return visualLink ? { ...snapshot, visualLink: { ...visualLink, note: localizedVisualNote(visualLink) } } : snapshot;
-    }
-    const accessibilitySession = {
-      ...rendererSession,
-      getState: () => accessibilitySnapshot(rendererSession.getState()),
-      subscribe: listener => rendererSession.subscribe(snapshot => listener(accessibilitySnapshot(snapshot))),
-    };
-    // The grid remains the only interactive map. Integration decorates the existing cells
-    // from the transport snapshot, including silent slots, without moving focus.
-    grid = mountDecodeAccessibility(byId("grid"), accessibilitySession, { language });
+    // Fixtures have no visual source. Supply their test-data label through the grid's translator.
+    const translateGrid = caseData.fixture ? (key, params) => {
+      if (key === "note." + caseData.id) return text.fixtureNote;
+      if (key === "reveal.relation.RELATED_CONTEXT") return "";
+      return t(key, params);
+    } : t;
+    // Keep one interactive grid and decorate its existing buttons from the session.
+    grid = mountDecodeGrid(byId("grid"), rendererSession, { t: translateGrid });
     const gridRoot = byId("grid");
     function labelCells(cols) {
       cellButtons.splice(0, cellButtons.length, ...gridRoot.querySelectorAll(".dg-cell"));

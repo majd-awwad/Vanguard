@@ -37,13 +37,15 @@ The grid announces the transition from `playing` to `ended` once per run, using 
 
 ### Reveal handoff
 
-Keep `DecodeCase.visualLink.note` as the source's provenance text. The integration supplies the Arabic equivalent for the production dust case to the presentation and live region. Synthetic fixtures get an explicit test-data message in the UI language even though their relation is also `RELATED_CONTEXT`. The relation can supply a generic label, while case-specific details need a faithful translation.
+Keep `DecodeCase.visualLink.note` as the source provenance. The grid announces the localized relation before the note. The dust case's approved Arabic translation lives in `web/i18n/decode-messages.js` under `note.<case-id>`, shared by the integrated evidence panel and grid. Mark untranslated English notes with `lang="en"`. For synthetic fixtures, the combined page supplies a localized test-data note and omits the imagery relation label.
 
 After the session publishes a locked Discovery Reveal snapshot, integration derives the cell markers from that snapshot's guesses and evidence cells. In v2 a `measured` status is at or above the case threshold. An exact match is correct, an unmatched guess is incorrect, and an unguessed threshold cell is missed. This follows the session's default zero-tolerance score. A missing value is still labelled missing in the evidence table.
 
 Integration calls `prepareReveal()` once for the new Reveal and immediately applies the returned callback using that snapshot's outcomes. `#decode-outcome-labels` is inside the accessible evidence section, outside the inert SVG. Setup may return `null`. The visual mount invalidates older callbacks when the phase, case or level changes. On Reset or explicit case selection integration calls `clearReveal()` before dispatch. Older visual mounts can omit these methods. The numeric evidence table and separate links for the GEOS-FP data and SVS context frame are available after Reveal.
 
 ## Validation and sources
+
+DecodeCase v2 provides two precomputed levels: Quick 3 × 4 and Advanced 6 × 8. They cover the same bounds. The loader reads both levels from the case JSON. The session can select either level. The combined dust page starts in Quick.
 
 The validator accepts the truth rule literal `value >= threshold`. Quick uses either `mean of 2x2 advanced cells` for continuous data or `sum of 2x2 advanced cells` for intermittent counts. Each Quick cell is missing if any child is missing. Use one threshold across levels and recompute the truth for each level. Grids are rectangular, equally subdivided in WGS84 and ordered north-to-south, west-to-east. Source granule IDs stay strings; record authenticated download links, checksums, QA and native-to-advanced aggregation in the science provenance. Propose any additional rule explicitly before using it in a case.
 

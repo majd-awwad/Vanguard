@@ -106,6 +106,7 @@ try {
     const grid = page.getByRole("grid");
     const cells = grid.getByRole("gridcell");
     assert.equal(await grid.count(), 1);
+    assert.equal(await grid.getAttribute("aria-multiselectable"), "true");
     assert.equal(await cells.count(), 12);
     assert.equal(await grid.locator('[tabindex="0"]').count(), 1);
     const a11yBefore = await grid.ariaSnapshot();
@@ -125,6 +126,7 @@ try {
     assert.equal(await page.locator(":focus").getAttribute("data-row"), "1");
     await page.keyboard.press("Space");
     assert.equal(await page.locator(":focus").getAttribute("aria-pressed"), "true");
+    assert.equal(await page.locator(":focus").getAttribute("aria-selected"), "true");
     assert.match(await page.locator("#decode-selections").textContent(), /1|١/);
     await page.keyboard.press("Enter");
     assert.match(await page.locator("#decode-probe-reading").textContent(), language === "ar" ? /صامت/ : /Silent/);
@@ -153,10 +155,17 @@ try {
     await page.locator(".dg-cell[data-row='1'][data-col='1']").focus();
     assert.match(await page.locator("#decode-source").getAttribute("href"), /^https:\/\/portal\.nccs\.nasa\.gov\//);
     assert.equal(await page.locator("#decode-context").getAttribute("href"), "https://svs.gsfc.nasa.gov/5669/");
-    assert.match(await page.locator("#decode-context-note").textContent(), language === "ar" ? /منفصلًا/ : /separate/);
+    const selectedCell = await page.locator(":focus").ariaSnapshot();
+    assert.match(selectedCell, /\[selected\]/);
+    const sourceNote = await page.locator("#decode-context-note").textContent();
+    assert.match(sourceNote, language === "ar" ? /تشغيل منفصل/ : /separate/);
     const announcement = await page.locator("#decode-status").textContent();
     assert.match(announcement, language === "ar" ? /النتيجة/ : /Results:/);
-    if (language === "ar") assert.match(announcement, /إطارًا منفصلًا/);
+    if (language === "ar") {
+      const relationOffset = announcement.indexOf("سياق علمي مرتبط");
+      assert.ok(relationOffset >= 0 && announcement.indexOf(sourceNote) > relationOffset);
+      assert.doesNotMatch(announcement, /Numerical data/);
+    }
     assert.equal(await page.locator(".decode-map-geography path").count(), 0);
     assert.deepEqual(await page.locator(".decode-reveal-markers > text").allTextContents(), ["–", "✓", "–", "–", "–"]);
     const outcomes = page.locator("#decode-outcome-labels li");
@@ -181,6 +190,7 @@ try {
     assert.equal(layout.fits, true);
     await page.keyboard.press("Space");
     assert.equal(await page.locator(":focus").getAttribute("aria-pressed"), "true");
+    assert.equal(await page.locator(":focus").getAttribute("aria-selected"), "true");
     await click("restart");
     assert.equal(await page.evaluate(() => window.clearRevealCalls), 1);
     assert.equal(await page.locator("[data-evidence]").count(), 0);
@@ -237,8 +247,10 @@ try {
     assert.equal(await page.locator("#decode-context-image").getAttribute("src"), null);
     assert.match(await page.locator("#decode-readings").textContent(), language === "ar" ? /القراءة مفقودة/ : /Missing reading/);
     const announcement = await page.locator("#decode-status").textContent();
-    assert.match(announcement, language === "ar" ? /الحالة ما فيها صورة أو قياسات من ناسا/ : /has no NASA frame or measurements/i);
+    assert.match(announcement, language === "ar" ? /الحالة ما فيها صورة أو قياسات من ناسا/ : /No NASA frame or measurements/i);
     if (language === "ar") assert.doesNotMatch(announcement, /Synthetic test data/i);
+    assert.doesNotMatch(announcement, /provides related context|سياق علمي مرتبط/);
+    assert.equal(await page.locator("#decode-status [lang=en]").count(), 0);
     await page.close();
     console.log("Decode fixture provenance, missing readings and localized Reveal: " + language + " passed.");
   }
