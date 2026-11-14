@@ -1,0 +1,74 @@
+/* Page-level styling for web/decode-3d.html. Loaded after the shared Decode styles, which stay untouched. */
+
+.cinematic-tagline {
+  margin-block: -.25rem 1rem;
+  color: var(--decode-muted, var(--sub));
+  font: 1.05rem/1.4 var(--serif);
+  letter-spacing: .01em;
+}
+
+/* The globe replaces the flat map. Its aspect follows the case's geographic bounds (--earth-ratio is set by the
+   mount) so the plate carree view is not stretched, and the grid below stays exactly registered to it. */
+#decode-stage[data-renderer="webgl"] {
+  background: #04070b;
+}
+
+#decode-stage[data-renderer="webgl"] #decode-visual canvas {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] #decode-grid[role="grid"] {
+  min-block-size: clamp(11rem, calc(100cqi * var(--earth-ratio, .4286)), 30rem);
+}
+
+/* The 3D layer draws the selection, playhead and outcome marks, so the buttons stay transparent and only keep
+   their focus ring, text label and hit area. Their colours would otherwise cover the globe. */
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell,
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell:hover,
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell[aria-pressed="true"],
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell[data-playing],
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell[data-evidence] {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell[data-playing]::after {
+  content: none;
+}
+
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell:hover {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .45);
+}
+
+#decode-map[data-live] #decode-stage[data-renderer="webgl"] .dg-cell {
+  color: #f4f8fb;
+  text-shadow: 0 1px 3px rgb(0 0 0 / .9), 0 0 2px rgb(0 0 0 / .9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #decode-stage[data-renderer="webgl"] #decode-visual canvas {
+    transition: none;
+  }
+}
+
+/* Outcome key shown after Reveal; the shared teal-cell key is replaced because the globe tints by outcome. */
+#decode-map[data-live]:has(#decode-stage[data-renderer="webgl"]) #decode-map-key {
+  display: none;
+}
+
+.cinematic-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1rem;
+  justify-content: center;
+  padding: .28rem .35rem;
+  font-size: .81rem;
+  color: var(--decode-muted, var(--sub));
+}
+
+.cinematic-key-correct { color: #2dd4bf; }
+.cinematic-key-incorrect { color: #ff6f9f; }
+.cinematic-key-missed { color: #d9dcff; }
