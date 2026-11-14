@@ -10,7 +10,10 @@ try {
     const page = await browser.newPage({ viewport: { width: 375, height: 700 }, reducedMotion: "reduce" });
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
+    // This fixture mounts its own session and isolates it from page bootstrap.
+    await page.route("**/audio/spatial-plan.js", route => route.fulfill({ status: 404, body: "" }));
     await page.goto(url);
+    await page.waitForFunction(() => /waiting for/.test(document.querySelector("#decode-state").textContent));
     await page.evaluate(async lang => {
       const { mountDecodeAccessibility } = await import("./decode.js");
       document.documentElement.lang = lang;

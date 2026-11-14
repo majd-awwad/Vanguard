@@ -149,6 +149,16 @@ export type VisualMountOptions = {
   t: Translate;
   geography?: DecodeGeography;
 };
-export type MountDecodeVisual = (root: HTMLElement, session: DecodeSession, options: VisualMountOptions) =>
-  { dispose(): void }; // Roaa
+export type DecodeRevealOutcome = {
+  row: number;
+  col: number;
+  outcome: "correct" | "incorrect" | "missed";
+};
+export type ApplyDecodeReveal = (outcomes: DecodeRevealOutcome[], evidenceRoot: HTMLElement,
+  formatLabel: (outcome: DecodeRevealOutcome["outcome"], row: number, col: number) => string) => boolean;
+export type MountDecodeVisual = (root: HTMLElement, session: DecodeSession, options: VisualMountOptions) => {
+  dispose(): void;
+  prepareReveal?(): ApplyDecodeReveal | null;
+  clearReveal?(): void;
+}; // Roaa
 export type DecodeMessage = (lang: "ar" | "en", ...args: Parameters<Translate>) => string; // Israa

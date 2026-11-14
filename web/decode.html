@@ -6,17 +6,12 @@
   <title>Decode · EARTHPULSE</title>
   <link rel="icon" href="./assets/atlas/pulse.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./visual/platform.css">
+  <link rel="stylesheet" href="./visual/decode.css">
   <style>
-    #decode-stage { position: relative; }
     #decode-visual { pointer-events: none; }
-    #decode-grid .dg-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    #decode-grid[data-cols="8"] .dg-row { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-    #decode-grid .dg-cell { min-block-size: 2.75rem; border: 1px solid currentColor; }
-    #decode-grid .dg-cell[aria-pressed="true"] { background: #c4f982; color: #122115; }
-    #decode-grid .dg-cell:focus-visible { outline: 3px solid #50d8fa; outline-offset: -4px; }
     #decode-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-block: 1rem; }
-    #decode-evidence table { border-collapse: collapse; margin-block: 1rem; }
-    #decode-evidence th, #decode-evidence td { padding: .35rem; border: 1px solid currentColor; text-align: start; }
+    #decode-evidence table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-block: 1rem; }
+    #decode-evidence th, #decode-evidence td { padding: .35rem; border: 1px solid currentColor; text-align: start; overflow-wrap: anywhere; }
   </style>
 </head>
 <body>
@@ -48,6 +43,7 @@
     <p id="decode-status" role="status" aria-live="polite"></p>
     <section id="decode-evidence" aria-labelledby="decode-phase" hidden>
       <p id="decode-score"></p>
+      <div id="decode-outcome-labels"></div>
       <table>
         <thead><tr>
           <th scope="col" id="decode-positions"></th>

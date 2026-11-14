@@ -29,7 +29,11 @@ In Discovery before Reveal, cells contain only `row`, `col`, `lat` and `lon`. Ke
 
 The integration layer publishes `snapshot.activeCell` as zero-based `[row, col]` or `null`. Treat absence in older session snapshots as `null`. `web/decode.js` resolves the event privately against the currently loaded plan using `transport.activeEventId` and matching `planRevision`, case and level. A silent slot has the same timing rules as a sounding slot. Clear the highlight while idle, starting, paused, seeking, in pre-roll, at the end, during Legend, or when revision or cell identity does not match. Resume from the next published playing snapshot. Neither renderer receives the plan or changes grid focus to follow playback.
 
-For the dust MVP, the combined page mounts after the session is ready. A native table provides numeric evidence after Reveal, with independent links for the data source and the SVS context frame. The fields for per-cell grades and units remain outside the shared renderer snapshot. Non-interactive drawing stays aria-hidden.
+### Reveal handoff
+
+After the session publishes a locked Discovery Reveal snapshot, integration derives the cell markers from that snapshot's guesses and evidence cells. In v2 a `measured` status is at or above the case threshold. An exact match is correct, an unmatched guess is incorrect, and an unguessed threshold cell is missed. This follows the session's default zero-tolerance score. A missing value is still labelled missing in the evidence table.
+
+Integration calls `prepareReveal()` once for the new Reveal and immediately applies the returned callback using that snapshot's outcomes. `#decode-outcome-labels` is inside the accessible evidence section, outside the inert SVG. Setup may return `null`. The visual mount invalidates older callbacks when the phase, case or level changes. On Reset or explicit case selection integration calls `clearReveal()` before dispatch. Older visual mounts can omit these methods. The numeric evidence table and separate links for the GEOS-FP data and SVS context frame are available after Reveal.
 
 ## Validation and sources
 

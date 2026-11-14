@@ -110,6 +110,26 @@ export function createDecodePlayback(transport) {
   };
 }
 
+const revealLabels = {
+  correct: "reveal.selection.correct",
+  incorrect: "reveal.selection.false",
+  missed: "reveal.selection.missed",
+};
+
+function revealOutcomes(snapshot) {
+  const guesses = new Set(snapshot.guesses.map(([row, col]) => row * snapshot.grid.cols + col));
+  const outcomes = [];
+  for (const { row, col, status } of snapshot.grid.cells) {
+    const chosen = guesses.has(row * snapshot.grid.cols + col);
+    if (status === "measured") {
+      outcomes.push({ row, col, outcome: chosen ? "correct" : "missed" });
+    } else if (chosen) {
+      outcomes.push({ row, col, outcome: "incorrect" });
+    }
+  }
+  return outcomes;
+}
+
 function evidenceRows(document, cells, text, t, format) {
   return cells.map(({ row, col, value, status }) => {
     const tr = document.createElement("tr");
@@ -148,6 +168,7 @@ export async function mountDecode(root, {
   const submit = byId("submit");
   const restart = byId("restart");
   const evidence = byId("evidence");
+  const outcomeLabels = byId("outcome-labels");
   const source = byId("source");
   const context = byId("context");
   const frame = byId("frame");
@@ -202,6 +223,11 @@ export async function mountDecode(root, {
     frame.hidden = !/^https:\/\//.test(visualLink.image);
     if (!frame.hidden) frame.href = visualLink.image;
     byId("context-note").textContent = caseData.fixture ? visualLink.note : text.contextNote;
+
+    // Pair the one-shot renderer callback with this exact, locked submission.
+    const applyReveal = visual?.prepareReveal?.();
+    applyReveal?.(revealOutcomes(snapshot), outcomeLabels, (outcome, row, col) =>
+      t("grid.position", { row: row + 1, col: col + 1 }) + ". " + t(revealLabels[outcome]) + ".");
   }
 
   function dispose() {
@@ -241,6 +267,7 @@ export async function mountDecode(root, {
 
     const rendererSession = {
       dispatch(intent) {
+        if (intent.type === "reset" || intent.type === "select-case") visual?.clearReveal?.();
         if (intent.type === "next" || intent.type === "submit") session.dispatch({ type: "pause" });
         return session.dispatch(intent);
       },
