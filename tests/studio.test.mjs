@@ -301,7 +301,9 @@ test("the computed difference is second minus first and refuses different builds
   assert.ok(published.values.every((v, i) => Math.abs(v - cmp.values[i]) < 1e-9), "computed matches the published file");
   assert.throws(() => compareDustSnapshots(byDate("2025-01-15"), a));
   // Missing propagates: never zero, never "no change".
-  const withHole = { ...a, values: a.values.map((v, i) => (i === 7 ? null : v)) };
+  const holeValues = a.values.map((v, i) => (i === 7 ? null : v));
+  const known = holeValues.filter((v) => v !== null);
+  const withHole = { ...a, values: holeValues, statistics: { valid: known.length, missing: 1, min: Math.min(...known), max: Math.max(...known) } };
   assert.equal(compareDustSnapshots(withHole, b).values[7], null);
 });
 
