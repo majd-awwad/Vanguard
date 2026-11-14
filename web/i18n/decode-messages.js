@@ -162,9 +162,14 @@ const messages = {
   },
   'reveal.relation.RELATED_CONTEXT': {
     en: 'The image provides related context for this case.',
-    ar: 'توفّر الصورة سياقًا مرتبطًا بهذه الحالة.',
+    ar: 'سياق علمي مرتبط، وليس تطابقًا في البيانات',
   },
   'reveal.visualLinkNote': { en: '{note}', ar: '{note}' },
+  'note.dust-geos-fp-20250819-1930-north-africa-med': {
+    en: 'Numerical data are standard GEOS-FP 0.25-degree latitude by 0.3125-degree longitude assimilation, a three-hour mean from 18:00 to 21:00 UTC centered at 19:30 UTC on 2025-08-19. SVS 5669 uses a separate GEOS-FP 2 km Replay at 20:00 UTC. These are related scientific context, not the same visualization dataset or instantaneous field.',
+    ar: 'البيانات العددية مأخوذة من نظام GEOS-FP القياسي لاستيعاب بيانات الغلاف الجوي، بدقة مكانية تبلغ 0.25 درجة في خط العرض و0.3125 درجة في خط الطول. وتمثل متوسطًا زمنيًا لثلاث ساعات، من 18:00 إلى 21:00 بالتوقيت العالمي المنسق (UTC)، ومركز الفترة الزمنية هو الساعة 19:30 بتاريخ 19 أغسطس 2025.\n\nأما مرئية NASA SVS 5669 فتعتمد على تشغيل منفصل من نموذج GEOS-FP بدقة 2 كيلومتر (Replay)، عند الساعة 20:00 UTC.\n\nلذلك، توجد علاقة علمية وسياقية بين المصدرين، لكنهما لا يمثلان مجموعة البيانات نفسها المستخدمة في المرئية، ولا الحقل الجوي اللحظي نفسه.',
+  },
+  'general.languageCode': { en: 'en', ar: 'ar' },
   'general.loading': { en: 'Loading case…', ar: 'جارٍ تحميل الحالة…' },
   'general.error': { en: 'The case could not be loaded.', ar: 'تعذّر تحميل الحالة.' },
   'general.retry': { en: 'Try again', ar: 'حاول مرة ثانية' },
