@@ -7,6 +7,7 @@ export const NAV_ITEMS = Object.freeze([
   { id: "home", path: "index.html" },
   { id: "decode", path: "decode-3d.html" },
   { id: "explore", path: "pages/explore.html" },
+  { id: "studio", path: "pages/studio.html" },
   { id: "sound", path: "pages/sound-lab.html" },
   { id: "science", path: "pages/science.html" },
   { id: "about", path: "pages/about.html" },
@@ -14,8 +15,8 @@ export const NAV_ITEMS = Object.freeze([
 export const SETTINGS_PATH = "pages/settings.html";
 
 export const navText = {
-  en: { label: "Main", menu: "Menu", home: "Home", decode: "Decode", explore: "Explore Earth", sound: "Sound Lab", science: "Science & Dataset", about: "About", settings: "Accessibility & Settings", language: "Language", skip: "Skip to the content" },
-  ar: { label: "التنقل الرئيسي", menu: "القائمة", home: "الرئيسية", decode: "فك الشيفرة", explore: "استكشف الأرض", sound: "مختبر الصوت", science: "العلوم والبيانات", about: "حول", settings: "إمكانية الوصول والإعدادات", language: "اللغة", skip: "تخطَّ إلى المحتوى" },
+  en: { label: "Main", menu: "Menu", home: "Home", decode: "Decode", explore: "Explore Earth", studio: "Sound Studio", sound: "Sound Lab", science: "Science & Dataset", about: "About", settings: "Accessibility & Settings", language: "Language", skip: "Skip to the content" },
+  ar: { label: "التنقل الرئيسي", menu: "القائمة", home: "الرئيسية", decode: "فك الشيفرة", explore: "استكشف الأرض", studio: "استوديو الصوت", sound: "مختبر الصوت", science: "العلوم والبيانات", about: "حول", settings: "إمكانية الوصول والإعدادات", language: "اللغة", skip: "تخطَّ إلى المحتوى" },
 };
 
 /** `from` is where the current page lives: "root" (web/) or "pages" (web/pages/). */
