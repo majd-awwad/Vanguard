@@ -160,6 +160,69 @@ test("row, cell and sequential contrast preserve selection order", () => {
   }
 });
 
+test("all contract invocation shapes produce complete events with data-independent IDs", () => {
+  for (const fixture of fixtures) for (const level of ["quick", "advanced"]) {
+    const data = structuredClone(fixture);
+    // Selection and sweep must use coordinates, not the array's storage order.
+    data.levels[level].cells.reverse();
+    const { rows, cols } = data.levels[level];
+    const selectedRow = rows - 1;
+    const selected = [[selectedRow, cols - 1], [0, 0]];
+    const invocations = [
+      [{ level, mode: "legend" }, null],
+      [{ level, mode: "sweep" }, Array.from({ length: rows * cols }, (_, i) => [i % rows, Math.floor(i / rows)])],
+      [{ level, mode: "row", row: selectedRow }, Array.from({ length: cols }, (_, col) => [selectedRow, col])],
+      [{ level, mode: "cell", cells: [selected[0]] }, [selected[0]]],
+      [{ level, mode: "contrast", cells: selected }, selected],
+      [{ level, mode: "contrast", cells: [selected[0], selected[0]] }, [selected[0], selected[0]]],
+    ];
+    const changed = structuredClone(data);
+    changed.id = "hidden-value-999-status-missing-silent";
+    changed.behavior = data.behavior === "continuous" ? "intermittent" : "continuous";
+    changed.levels[level].cells.forEach(cell => Object.assign(cell, {
+      value: cell.status === "missing" ? 999 : null,
+      status: cell.status === "missing" ? "measured" : "missing", eventCount: 0,
+    }));
+    for (const [options, positions] of invocations) {
+      const plan = makeSpatialPlan(data, options);
+      if (positions) assert.deepEqual(plan.events.map(e => [e.row, e.col]), positions);
+      else assert.equal(plan.events.length, 6);
+      assert.deepEqual(plan.events.map(e => e.id), plan.events.map((_, i) => `ev-${i}`));
+      assert.deepEqual(makeSpatialPlan(changed, options).events.map(e => e.id), plan.events.map(e => e.id));
+      for (const event of plan.events) {
+        assert.deepEqual(Object.keys(event).sort(), ["id", "onsetS", "row", "col", "tone", "evidence"].sort());
+        assert.ok(Number.isFinite(event.onsetS));
+        assert.ok(event.tone === null || typeof event.tone === "object");
+        assert.equal(event.evidence.row, event.row);
+        assert.equal(event.evidence.col, event.col);
+        if (event.evidence.status !== "measured") assert.equal(event.tone, null);
+      }
+    }
+  }
+});
+
+test("heardClass agrees with planned silence and output gain for every data mode", () => {
+  const boundaryCase = calibrated([0, 0.04, 1 / 9, 0.25, 4 / 9, 1]);
+  for (const data of [...fixtures, boundaryCase]) for (const level of ["quick", "advanced"]) {
+    const sweep = makeSpatialPlan(data, { level, mode: "sweep" });
+    for (const event of sweep.events) {
+      const { row, col } = event;
+      const heard = heardClass(data, level, row, col);
+      const amplitude = event.tone ? event.tone.gain / GAIN_CEILING : 0;
+      assert.equal(heard, amplitude === 0 ? "silent" : amplitude < 1 / 3 ? "low" : amplitude < 2 / 3 ? "mid" : "high");
+      if (event.evidence.status !== "measured") assert.equal(heard, "silent");
+      for (const options of [
+        { mode: "row", row }, { mode: "cell", cells: [[row, col]] },
+        { mode: "contrast", cells: [[row, col], [row, col]] },
+      ]) {
+        const selected = makeSpatialPlan(data, { level, ...options }).events.filter(e => e.row === row && e.col === col);
+        assert.ok(selected.length > 0);
+        selected.forEach(e => assert.deepEqual(e.tone, event.tone));
+      }
+    }
+  }
+});
+
 test("invalid modes, coordinates, grids and parameters reject explicitly", () => {
   for (const options of [
     { mode: "bad" }, { level: "bad" }, { mode: "row", row: -1 }, { mode: "row", row: 3 },
@@ -230,6 +293,22 @@ function audioHarness({ stereo = true, refuses = false } = {}) {
     requestFrame: callback => { frame = callback; return 1; }, cancelFrame: () => { frame = undefined; } });
   return { nodes, context, transport, advance(seconds) { context.currentTime += seconds; frame?.(); } };
 }
+
+test("transport exposes opaque IDs for silent and audible spatial events across revisions", async () => {
+  const data = calibrated([0, 0.25]);
+  const plan = makeSpatialPlan(data, { level: "advanced", mode: "contrast", cells: [[0, 0], [0, 1]] });
+  assert.equal(plan.events[0].tone, null);
+  const harness = audioHarness();
+  harness.transport.load(plan);
+  await harness.transport.play();
+  assert.equal(harness.transport.snapshot().activeEventId, "ev-0");
+  assert.equal(harness.nodes.filter(n => n.kind === "oscillator").length, 1);
+  harness.advance(0.84);
+  assert.equal(harness.transport.snapshot().activeEventId, "ev-1");
+  harness.transport.load(makeSpatialPlan(data, { mode: "legend" }));
+  assert.equal(harness.transport.snapshot().activeEventId, "ev-0");
+  assert.equal(harness.transport.snapshot().planRevision, 2);
+});
 
 test("transport routes continuous and crackle voices through stereo pan and cleans nodes", async () => {
   for (const data of fixtures) {

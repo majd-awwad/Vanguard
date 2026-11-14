@@ -163,7 +163,10 @@ Level defaults to Quick, mode to sweep, waveform to sine. Unknown levels/modes,
 unsupported waveforms, out-of-bounds/fractional coordinates, wrong selection
 counts, incomplete grids, duplicate cells and malformed cells reject explicitly.
 Grid storage order is not assumed. Contrast may repeat a cell; event IDs remain
-unique within the plan.
+unique within the plan. Every mode uses opaque, sequential IDs (`ev-0`, `ev-1`,
+etc.), including silent and synthetic events. IDs never encode case metadata,
+coordinates, values, statuses, calibration labels or audibility. IDs are local
+to a plan; consumers must pair them with `transport.planRevision` across loads.
 
 Yaman can pass `makeSpatialPlan` as `makePlan` and `heardClass` into the session
 factory specified in the shared contract. Majd owns connecting imports and UI
@@ -171,6 +174,12 @@ handlers. Their files have not been edited. The transport already accepts the v2
 plan and returns its event IDs in snapshots. All legacy pulse/envelope behavior,
 volume/mute controls, playback clocks, silent playback, revision handling and
 cancellation remain in place. No Decode page has been integrated by this change.
+`web/experiences/decode/session.js` is absent on this branch, so compatibility
+has been checked against the shared factory contract and transport, not a running
+Decode Session. Yaman must supply the session and Majd must connect the page.
+The shared DOM contract still calls for agreement on a public event-ID-to-cell
+mapping; UI consumers must not parse IDs or receive private event evidence to
+locate the playhead.
 
 `voices.js` also exports `continuousVoice(parameters)` and
 `crackleVoice({ ...parameters, eventCount })` for reuse. Parameters are
