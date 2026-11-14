@@ -18,6 +18,7 @@ try {
     const page = await browser.newPage({ viewport: { width: 375, height: 700 }, reducedMotion: "reduce" });
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
+    await page.route("https://svs.gsfc.nasa.gov/**", route => route.abort());
     await hideSoundModule(page);
     await page.goto(url.href);
     await page.waitForFunction(() => /waiting for|بانتظار/.test(document.querySelector("#decode-state").textContent));
@@ -28,7 +29,12 @@ try {
       const { mountDecode } = await import("./decode.js");
       const { createTransport } = await import("./audio/transport.js");
       const { mountDecodeVisual } = await import("./visual/decode-visual.js");
-      const transport = createTransport({ createContext() { throw new Error("Unexpected audio in test"); } });
+      let seconds = 0;
+      window.advanceDecodeClock = () => { seconds += 61; };
+      const transport = createTransport({
+        now: () => seconds,
+        createContext() { throw new Error("Unexpected audio in test"); },
+      });
       function makePlan(data, { level, mode }) {
         return {
           caseId: data.id, level, mode, mappingVersion: "test-only", durationS: 60,
@@ -123,6 +129,14 @@ try {
     await page.keyboard.press("Enter");
     assert.match(await page.locator("#decode-probe-reading").textContent(), language === "ar" ? /صامت/ : /Silent/);
     assert.equal(await page.locator(":focus").getAttribute("data-col"), "1");
+    await page.keyboard.press("l");
+    await page.evaluate(() => window.advanceDecodeClock());
+    const completedLegend = language === "ar" ? "اكتملت معايرة الصوت." : "Sound calibration complete.";
+    await page.waitForFunction(message => document.querySelector("#decode-status").textContent === message, completedLegend);
+    await page.keyboard.press("p");
+    await page.evaluate(() => window.advanceDecodeClock());
+    const completedSweep = language === "ar" ? "اكتمل المسح الصوتي." : "Spatial sweep complete.";
+    await page.waitForFunction(message => document.querySelector("#decode-status").textContent === message, completedSweep);
     await page.keyboard.press("s");
     await page.locator("#decode-evidence").waitFor({ state: "visible" });
     assert.equal(await page.locator("#decode-readings tr").count(), 12);
@@ -199,29 +213,35 @@ try {
   for (const level of Object.values(data.levels)) {
     level.truth.present = level.truth.present.filter(([row, col]) => row !== 0 || col !== 0);
   }
-  const page = await browser.newPage();
-  await hideSoundModule(page);
-  await page.goto(base.href);
-  await page.waitForFunction(() => /waiting for/.test(document.querySelector("#decode-state").textContent));
-  await page.evaluate(async data => {
-    const { mountDecode } = await import("./decode.js");
-    const { validateDecodeCase } = await import("./contracts/validate.js");
-    window.decodeTest = await mountDecode(document.querySelector("#decode-page"), {
-      caseId: data.id, loadCase: async () => validateDecodeCase(data),
-      makePlan: (data, { level, mode }) => ({ caseId: data.id, level, mode, durationS: 0, events: [] }),
-      heardClass: () => "silent", testPlayback: true,
-    });
-  }, data);
-  assert.match(await page.locator("#decode-notice").textContent(), /synthetic demonstration data/i);
-  await page.locator("#decode-next").click();
-  await page.locator("#decode-next").click();
-  await page.locator("#decode-next").click();
-  await page.locator("#decode-submit").click();
-  assert.equal(await page.locator("#decode-source").getAttribute("href"), null);
-  assert.equal(await page.locator("#decode-frame").getAttribute("href"), null);
-  assert.match(await page.locator("#decode-readings").textContent(), /Missing reading/);
-  console.log("Decode fixture provenance and missing readings passed.");
-  await page.close();
+  for (const language of ["en", "ar"]) {
+    const page = await browser.newPage();
+    const url = new URL(base);
+    url.searchParams.set("lang", language);
+    await hideSoundModule(page);
+    await page.goto(url.href);
+    await page.waitForFunction(() => /waiting for|بانتظار/.test(document.querySelector("#decode-state").textContent));
+    await page.evaluate(async ({ data, language }) => {
+      const { mountDecode } = await import("./decode.js");
+      const { validateDecodeCase } = await import("./contracts/validate.js");
+      await mountDecode(document.querySelector("#decode-page"), {
+        language, caseId: data.id, loadCase: async () => validateDecodeCase(data),
+        makePlan: (data, { level, mode }) => ({ caseId: data.id, level, mode, durationS: 0, events: [] }),
+        heardClass: () => "silent", testPlayback: true,
+      });
+    }, { data, language });
+    assert.match(await page.locator("#decode-notice").textContent(), language === "ar" ? /اصطناعية/ : /synthetic demonstration data/i);
+    for (let step = 0; step < 3; step++) await page.locator("#decode-next").click();
+    await page.locator("#decode-submit").click();
+    assert.equal(await page.locator("#decode-source").getAttribute("href"), null);
+    assert.equal(await page.locator("#decode-frame").getAttribute("href"), null);
+    assert.equal(await page.locator("#decode-context-image").getAttribute("src"), null);
+    assert.match(await page.locator("#decode-readings").textContent(), language === "ar" ? /القراءة مفقودة/ : /Missing reading/);
+    const announcement = await page.locator("#decode-status").textContent();
+    assert.match(announcement, language === "ar" ? /الحالة ما فيها صورة أو قياسات من ناسا/ : /has no NASA frame or measurements/i);
+    if (language === "ar") assert.doesNotMatch(announcement, /Synthetic test data/i);
+    await page.close();
+    console.log("Decode fixture provenance, missing readings and localized Reveal: " + language + " passed.");
+  }
 
   const bootstrap = await browser.newPage();
   await bootstrap.route("**/audio/spatial-plan.js", route => route.fulfill({

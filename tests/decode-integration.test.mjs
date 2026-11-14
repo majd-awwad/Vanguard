@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { createTransport } from "../web/audio/transport.js";
@@ -114,4 +115,10 @@ test("the renderer highlight follows the transport through pause, seek, and plan
   assert.equal(project(first).activeCell, null);
   assert.deepEqual(state().activeCell, [0, 0]);
   assert.equal("evidence" in state(), false);
+});
+
+test("the locally packaged NASA context frame matches its recorded WebP checksum", async () => {
+  const image = await readFile(new URL("../web/assets/decode/svs-5669-context.webp", import.meta.url));
+  const checksum = createHash("sha256").update(image).digest("hex");
+  assert.equal(checksum, "abece93664d0966265da5819b6844a7b9dd9aac17aded9c84a0076f80d72b30a");
 });

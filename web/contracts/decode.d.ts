@@ -100,6 +100,8 @@ type SessionGrid<T> = { rows: number; cols: number; cells: T[] };
 type SessionBase = { caseId: string; behavior: DecodeCase["behavior"]; level: Level; condition: Condition;
   focus: CellPosition; guesses: CellPosition[]; expectedCount: number;
   lastProbe: null | { row: number; col: number; heard: Heard }; planRevision: number; transport: TransportSnapshot;
+  /** Mode of the plan for planRevision; null before a case's plan loads. Older sessions may omit it. */
+  playMode?: SpatialPlan["mode"] | null;
   /** Always present in the integrated renderer view. Older session views may omit it. */
   activeCell?: readonly [row: number, col: number] | null };
 

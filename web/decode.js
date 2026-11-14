@@ -80,7 +80,7 @@ const copy = {
 const systemCopy = {
   en: {
     awaitingAudio: "The dust case is ready. This experience is waiting for the spatial audio module.",
-    playbackComplete: "Playback complete.",
+    fixtureNote: "Synthetic test data only. The case has no NASA frame or measurements.",
     unavailable: "Audio could not start. Check your audio settings and try again.",
     testAudio: "Integration test: simulated playback. It does not represent the sound of NASA data.",
 
@@ -99,7 +99,7 @@ const systemCopy = {
   },
   ar: {
     awaitingAudio: "حالة الغبار جاهزة. التجربة بانتظار توصيل وحدة الصوت المكاني.",
-    playbackComplete: "اكتمل التشغيل.",
+    fixtureNote: "بيانات اصطناعية للاختبار فقط. الحالة ما فيها صورة أو قياسات من ناسا.",
     unavailable: "تعذّر تشغيل الصوت. تحقّق من إعدادات الصوت وحاول مرة ثانية.",
     testAudio: "اختبار دمج: التشغيل محاكى. هذا التشغيل لا يمثّل صوت بيانات ناسا.",
 
@@ -114,7 +114,7 @@ const systemCopy = {
     context: "سياق الحدث من NASA SVS 5669",
     frame: "افتح إطار SVS المنفصل",
     evidence: "نتائج نموذج GEOS-FP من {start} إلى {end} بالتوقيت العالمي UTC.",
-    contextNote: "يعرض SVS 5669 إطارًا منفصلًا من تشغيل GEOS-FP Replay بدقّة ٢ كم عند الساعة ٢٠:٠٠ بالتوقيت العالمي. الشبكة والصوت مبنيّان على متوسط ثلاث ساعات من تشغيل GEOS-FP القياسي.",
+    contextNote: "قيم الشبكة والصوت من تشغيل GEOS-FP القياسي لاستيعاب البيانات، بدقّة 0.25 درجة عرض و0.3125 درجة طول. القيم متوسط ثلاث ساعات من 18:00 إلى 21:00 بالتوقيت العالمي في 19 آب 2025، ومركز الفترة 19:30. يعرض SVS 5669 إطارًا منفصلًا من تشغيل GEOS-FP Replay بدقّة ٢ كم عند الساعة 20:00 بالتوقيت العالمي. الإطار للسياق العلمي، وله بياناته الخاصة وتوقيته اللحظي.",
   },
 };
 
@@ -261,7 +261,7 @@ export async function mountDecode(root, {
   let lastChoiceText;
   let lastProbeText;
   let caseData;
-  let grid, visual, stopRendering, stopEndAnnouncement;
+  let grid, visual, stopRendering;
   const handlers = new AbortController();
   const playback = createDecodePlayback(transport);
   const session = createDecodeSession({
@@ -272,6 +272,15 @@ export async function mountDecode(root, {
       return caseData;
     },
   });
+
+  function localizedVisualNote(link) {
+    if (caseData.fixture) return text.fixtureNote;
+    if (language === "ar" && caseData.id === dustCaseId &&
+      link.svs === "https://svs.gsfc.nasa.gov/5669/" && link.relation === "RELATED_CONTEXT") {
+      return text.contextNote;
+    }
+    return link.note;
+  }
 
   function setPhase(snapshot) {
     const { phase } = snapshot;
@@ -343,7 +352,7 @@ export async function mountDecode(root, {
     byId("svs-card").hidden = !visualLink.svs;
     figure.hidden = !showFrame;
     if (showFrame) image.src = dustFrame.href;
-    byId("context-note").textContent = showFrame ? text.contextNote : visualLink.note;
+    byId("context-note").textContent = language === "en" && showFrame ? text.contextNote : localizedVisualNote(visualLink);
 
     // Pair the one-shot renderer callback with this exact, locked submission.
     const applyReveal = visual?.prepareReveal?.();
@@ -354,7 +363,6 @@ export async function mountDecode(root, {
   function dispose() {
     handlers.abort();
     stopRendering?.();
-    stopEndAnnouncement?.();
     visual?.dispose();
     grid?.dispose();
     transport.pause();
@@ -428,14 +436,14 @@ export async function mountDecode(root, {
       getState: () => playback.withActiveCell(session.getState()),
       subscribe: listener => session.subscribe(snapshot => listener(playback.withActiveCell(snapshot))),
     };
+    function accessibilitySnapshot(snapshot) {
+      const { visualLink } = snapshot;
+      return visualLink ? { ...snapshot, visualLink: { ...visualLink, note: localizedVisualNote(visualLink) } } : snapshot;
+    }
     const accessibilitySession = {
       ...rendererSession,
-      subscribe(listener) {
-        return rendererSession.subscribe(snapshot => listener(language === "ar" && snapshot.visualLink?.svs === "https://svs.gsfc.nasa.gov/5669/" &&
-          snapshot.visualLink.relation === "RELATED_CONTEXT" && !caseData.fixture
-          ? { ...snapshot, visualLink: { ...snapshot.visualLink, note: text.contextNote } }
-          : snapshot));
-      },
+      getState: () => accessibilitySnapshot(rendererSession.getState()),
+      subscribe: listener => rendererSession.subscribe(snapshot => listener(accessibilitySnapshot(snapshot))),
     };
     // The grid remains the only interactive map. Integration decorates the existing cells
     // from the transport snapshot, including silent slots, without moving focus.
@@ -461,15 +469,6 @@ export async function mountDecode(root, {
 
     let previousPhase;
     let previousGridSize = cellButtons.length;
-    let previousStatus;
-    let previousRevision;
-    stopEndAnnouncement = rendererSession.subscribe(({ phase, planRevision, transport: state }) => {
-      if (state.status === "ended" && previousStatus !== "ended" && planRevision === previousRevision) {
-        byId("status").textContent = phase === "legend" ? t("legend.completed") : text.playbackComplete;
-      }
-      previousStatus = state.status;
-      previousRevision = planRevision;
-    });
     stopRendering = rendererSession.subscribe(snapshot => {
       const { phase, activeCell, transport: state } = snapshot;
       if (previousGridSize !== snapshot.grid.cells.length) {
@@ -504,7 +503,7 @@ export async function mountDecode(root, {
       const hasPlayback = ["legend", "listen", "decode"].includes(phase);
       pause.hidden = replay.hidden = mute.hidden = !hasPlayback;
       playbackPanel.hidden = !hasPlayback;
-      const matchingPlan = (phase === "legend") === (playback.mode === "legend");
+      const matchingPlan = (phase === "legend") === ((snapshot.playMode ?? playback.mode) === "legend");
       replay.disabled = !matchingPlan;
       progress.max = (matchingPlan ? playback.durationS : 0) || 1;
       progress.value = matchingPlan ? state.positionS : 0;
