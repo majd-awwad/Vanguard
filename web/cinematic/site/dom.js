@@ -2,6 +2,8 @@
 export function h(document, tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) {
+    // ARIA states are strings: aria-pressed="true", never an empty attribute.
+    if (key.startsWith("aria-") && typeof value === "boolean") { node.setAttribute(key, String(value)); continue; }
     if (value == null || value === false) continue;
     if (key === "text") node.textContent = value;
     else if (key === "class") node.className = value;

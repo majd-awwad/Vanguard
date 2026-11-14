@@ -24,3 +24,5 @@ Sound Lab, Accessibility & Settings, Explore Earth. Status is tracked at the bot
 
 - [x] Science & Dataset: `/pages/science.html`
 - [x] About: `/pages/about.html` (six first names only, no roles, bios or photos; listening study stated as planned)
+- [x] Sound Lab: `/pages/sound-lab.html`
+- [x] Accessibility & Settings: `/pages/settings.html`

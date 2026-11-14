@@ -175,3 +175,46 @@ test("the Decode completion flag is only set by a finished discovery session", (
   const main = read("web/cinematic/main.js");
   assert.match(main, /phase === "reveal" && snapshot\.mode === "discovery"\) markDecodeCompleted/);
 });
+
+import { hasVoice } from "../web/cinematic/site/settings-page.js";
+import { settingsCopy } from "../web/cinematic/site/settings-copy.js";
+import { decodeMessage } from "../web/i18n/decode-messages.js";
+import { h } from "../web/cinematic/site/dom.js";
+
+test("ARIA booleans become real strings", () => {
+  const el = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, append() {} };
+  const doc = { createElement: () => el };
+  h(doc, "button", { "aria-pressed": true, "aria-selected": false, checked: true, hidden: false });
+  assert.equal(el.attrs["aria-pressed"], "true");
+  assert.equal(el.attrs["aria-selected"], "false");
+  assert.equal(el.attrs.checked, "");
+  assert.ok(!("hidden" in el.attrs));
+});
+
+test("settings page: only real controls, real shortcuts, voice gating", () => {
+  assert.equal(hasVoice([{ lang: "en-US" }], "ar"), false);
+  assert.equal(hasVoice([{ lang: "ar-SA" }], "ar"), true);
+  assert.equal(hasVoice([], "en"), false);
+  const src = read("web/cinematic/site/settings-page.js");
+  assert.match(src, /typeof|setSpeed/);
+  for (const key of ["arrows", "space", "enter", "p", "l", "r", "s"]) {
+    assert.ok(decodeMessage("en", "grid.shortcut." + key), key);
+    assert.ok(decodeMessage("ar", "grid.shortcut." + key), key);
+  }
+  const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "object" ? k + "{" + keys(o[k]) + "}" : k)).join();
+  assert.equal(keys(settingsCopy.en), keys(settingsCopy.ar));
+  // Shortcuts the grids really implement: sound.js and decode-grid.js.
+  const grid = read("web/accessibility/decode-grid.js");
+  assert.ok(/ArrowUp/.test(grid) && /"enter"/.test(grid));
+  const sound = read("web/cinematic/site/sound.js");
+  assert.ok(/ArrowUp/.test(sound) && /"Home"/.test(sound) && /"End"/.test(sound));
+});
+
+test("every site page and the Decode 3D page link to the shared settings and nav", () => {
+  for (const file of ["web/pages/science.html", "web/pages/about.html", "web/pages/sound-lab.html", "web/pages/settings.html"]) {
+    const html = read(file);
+    assert.ok(html.includes('id="site-nav"'), file);
+    assert.ok(html.includes("site/site.css"), file);
+  }
+  assert.ok(read("web/cinematic/main.js").includes("NAV_ITEMS"));
+});
