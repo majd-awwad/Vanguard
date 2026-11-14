@@ -100,3 +100,25 @@ test("pages never use the NASA logo and keep SVS 5669 out of the globe", () => {
   assert.ok(!/nasa-logo|insignia|meatball/i.test(css + js));
   assert.ok(!/svs-5669/.test(read("web/cinematic/scene.js")));
 });
+
+import { aboutCopy, TEAM } from "../web/cinematic/site/about-copy.js";
+import { decorativeWavePath } from "../web/cinematic/site/about.js";
+
+test("about page: six names, no photos or bios, no benefit claims, no NASA endorsement", () => {
+  assert.deepEqual([...TEAM], ["Mohammad", "Andreh", "Yaman", "Roaa", "Israa", "Majd"]);
+  const copy = JSON.stringify(aboutCopy.en);
+  assert.ok(/listening study[^"]*planned/i.test(copy));
+  assert.ok(/not endorsed by NASA/.test(copy));
+  assert.ok(!/proven|improves outcomes|clinically/i.test(copy));
+  assert.ok(!/<img/.test(read("web/cinematic/site/about.js")));
+  const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "object" ? k + "{" + keys(o[k]) + "}" : k)).join();
+  assert.equal(keys(aboutCopy.en), keys(aboutCopy.ar));
+  assert.equal(aboutCopy.en.cards.length, 4);
+  assert.equal(aboutCopy.ar.cards.length, 4);
+});
+
+test("decorative waveform is fixed, finite and independent of any data", () => {
+  const path = decorativeWavePath();
+  assert.equal(path, decorativeWavePath());
+  assert.ok(!/NaN|Infinity/.test(path));
+});
