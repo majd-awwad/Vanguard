@@ -89,3 +89,13 @@ export function scanSteps(cells, values, k = 1) {
     .sort((a, b) => a.row - b.row || a.col - b.col)
     .map((c) => ({ row: c.row, col: c.col, index: c.index, value: values[c.index] ?? null }));
 }
+
+/** Joins two plans back to back with a gap; events keep their order and are tagged with the place they belong to. */
+export function joinPlans(a, b, gapS = 0.35) {
+  const offset = a.durationS + gapS;
+  const events = [
+    ...a.events.map((e) => ({ ...e, place: "a" })),
+    ...b.events.map((e) => ({ ...e, place: "b", onsetS: e.onsetS + offset, step: e.step + (a.events.at(-1)?.step ?? 0) + 1 })),
+  ].map((e, i) => ({ ...e, id: `ev-${i}` }));
+  return { ...a, mode: "places", events, durationS: offset + b.durationS };
+}

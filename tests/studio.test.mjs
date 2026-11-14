@@ -262,3 +262,65 @@ test("path steps: equal distance, nearest real cell, plan follows the path in or
   assert.ok(outside.some((s) => s.outside && s.value === null));
   assert.deepEqual(rectBetween({ lon: 5, lat: 30 }, { lon: -3, lat: 20 }), { west: -3, east: 5, south: 20, north: 30 });
 });
+
+import { DEFAULT_REASON, FINGERPRINT_CELLS, fingerprintPlan, placeSummary, resolveComparison } from "../web/studio/compare.js";
+import { joinPlans } from "../web/studio/mapping.js";
+import { compareDustSnapshots } from "../web/sources/decode/dust-visual.js";
+
+const idOfDate = (d) => catalog.snapshots.find((s) => s.date === d).id;
+
+test("time comparison: published when it exists, computed only within one build, otherwise unavailable with a reason", () => {
+  const apr = idOfDate("2025-04-15");
+  const jul = idOfDate("2025-07-15");
+  assert.equal(resolveComparison(catalog, apr, jul).status, "published");
+  assert.equal(resolveComparison(catalog, jul, apr).status, "published", "order is normalised to earlier-first");
+  assert.equal(resolveComparison(catalog, jul, apr).first, apr);
+  assert.equal(resolveComparison(catalog, apr, apr).status, "same");
+  const cross = resolveComparison(catalog, idOfDate("2025-01-15"), apr);
+  assert.equal(cross.status, "unavailable");
+  assert.match(cross.reason, /build/i);
+  assert.equal(resolveComparison(catalog, idOfDate("2024-12-15"), idOfDate("2025-04-15")).reason, DEFAULT_REASON);
+  assert.equal(resolveComparison(catalog, idOfDate("2024-12-15"), idOfDate("2025-02-15")).status, "computed");
+  // Every pair across the two build groups is unavailable; every same-group pair is available.
+  const groups = catalog.compatibilityGroups;
+  for (const x of catalog.snapshots) for (const y of catalog.snapshots) {
+    if (x.id >= y.id) continue;
+    const same = groups.some((g) => g.snapshotIds.includes(x.id) && g.snapshotIds.includes(y.id));
+    const r = resolveComparison(catalog, x.id, y.id);
+    assert.equal(r.status === "unavailable", !same, `${x.date} ${y.date}`);
+  }
+});
+
+test("the computed difference is second minus first and refuses different builds", () => {
+  const byDate = (d) => snapshots.find((s) => s.id === idOfDate(d));
+  const a = byDate("2025-04-15");
+  const b = byDate("2025-07-15");
+  const cmp = compareDustSnapshots(a, b);
+  assert.ok(Math.abs(cmp.values[100] - (b.values[100] - a.values[100])) < 1e-12);
+  const published = JSON.parse(read(dust + "comparisons/" + catalog.comparisons[0].path.split("/").pop()));
+  assert.ok(published.values.every((v, i) => Math.abs(v - cmp.values[i]) < 1e-9), "computed matches the published file");
+  assert.throws(() => compareDustSnapshots(byDate("2025-01-15"), a));
+  // Missing propagates: never zero, never "no change".
+  const withHole = { ...a, values: a.values.map((v, i) => (i === 7 ? null : v)) };
+  assert.equal(compareDustSnapshots(withHole, b).values[7], null);
+});
+
+test("places: summaries use real cells and missing is counted; fingerprints are short and deterministic", () => {
+  const values = snapshots[0].values;
+  const cell = { type: "cell", cell: { row: 8, col: 8, index: 8 * 40 + 8 } };
+  assert.equal(placeSummary(cell, values, grid).mean, values[328]);
+  const area = { type: "area", rect: { west: 0, east: 10, south: 20, north: 30 } };
+  const sum = placeSummary(area, values, grid);
+  assert.ok(sum.valid > 10 && sum.min <= sum.mean && sum.mean <= sum.max);
+  assert.equal(placeSummary(null, values, grid), null);
+  const fpCell = fingerprintPlan(cell, values, "dust", grid);
+  const fpArea = fingerprintPlan(area, values, "dust", grid);
+  assert.equal(fpCell.events.length, 3);
+  assert.ok(fpArea.events.length <= FINGERPRINT_CELLS);
+  assert.deepEqual(fpCell, fingerprintPlan(cell, values, "dust", grid));
+  const joined = joinPlans(fpCell, fpArea);
+  assert.equal(joined.events.length, fpCell.events.length + fpArea.events.length);
+  assert.ok(joined.events.every((e, i) => i === 0 || e.onsetS > joined.events[i - 1].onsetS), "back to back, in order");
+  assert.deepEqual([...new Set(joined.events.map((e) => e.place))], ["a", "b"]);
+  assert.ok(joined.durationS > fpCell.durationS + fpArea.durationS);
+});

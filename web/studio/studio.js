@@ -8,6 +8,7 @@ import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { studioCopy } from "./studio-copy.js";
 import { createStudioAudio } from "./audio.js";
+import { mountCompare } from "./compare.js";
 import { mountTools } from "./tools.js";
 import { drawWaveform } from "../cinematic/audio-tap.js";
 import { loadSettings, saveSettings } from "../cinematic/site/settings.js";
@@ -21,6 +22,7 @@ const EARTH_URL_SMALL = () => new URL("../assets/earth/blue-marble-2048.jpg", im
 /** Catalog snapshots in time order. */
 export const chronological = (catalog) => [...catalog.snapshots].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
+let api_refreshDateInfo;
 export function startStudio(document = globalThis.document) {
   const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages" });
   const c = studioCopy[language];
@@ -169,6 +171,7 @@ async function mountStudio(document, root, language) {
     if (!state.comparison) applyLayer();
     onDataChanged();
   }
+  api_refreshDateInfo = onDateChanged;
   el.date.addEventListener("change", () => chooseDate(el.date.value));
   const step = (delta) => { const i = list.findIndex((s) => s.id === state.snapshot.id); const next = list[Math.min(list.length - 1, Math.max(0, i + delta))]; if (next) chooseDate(next.id); };
   el.prev.addEventListener("click", () => step(-1));
@@ -252,7 +255,7 @@ async function mountStudio(document, root, language) {
     } else {
       const dir = d.value === null ? "" : Math.abs(d.value) < NEAR_ZERO ? c.understand.flat : d.value > 0 ? c.understand.up : c.understand.down;
       u.value.dd.textContent = d.value === null ? "—" : T(c.understand.changeText, { value: fmtChange(d.value), direction: dir });
-      u.scale.dd.textContent = d.value === null ? "—" : T(c.legend.near, { band: NEAR_ZERO }) + " / " + c.legend.changeNote;
+      u.scale.dd.textContent = d.value === null ? "—" : T(c.legend.near, { band: NEAR_ZERO });
     }
     u.sound.dd.textContent = soundText(d);
     for (const extra of state.understandExtras) extra(d);
@@ -425,9 +428,10 @@ async function mountStudio(document, root, language) {
   onDateChanged();
   win.addEventListener("resize", resize);
   win.document.addEventListener("visibilitychange", () => { if (!win.document.hidden) invalidate(); });
-  const api = { state, el, grid, catalog, list, get renderer() { return renderer; }, setView, setCursor, chooseDate, applyLayer, onDataChanged, renderUnderstand, invalidate, toScreen, toGeo, T, c, language, layerValues, layerKind, getSnapshot, audio, soundForCursor, setSound, readText, fmt, fmtChange, document, win, bounds, drawOverlay, reduced, svgNode: svg };
+  const api = { state, el, grid, catalog, list, get renderer() { return renderer; }, setView, setCursor, chooseDate, applyLayer, onDataChanged, renderUnderstand, invalidate, toScreen, toGeo, T, c, language, layerValues, layerKind, getSnapshot, refreshDateInfo: () => api_refreshDateInfo(), audio, soundForCursor, setSound, readText, fmt, fmtChange, document, win, bounds, drawOverlay, reduced, svgNode: svg };
   if (params.has("debug")) win.__studio = api;
   state.api = api;
   mountTools(api);
+  mountCompare(api);
   return api;
 }

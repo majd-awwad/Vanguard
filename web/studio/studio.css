@@ -65,3 +65,17 @@
 .volume { display: flex; align-items: center; gap: .8rem; margin: .5rem 0; color: var(--muted); font-size: .85rem; }
 .volume input { flex: 1; accent-color: var(--teal); min-height: 1.5rem; }
 .st-left canvas { width: 100%; height: auto; display: block; border-radius: 8px; background: rgb(5 11 18 / .7); border: 1px solid var(--line); margin: .4rem 0; }
+
+.st-place { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.st-place-a { stroke: #68e0d0; fill: rgb(104 224 208 / .12); }
+.st-place-b { stroke: #ffcb86; fill: rgb(255 203 134 / .12); }
+.st-place.active { stroke-width: 5; fill-opacity: .3; }
+.st-place-label { fill: #fff; font: 700 14px var(--sans); paint-order: stroke; stroke: #000; stroke-width: 3px; }
+.callout.warn { border-color: #ff8a6b; background: rgb(255 138 107 / .1); }
+.small-button { min-height: 2.5rem; padding: .4rem .8rem; font-size: .8rem; }
+.st-pick { display: flex; align-items: center; gap: .6rem; color: var(--muted); font-size: .85rem; margin-bottom: .4rem; }
+.st-pick select { flex: 1; min-height: 2.5rem; background: rgb(255 255 255 / .06); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 .5rem; font: inherit; }
+.st-pick select option { background: #0a141f; color: #f0f4fa; }
+.st-compare h3 { color: var(--teal); margin: .7rem 0 .3rem; }
+.st-places { display: grid; gap: .6rem; margin: .6rem 0; }
+.xp-diff { color: var(--ink) !important; }
