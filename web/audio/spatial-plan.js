@@ -89,7 +89,7 @@ function legend(data, level, rows, cols, waveform) {
     const cell = { row, col, lat: 0, lon: 0, value, status: "measured",
       ...(data.behavior === "intermittent" ? { eventCount: 4 } : {}) };
     return {
-      id: `${data.id}:${level}:legend:${label}`, onsetS: index, row, col,
+      id: `ev-${index}`, onsetS: index, row, col,
       tone: toneFor(data, cell, rows, cols, value, waveform),
       evidence: { ...cell, unit: "synthetic calibration (normalized)", mappingVersion,
         synthetic: true, calibration: label },
@@ -123,7 +123,7 @@ export function makeSpatialPlan(data, { level = "quick", mode = "sweep", row, ce
     events = positions.map(([row, col], index) => {
       const cell = indexed.get(row * cols + col);
       return {
-        id: `${data.id}:${level}:${mode}:${index}:${row}:${col}`, onsetS: index * slotS, row, col,
+        id: `ev-${index}`, onsetS: index * slotS, row, col,
         tone: toneFor(data, cell, rows, cols, intensity(cell, range, data.behavior), waveform),
         evidence: { ...cell, unit: data.unit, mappingVersion },
       };
