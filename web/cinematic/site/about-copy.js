@@ -2,6 +2,7 @@
 // and bios are deliberately absent because the repository documents none.
 
 export const TEAM = Object.freeze(["Mohammad", "Andreh", "Yaman", "Roaa", "Israa", "Majd"]);
+export const TEAM_AR = Object.freeze(["محمد", "أندريه", "يمان", "رؤى", "إسراء", "مجد"]);
 
 export const aboutCopy = {
   en: {

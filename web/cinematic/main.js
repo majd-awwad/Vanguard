@@ -8,6 +8,7 @@ import { copy } from "./copy.js";
 import { createGlobeMount } from "./globe.js";
 import { createHero } from "./hero.js";
 import { createScene } from "./scene.js";
+import { markDecodeCompleted } from "./site/progress.js";
 
 // Mirrors startDecode() in web/decode.js (read-only): the same session, transport, spatial plan and accessible
 // grid run underneath, with a cinematic scene, hero and dock around them. The only interactive grid is still the
@@ -98,6 +99,8 @@ export async function startCinematic(root) {
         language, makePlan: sound.makeSpatialPlan, heardClass: sound.heardClass, mountVisual, transport, loadCase,
       });
       hero.bind(mounted.session);
+      // Remember that Decode was finished once, so Explore Earth and Sound Lab may show the answers.
+      mounted.session.subscribe((snapshot) => { if (snapshot.phase === "reveal" && snapshot.mode === "discovery") markDecodeCompleted(); });
       // Test and inspection hook, off unless the URL asks for it.
       if (new URL(document.URL).searchParams.has("cine-debug")) window.__cineDebug = { session: mounted.session, transport, scene };
       state.textContent = "";

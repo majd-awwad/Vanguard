@@ -1,5 +1,5 @@
 import { badge, h } from "./dom.js";
-import { aboutCopy, TEAM } from "./about-copy.js";
+import { aboutCopy, TEAM, TEAM_AR } from "./about-copy.js";
 import { mountNav } from "./nav.js";
 
 const TEXTURE = "../assets/earth/blue-marble-4096.jpg";
@@ -53,7 +53,7 @@ export function renderAbout(document, root, language, hrefs) {
   const cards = h(document, "ul", { class: "about-cards" });
   for (const card of c.cards) cards.append(h(document, "li", { class: "panel" }, h(document, "h3", { text: card.title }), h(document, "p", { text: card.text })));
   const members = h(document, "ul", { class: "members", "aria-label": c.team.members });
-  for (const name of TEAM) members.append(h(document, "li", { class: "ltr", text: name }));
+  for (const name of language === "ar" ? TEAM_AR : TEAM) members.append(h(document, "li", { text: name }));
   const team = h(document, "section", { class: "panel about-team", "aria-labelledby": "about-team-title" },
     h(document, "div", {}, h(document, "p", { class: "eyebrow", text: c.team.title }),
       h(document, "h2", { id: "about-team-title" }, h(document, "bdi", { text: c.team.name }), " — ", c.team.place),

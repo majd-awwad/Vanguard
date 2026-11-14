@@ -122,3 +122,56 @@ test("decorative waveform is fixed, finite and independent of any data", () => {
   assert.equal(path, decorativeWavePath());
   assert.ok(!/NaN|Infinity/.test(path));
 });
+
+import { calibration, cellSound, panWord } from "../web/cinematic/site/sound.js";
+import { soundCopy } from "../web/cinematic/site/sound-copy.js";
+import { COMPLETED_KEY, allowSpoilersThisVisit, isDecodeCompleted, markDecodeCompleted, resetOverrideForTests, spoilersUnlocked } from "../web/cinematic/site/progress.js";
+import { makeSpatialPlan } from "../web/audio/spatial-plan.js";
+
+test("sound lab reads pitch, pan and gain from the real plan, never from typed numbers", () => {
+  const cal = calibration(data);
+  assert.equal(cal.left, -1);
+  assert.equal(cal.right, 1);
+  assert.equal(cal.high, 880);
+  assert.equal(cal.low, 220);
+  assert.ok(cal.quiet < cal.loud);
+  // A measured cell: B2 on the quick grid is row 1, col 1.
+  const sound = cellSound(data, "quick", 1, 1);
+  const planEvent = makeSpatialPlan(data, { level: "quick", mode: "cell", cells: [[1, 1]] }).events[0];
+  assert.deepEqual(sound.tone, planEvent.tone);
+  assert.equal(sound.tone.frequencyHz, 440);
+  // Cells below the threshold are silent in this mapping.
+  assert.equal(cellSound(data, "quick", 0, 0).tone, null);
+  assert.equal(panWord(-0.33, soundCopy.en), "left");
+  const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "object" ? k + "{" + keys(o[k]) + "}" : k)).join();
+  assert.equal(keys(soundCopy.en), keys(soundCopy.ar));
+});
+
+test("sound lab copy claims none of the rejected reference-image rules", () => {
+  const copy = JSON.stringify(soundCopy);
+  assert.ok(!/richness|texture|0\.8\s*[–-]\s*1\.2|higher dust value.{0,20}higher pitch/i.test(copy));
+  assert.ok(/farther north/.test(copy) && /west to east/.test(copy));
+});
+
+test("spoiler flag persists, never throws, and 'show anyway' is per visit", () => {
+  const storage = fakeStorage();
+  resetOverrideForTests();
+  assert.equal(isDecodeCompleted(storage), false);
+  assert.equal(spoilersUnlocked({ completedStorage: storage, overrideStorage: fakeStorage() }), false);
+  markDecodeCompleted(storage);
+  assert.equal(storage.getItem(COMPLETED_KEY), "1");
+  assert.equal(spoilersUnlocked({ completedStorage: storage, overrideStorage: fakeStorage() }), true);
+  resetOverrideForTests();
+  const broken = { getItem() { throw new Error("x"); }, setItem() { throw new Error("x"); } };
+  assert.equal(isDecodeCompleted(broken), false);
+  assert.doesNotThrow(() => markDecodeCompleted(broken));
+  assert.equal(spoilersUnlocked({ completedStorage: fakeStorage(), overrideStorage: broken }), false);
+  allowSpoilersThisVisit(broken);
+  assert.equal(spoilersUnlocked({ completedStorage: fakeStorage(), overrideStorage: broken }), true);
+  resetOverrideForTests();
+});
+
+test("the Decode completion flag is only set by a finished discovery session", () => {
+  const main = read("web/cinematic/main.js");
+  assert.match(main, /phase === "reveal" && snapshot\.mode === "discovery"\) markDecodeCompleted/);
+});
