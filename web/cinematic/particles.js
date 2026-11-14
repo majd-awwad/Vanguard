@@ -7,7 +7,7 @@
 // noise); how many sit in each cell is data.
 
 export const MAX_PARTICLES = 20000;
-const HAZE_SHARE = 0.12; // extra large, faint sprites per cell for the volumetric look; counted in the budget
+export const HAZE_SHARE = 0.22; // extra large, faint sprites per cell for the volumetric look; counted in the budget
 
 function seededRandom(seed) {
   let state = seed >>> 0;
@@ -71,8 +71,9 @@ export function buildDustParticles(snapshot, bounds) {
       lonLat.push(bounds.west + (cell.col + random()) * dLon, bounds.north - (cell.row + random()) * dLat);
       altitude.push(random());
       seed.push(random(), random(), random());
-      size.push(isHaze ? 9 + random() * 9 : 1.4 + random() * 2.2);
-      alpha.push(isHaze ? 0.07 + 0.1 * share : 0.35 + 0.55 * share);
+      // Sizes are world units (the unrolled map is about 0.5 units tall); alpha is low because sprites add up.
+      size.push(isHaze ? 0.022 + random() * 0.03 : 0.004 + random() * 0.005);
+      alpha.push(isHaze ? 0.04 + 0.11 * share : 0.35 + 0.55 * share);
     }
   });
   return {

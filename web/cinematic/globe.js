@@ -24,7 +24,7 @@ export function createGlobeMount({ scene = null, fallback, captionFor = () => ""
     if (!scene) return useFallback();
 
     if (stage?.dataset) stage.dataset.renderer = "webgl";
-    scene.setStage(stage);
+    scene.setStage(stage?.querySelector("#decode-grid") ?? stage);
 
     const bottom = stage?.closest("#decode-map")?.querySelector(".decode-map-bottom");
     // The shared map key says teal cells reached the threshold, which would contradict outcome colours here,

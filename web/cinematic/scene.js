@@ -83,8 +83,8 @@ const earthFragment = /* glsl */ `
     // The decoding map is fully lit and readable; outside the region it falls away into space.
     float dx = max(max(uBounds.x - vLonLat.x, vLonLat.x - uBounds.y), 0.0);
     float dy = max(max(uBounds.z - vLonLat.y, vLonLat.y - uBounds.w), 0.0);
-    float inside = 1.0 - smoothstep(0.0, 7.0, length(vec2(dx, dy)));
-    vec3 mapColor = day * (0.05 + 0.95 * inside);
+    float inside = 1.0 - smoothstep(0.0, 3.5, length(vec2(dx, dy)));
+    vec3 mapColor = day * (0.015 + 0.985 * inside);
     gl_FragColor = vec4(mix(color, mapColor, uT), 1.0);
     #include <colorspace_fragment>
   }
@@ -158,10 +158,12 @@ const dustVertex = /* glsl */ `
     float lat = aLonLat.y + drift.y;
     vec3 onPlane = uNormal + uEast * radians(lon - uCenter.x) + uNorth * radians(lat - uCenter.y);
     float rise = uReveal * (0.012 + 0.07 * pow(aAltitude, 1.4)) * (0.85 + 0.3 * breathe);
-    vec3 pos = onPlane + uNormal * (0.01 + rise);
+    // The dust lifts off the surface: toward the camera, and up the screen as it rises.
+    vec3 pos = onPlane + uNormal * (0.01 + rise) + uNorth * rise * 0.55 + uEast * rise * 0.18 * sin(aSeed.x * 6.2831);
     vec4 view = viewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * view;
-    gl_PointSize = aSize * uScale * (0.8 + 0.4 * breathe) * (0.4 + 0.6 * uReveal) / max(0.5, -view.z);
+    // aSize is a world size; projectionMatrix[1][1] and the viewport height turn it into pixels for any frustum.
+    gl_PointSize = aSize * projectionMatrix[1][1] * uScale * (0.8 + 0.4 * breathe) * (0.4 + 0.6 * uReveal) / max(0.5, -view.z);
     vAlpha = aAlpha * uReveal * (0.85 + 0.3 * breathe);
     vHeat = aAltitude;
   }
@@ -172,8 +174,9 @@ const dustFragment = /* glsl */ `
   void main() {
     float d = length(gl_PointCoord - 0.5) * 2.0;
     float soft = smoothstep(1.0, 0.0, d);
-    vec3 amber = mix(vec3(1.0, 0.72, 0.3), vec3(1.0, 0.5, 0.16), vHeat);
-    gl_FragColor = vec4(amber * soft * vAlpha, soft * vAlpha);
+    vec3 amber = mix(vec3(1.0, 0.62, 0.18), vec3(0.96, 0.4, 0.08), vHeat);
+    float a = soft * vAlpha;
+    gl_FragColor = vec4(amber * a, a);
   }
 `;
 
@@ -331,9 +334,11 @@ export function createScene({
     active: decal(STYLE.active, 1),
     ripple: decal(STYLE.active, 0.6, true),
     bracket: decal(STYLE.bracket, 1),
-    correct: decal(STYLE.correct, 0.5),
-    incorrect: decal(STYLE.incorrect, 0.5),
-    missed: decal(STYLE.missed, 0.2),
+    correct: decal(STYLE.correct, 0.12),
+    incorrect: decal(STYLE.incorrect, 0.11),
+    missed: decal(STYLE.missed, 0.06),
+    correctRing: decal(STYLE.correct, 0.95),
+    incorrectRing: decal(STYLE.incorrect, 0.95),
     missedRing: decal(STYLE.missed, 0.85),
     guide: decal(STYLE.guide, 1, true),
   };
@@ -349,7 +354,7 @@ export function createScene({
   };
   const dustMaterial = new ShaderMaterial({
     vertexShader: dustVertex, fragmentShader: dustFragment, uniforms: dustUniforms,
-    transparent: true, depthWrite: false, blending: AdditiveBlending,
+    transparent: true, depthWrite: false, premultipliedAlpha: true,
   });
 
   const layers = new Map();
@@ -419,7 +424,7 @@ export function createScene({
     renderer.setSize(width, height, false);
     canvas.style.cssText = "position:fixed;inset:0;width:100%;height:100%;display:block";
     starUniforms.uPixels.value = pixelRatio;
-    dustUniforms.uScale.value = (height * pixelRatio) / 2.2;
+    dustUniforms.uScale.value = (height * pixelRatio) / 2;
     invalidate();
   }
 
@@ -481,9 +486,7 @@ export function createScene({
       const rects = model.outcomes.filter((entry) => entry.outcome === outcome).map(({ row, col }) => rect([row, col]));
       if (!rects.length) continue;
       setLayer(outcome, mesh(fillTriangles(frame, rects, { t, lift: LIFT * 2.5 }).positions, materials[outcome], null, 5));
-      if (outcome === "missed") {
-        setLayer("missedRing", mesh(ringTriangles(frame, rects, { t, lift: LIFT * 3, insetDeg: 0.8, thicknessDeg: 0.3 }), materials.missedRing, null, 6));
-      }
+      setLayer(outcome + "Ring", mesh(ringTriangles(frame, rects, { t, lift: LIFT * 3, insetDeg: 0.8, thicknessDeg: 0.3 }), materials[outcome + "Ring"], null, 6));
       const glyph = fillTriangles(frame, rects.map((r) => ({
         west: (r.west + r.east) / 2 - (r.east - r.west) * 0.2, east: (r.west + r.east) / 2 + (r.east - r.west) * 0.2,
         north: (r.north + r.south) / 2 + (r.north - r.south) * 0.2, south: (r.north + r.south) / 2 - (r.north - r.south) * 0.2,

@@ -10,7 +10,7 @@ import {
 import { overlayModel, sanitizeOutcomes } from "../web/cinematic/overlay.js";
 import { createGlobeMount } from "../web/cinematic/globe.js";
 import { LEGEND_SECONDS, guideState, meridianStrip, parallelStrip } from "../web/cinematic/guide.js";
-import { MAX_PARTICLES, buildDustParticles, particleCounts } from "../web/cinematic/particles.js";
+import { HAZE_SHARE, MAX_PARTICLES, buildDustParticles, particleCounts } from "../web/cinematic/particles.js";
 import { createAudioTap, drawWaveform, isSilent } from "../web/cinematic/audio-tap.js";
 import { copy, fill } from "../web/cinematic/copy.js";
 
@@ -293,7 +293,7 @@ test("the particle budget holds for both grid sizes and for degenerate readings"
   assert.equal(buildDustParticles({ phase: "reveal", grid: { rows: 3, cols: 4, cells: [] } }, dust).count, 0);
   assert.deepEqual(particleCounts([0, 0]).counts, [0, 0]);
   const wild = particleCounts(Array.from({ length: 48 }, () => 1e9));
-  assert.ok(wild.counts.reduce((a, b) => a + b, 0) * 1.12 <= MAX_PARTICLES + 1);
+  assert.ok(wild.counts.reduce((a, b) => a + b, 0) * (1 + HAZE_SHARE) <= MAX_PARTICLES + 1);
 });
 
 // ---------- audio tap and waveform ----------
@@ -340,7 +340,7 @@ function fakeDom() {
     setAttribute() {}, append(...nodes) { this.children.push(...nodes); }, remove() { this.removed = true; },
   });
   const bottom = element();
-  const stage = { dataset: {}, closest: () => ({ querySelector: () => bottom }) };
+  const stage = { dataset: {}, querySelector: () => null, closest: () => ({ querySelector: () => bottom }) };
   return { bottom, stage, root: { ownerDocument: { createElement: element }, parentElement: stage, contains: () => false } };
 }
 

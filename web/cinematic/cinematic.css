@@ -215,8 +215,18 @@ body.cine #decode-page button.cine-orbit:hover { transform: scale(1.04); box-sha
 
 /* ---- view switch: hero <-> decoding dock ---- */
 body.cine[data-view="hero"] :is(#decode-interface, #decode-map, #decode-evidence, #decode-status) { display: none; }
-body.cine[data-view="decode"] .cine-hero { display: none; }
-body.cine[data-view="decode"] :is(.cine-orbit, .cine-rail) { display: none; }
+/* The hero copy collapses away as the dock slides in; nothing else moves, so the camera flight reads as one shot. */
+body.cine .cine-hero { transition: opacity .5s ease, transform .6s ease; }
+body.cine[data-view="decode"] .cine-hero {
+  position: absolute;
+  inset: 0 auto auto 0;
+  opacity: 0;
+  transform: translateX(-2.5rem) scale(.985);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .45s ease, transform .6s ease, visibility 0s .6s;
+}
+[dir="rtl"] body.cine[data-view="decode"] .cine-hero { transform: translateX(2.5rem) scale(.985); }
 body.cine[data-view="decode"] :is(.cine-bar-challenge, .cine-bar-challenge-sep) { display: none; }
 body.cine[data-view="decode"] .cine-bar { inset-inline-end: auto; inset-block-end: 1rem; padding: .55rem 1rem; }
 
@@ -332,5 +342,6 @@ body.cine #decode-svs-card figure { max-inline-size: 15rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .cine-orbit-arc, body.cine[data-view="decode"] #decode-interface { animation: none; }
+  body.cine .cine-hero, body.cine[data-view="decode"] .cine-hero { transition: none; }
   body.cine[data-renderer="webgl"] #decode-stage { transition: none; }
 }
