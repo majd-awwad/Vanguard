@@ -44,6 +44,7 @@ export function createDecodeSession({
   let locked = false;
   let score = null;
   let planKey = null;
+  let planMode = null;
   let loadToken = 0;
   let quiet = 0;
   let transportState = transport.snapshot();
@@ -84,6 +85,7 @@ export function createDecodeSession({
       expectedCount: data ? grid().truth.present.length : 0,
       lastProbe: lastProbe ? { ...lastProbe } : null,
       planRevision: transportState.planRevision ?? 0,
+      playMode: planMode,
       transport: { ...transportState },
       description: description(),
       grid: data ? sessionGrid(evidence) : { rows: 0, cols: 0, cells: [] },
@@ -109,6 +111,7 @@ export function createDecodeSession({
     transport.load(makePlan(data, { level: activeLevel, ...options }), 0);
     transportState = transport.snapshot();
     planKey = JSON.stringify(options);
+    planMode = options.mode;
   }
 
   function resetAttempt() {
@@ -146,6 +149,7 @@ export function createDecodeSession({
       return undefined;
     }
     data = null;
+    planMode = null;
     resetAttempt();
     return Promise.resolve().then(() => loadCase(id)).then((next) => {
       if (!next?.levels?.quick || !next.levels.advanced) throw new TypeError(`Case ${id} has no Decode levels.`);

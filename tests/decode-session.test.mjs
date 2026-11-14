@@ -265,6 +265,31 @@ test("stale transport snapshots and superseded case loads cannot overwrite the c
   assert.equal(slow.getState().grid.rows, 3);
 });
 
+test("playMode names the loaded plan and survives the end of playback", async () => {
+  const { session, transport, states } = await setup();
+  session.dispatch({ type: "play", mode: "legend" });
+  assert.equal(session.getState().playMode, "legend");
+  assert.equal(session.getState().transport.status, "playing");
+
+  transport.emitRaw({ ...transport.snapshot(), status: "ended" });
+  const ended = states.at(-1);
+  assert.equal(ended.transport.status, "ended");
+  assert.equal(ended.playMode, "legend");
+  assertRedacted(ended);
+
+  session.dispatch({ type: "play", mode: "sweep" });
+  assert.equal(session.getState().playMode, "sweep");
+  session.dispatch({ type: "next" });
+  session.dispatch({ type: "next" });
+  session.dispatch({ type: "probe", row: 0, col: 2 });
+  assert.equal(session.getState().playMode, "cell");
+
+  const slow = createDecodeSession({
+    cases: ids, loadCase: () => new Promise(() => {}), makePlan: fakePlan, heardClass: fakeHeard, transport: fakeTransport(),
+  });
+  assert.equal(slow.getState().playMode, null);
+});
+
 test("focus is a single clamped cell, guesses toggle, and invalid intents are ignored", async () => {
   const { session } = await setup();
   session.dispatch({ type: "focus", row: 99, col: -5 });
