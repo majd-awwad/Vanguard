@@ -137,5 +137,15 @@ export type ScoreGuesses = (truth: DecodeGrid["truth"], guesses: CellPosition[],
 type Translate = (key: string, params?: Record<string, number | string>) => string;
 type Mount = (root: HTMLElement, session: DecodeSession, options: { t: Translate }) => { dispose(): void };
 export type MountDecodeGrid = Mount; // Israa
-export type MountDecodeVisual = Mount; // Roaa
+export type DecodeGeography = {
+  caseId: string;
+  bounds: DecodeCase["bounds"];
+  projection: "plate-carree";
+};
+export type VisualMountOptions = {
+  t: Translate;
+  geography?: DecodeGeography;
+};
+export type MountDecodeVisual = (root: HTMLElement, session: DecodeSession, options: VisualMountOptions) =>
+  { dispose(): void }; // Roaa
 export type DecodeMessage = (lang: "ar" | "en", ...args: Parameters<Translate>) => string; // Israa

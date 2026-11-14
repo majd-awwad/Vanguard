@@ -13,6 +13,14 @@ The signatures are in `decode.d.ts`. Majd provides `validateDecodeCase`. Mohamma
 
 ## Interaction and disclosure
 
+### Coastline geography
+
+`mountDecodeVisual(root, session, { t })` remains valid. After validating the loaded case, the integration layer may pass `geography: { caseId, bounds, projection: "plate-carree" }`. Use the validated case's ID and bounds. The mount option contains geographic metadata only.
+
+Render the coastline only when geography is present and its `caseId` matches `snapshot.caseId`. Clear the previous coastline on a case change. Integration disposes the old visual mount and remounts it once the new case has validated geography, keeping the session and interactive grid mounted.
+
+Project longitude linearly to x and latitude inversely to y in the grid's drawing rectangle. West is left and north is up in both LTR and RTL. Quick and Advanced use the same geographic extent. The coastline is the Decode basemap. Any SVS frame is separate evidence and requires independently verified registration before it can be treated as geographically aligned.
+
 Row 0 is north; column 0 is west in Arabic and English. The only shared focus is `snapshot.focus`. Arrows move it. Pointer activation and Space use the same toggle. Enter probes, P sweeps, L plays calibration, R reads and S submits. Scope character shortcuts to the grid. Keep Tab exits and visible controls. An active playback event does not move keyboard focus. Both layers use the current plan revision and transport event identity for the playhead. Do not start a renderer clock or expose private spatial-plan evidence to resolve the active cell.
 
 In Discovery before Reveal, cells contain only `row`, `col`, `lat` and `lon`. Keep values, statuses, event counts, source imagery, truth and scores out of the visual and accessibility trees. The v2 `expectedCount` hint must be the same in every compared condition when used. Only relay `lastProbe.heard` after a permitted probe; it is a qualitative cue. In a text-only trial it cannot relay an unplayed audio probe. Learning may expose readings and does not submit or score. After Reveal, keep guesses locked. Fixtures must have a visible test-data label when exercised by later integration.
