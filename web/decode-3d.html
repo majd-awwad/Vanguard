@@ -3,33 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Decode the Dust · EARTHPULSE</title>
+  <meta name="color-scheme" content="dark">
+  <title>Hear the Unseen · EARTHPULSE</title>
   <link rel="icon" href="./assets/atlas/pulse.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./visual/platform.css">
   <link rel="stylesheet" href="./visual/decode.css">
   <link rel="stylesheet" href="./decode-page.css">
   <link rel="stylesheet" href="./cinematic/cinematic.css">
-  <style>
-    #decode-visual { pointer-events: none; }
-  </style>
 </head>
-<body>
-  <main class="wrap" id="decode-page">
-    <header class="decode-header">
-      <a id="decode-home" href="./">EARTHPULSE</a>
-      <a id="decode-language" href="?lang=ar" lang="ar" hreflang="ar" hidden>العربية</a>
-    </header>
-    <h1 id="decode-title">Decode the Dust</h1>
-    <p id="cinematic-tagline" class="cinematic-tagline">Turning NASA dust data into sound</p>
-    <p id="decode-state" role="status"></p>
-    <button type="button" id="decode-retry" hidden></button>
+<body class="cine" data-view="hero">
+  <a class="skip" href="#decode-interface">Skip to the decoding controls</a>
 
-    <div id="decode-interface" hidden>
-      <div class="decode-brief">
-        <div class="decode-case">
-          <p id="decode-region"></p>
-          <p id="decode-date"></p>
+  <header class="cine-nav">
+    <a id="decode-home" class="cine-logo" href="./">EARTH<span>PULSE</span></a>
+    <nav class="cine-links" aria-label="Main">
+      <a id="cine-nav-decode" href="./decode-3d.html" aria-current="page">Decode</a>
+      <a id="cine-nav-about" href="./#about">About</a>
+      <a id="cine-nav-science" href="./#lens">Science</a>
+      <a id="cine-nav-dataset" href="./#atlas">Dataset</a>
+    </nav>
+    <div class="cine-tools">
+      <span class="cine-lang" role="group" aria-label="Language">
+        <a id="cine-lang-en" href="?lang=en" lang="en" hreflang="en">EN</a>
+        <span aria-hidden="true">|</span>
+        <a id="cine-lang-ar" href="?lang=ar" lang="ar" hreflang="ar">العربية</a>
+      </span>
+      <button type="button" id="cine-sound" class="cine-icon-button" aria-pressed="false" aria-label="Sound">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 14v-2a8 8 0 0 1 16 0v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="13" width="4" height="7" rx="1.6" fill="currentColor"/><rect x="17" y="13" width="4" height="7" rx="1.6" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="decode-page" class="cine-page">
+    <section id="cine-hero" class="cine-hero" aria-labelledby="decode-title">
+      <div class="cine-copy">
+        <p id="cine-eyebrow" class="cine-eyebrow">NASA Earth data sonification</p>
+        <h1 id="decode-title"><span id="cine-title-lead">HEAR THE</span> <em id="cine-title-accent">UNSEEN</em></h1>
+        <p id="cine-lede" class="cine-lede"></p>
+        <p id="cine-lede2" class="cine-lede"></p>
+        <p id="decode-state" role="status"></p>
+        <button type="button" id="decode-retry" hidden></button>
+
+        <div class="cine-guide">
+          <button type="button" id="cine-play-guide" class="cine-pill" aria-pressed="false">
+            <svg class="cine-play-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+            <span id="cine-play-label">Play Sound Guide</span>
+            <canvas id="cine-wave" width="168" height="34" aria-hidden="true"></canvas>
+          </button>
+          <p id="cine-guide-caption" class="cine-guide-caption" hidden></p>
         </div>
+
+        <ol id="cine-steps" class="cine-icon-steps">
+          <li data-step="listen">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M3 12h2m3-5v10m4-13v16m4-12v8m4-5v2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            <span></span>
+          </li>
+          <li data-step="select">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M15 15l5 2-2 1-1 2z" fill="currentColor"/></svg>
+            <span></span>
+          </li>
+          <li data-step="reveal">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            <span></span>
+          </li>
+        </ol>
+      </div>
+
+      <button type="button" id="cine-start" class="cine-orbit">
+        <svg class="cine-orbit-ring" viewBox="0 0 140 140" aria-hidden="true" focusable="false">
+          <circle cx="70" cy="70" r="64" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1.5"/>
+          <circle class="cine-orbit-arc" cx="70" cy="70" r="64" fill="none" stroke="#5eead4" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="86 316"/>
+        </svg>
+        <span id="cine-start-label">Start Decoding</span>
+        <svg class="cine-orbit-arrow" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 12h15m-5-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="cine-rail" role="group">
+        <button type="button" id="cine-zoom-in" class="cine-icon-button" aria-label="Zoom in">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" id="cine-zoom-out" class="cine-icon-button" aria-label="Zoom out">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" id="cine-compass" class="cine-icon-button cine-compass" aria-label="Reset view, north is up">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M12 3l3.2 9H8.8z" fill="#5eead4"/><path d="M12 21l-3.2-9h6.4z" fill="rgba(255,255,255,.35)"/></svg>
+          <span aria-hidden="true">N</span>
+        </button>
+      </div>
+    </section>
+
+    <div id="decode-interface" class="cine-dock" hidden>
+      <p id="cine-dock-label" class="sr-only"></p>
+      <div class="decode-brief">
         <p id="decode-question"></p>
         <p id="decode-method"></p>
       </div>
@@ -108,7 +173,19 @@
         <p class="decode-source-links"><a id="decode-context"></a> <a id="decode-frame"></a></p>
       </div>
     </section>
+    <div id="cine-bar" class="cine-bar" role="group" aria-label="Case">
+      <svg class="cine-bar-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M12 3l2 2-2 2-2-2zM5 10l2 2-2 2-2-2zM19 10l2 2-2 2-2-2zM7.2 12h9.6M12 7v10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="17.5" r="2.2" fill="currentColor"/></svg>
+      <span id="cine-source" class="cine-bar-source"></span>
+      <span class="cine-bar-sep" aria-hidden="true"></span>
+      <span id="decode-region" class="cine-bar-region"></span>
+      <span class="cine-bar-sep" aria-hidden="true"></span>
+      <span id="decode-date" class="cine-bar-date"></span>
+      <span class="cine-bar-sep cine-bar-challenge-sep" aria-hidden="true"></span>
+      <span id="cine-challenge" class="cine-bar-challenge"></span>
+    </div>
+  
   </main>
+
   <script type="module">
     import { startCinematic } from "./cinematic/main.js";
     startCinematic(document.querySelector("#decode-page"));

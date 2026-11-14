@@ -25,8 +25,8 @@ export const unroll = (p) => {
   return x * x * (3 - 2 * x);
 };
 
-export function spherePoint(lon, lat, out = new Vector3()) {
-  const lo = lon * DEG;
+export function spherePoint(lon, lat, out = new Vector3(), spin = 0) {
+  const lo = (lon + spin) * DEG;
   const la = lat * DEG;
   return out.set(Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo));
 }
@@ -68,39 +68,80 @@ const sphereTemp = new Vector3();
 const flatTemp = new Vector3();
 const normalTemp = new Vector3();
 
-/** A point on the unrolling surface, lifted along its normal so overlays clear the texture. */
-export function surfacePoint(frame, lon, lat, t, lift = 0, out = new Vector3()) {
-  spherePoint(lon, lat, sphereTemp);
+/**
+ * A point on the unrolling surface, lifted along its normal so overlays clear the texture. `spin` (degrees of
+ * longitude) turns only the sphere; the flat map is never spun, so it must be 0 by the time t reaches 1.
+ */
+export function surfacePoint(frame, lon, lat, t, lift = 0, out = new Vector3(), spin = 0) {
+  spherePoint(lon, lat, sphereTemp, spin);
   flatPoint(frame, lon, lat, flatTemp);
   out.lerpVectors(sphereTemp, flatTemp, t);
   normalTemp.lerpVectors(sphereTemp, frame.normal, t).normalize();
   return out.addScaledVector(normalTemp, lift);
 }
 
-/** World-to-camera and projection matrices at fly-to progress p for a canvas of the given aspect. */
-export function cameraMatrices(frame, p, aspect) {
+export const HERO_DISTANCE = 3.5;
+export const HERO_SHIFT = 0.42;
+const HERO_LON = 8;
+const HERO_LAT = 18;
+
+/** Longitude spin (degrees) left on the sphere at fly-to progress p: it unwinds to 0 before the unroll. */
+export function flightSpin(spinStart, p) {
+  const x = clamp01(ease(p) / 0.6);
+  return spinStart * (1 - x * x * (3 - 2 * x));
+}
+
+/**
+ * Off-axis frustum, at the near plane, that maps the region rectangle (seen flat from PLANE_DISTANCE) exactly onto
+ * a pixel rectangle of the canvas. With no rect it is the whole canvas.
+ */
+export function fitFrustum(frame, rect = null, canvas = { width: 1, height: 1 }) {
+  const { width, height } = canvas;
+  const box = rect ?? { x0: 0, y0: 0, x1: width, y1: height };
+  const ndcLeft = (2 * box.x0) / width - 1;
+  const ndcRight = (2 * box.x1) / width - 1;
+  const ndcTop = 1 - (2 * box.y0) / height;
+  const ndcBottom = 1 - (2 * box.y1) / height;
+  const scale = NEAR / PLANE_DISTANCE;
+  const w = (4 * (frame.lonSpan / 2) * DEG * scale) / (ndcRight - ndcLeft);
+  const h = (4 * (frame.latSpan / 2) * DEG * scale) / (ndcTop - ndcBottom);
+  const sumX = (-(ndcLeft + ndcRight) * w) / 2;
+  const sumY = (-(ndcTop + ndcBottom) * h) / 2;
+  return { left: (sumX - w) / 2, right: (sumX + w) / 2, top: (sumY + h) / 2, bottom: (sumY - h) / 2 };
+}
+
+/**
+ * World-to-camera and projection matrices at fly-to progress p. At p = 0 the camera holds the hero pose: the globe
+ * is shifted to one side by `hero.shift` (NDC; negative mirrors the layout) at `hero.distance`. At p = 1 it looks
+ * straight down the unrolled region through fitFrustum(rect). Without `hero` it starts from the plain overview.
+ */
+export function cameraMatrices(frame, p, aspect, { rect = null, canvas = null, hero = null } = {}) {
   const e = ease(p);
-  const overview = spherePoint(frame.lon0 - 55, Math.min(60, frame.lat0 * 0.5 + 12));
+  const overview = hero
+    ? spherePoint(HERO_LON, HERO_LAT)
+    : spherePoint(frame.lon0 - 55, Math.min(60, frame.lat0 * 0.5 + 12));
   const direction = overview.clone().applyQuaternion(
     new Quaternion().slerp(new Quaternion().setFromUnitVectors(overview, frame.normal), e));
-  const radius = OVERVIEW_DISTANCE + (1 + PLANE_DISTANCE - OVERVIEW_DISTANCE) * e;
+  const startDistance = hero?.distance ?? OVERVIEW_DISTANCE;
+  const radius = startDistance + (1 + PLANE_DISTANCE - startDistance) * e;
   const eye = direction.multiplyScalar(radius);
   const target = frame.normal.clone().multiplyScalar(e);
   const up = new Vector3(0, 1, 0).lerp(frame.north, e).normalize();
   const world = new Matrix4().lookAt(eye, target, up).setPosition(eye);
 
   const tanHalf = Math.tan((OVERVIEW_FOV * DEG) / 2);
-  const symmetric = { top: NEAR * tanHalf, right: NEAR * tanHalf * aspect };
-  const fit = {
-    top: ((frame.latSpan / 2) * DEG * NEAR) / PLANE_DISTANCE,
-    right: ((frame.lonSpan / 2) * DEG * NEAR) / PLANE_DISTANCE,
-  };
-  const top = symmetric.top + (fit.top - symmetric.top) * e;
-  const right = symmetric.right + (fit.right - symmetric.right) * e;
+  const halfH = NEAR * tanHalf;
+  const halfW = halfH * aspect;
+  const shift = hero?.shift ?? 0;
+  const symmetric = { left: -halfW * (1 + shift), right: halfW * (1 - shift), top: halfH, bottom: -halfH };
+  const fit = fitFrustum(frame, rect, canvas ?? { width: aspect, height: 1 });
+  const mix = (a, b) => a + (b - a) * e;
   return {
     view: world.clone().invert(),
     world,
-    projection: new Matrix4().makePerspective(-right, right, top, -top, NEAR, FAR),
+    projection: new Matrix4().makePerspective(
+      mix(symmetric.left, fit.left), mix(symmetric.right, fit.right),
+      mix(symmetric.top, fit.top), mix(symmetric.bottom, fit.bottom), NEAR, FAR),
   };
 }
 
@@ -190,6 +231,34 @@ export function gridLines(frame, rows, cols, { t, lift = 0, segments = 24 }) {
     for (let k = 0; k < segments; k++) {
       push(lon, north - ((north - south) * k) / segments);
       push(lon, north - ((north - south) * (k + 1)) / segments);
+    }
+  }
+  return new Float32Array(positions);
+}
+
+/**
+ * Four L-shaped corner brackets per cell (two thin quads each), for selections. Sizes are in degrees so the arms
+ * have the same pixel width on every side. `arm` is the arm length as a fraction of the shorter cell edge.
+ */
+export function bracketTriangles(frame, rects, { t, lift = 0, insetDeg = 0.7, thicknessDeg = 0.4, arm = 0.28, spin = 0 }) {
+  const positions = [];
+  const push = (lon, lat) => surfacePoint(frame, lon, lat, t, lift, flatTemp.clone(), spin).toArray(positions, positions.length);
+  const quad = (lonA, latA, lonB, latB) => {
+    push(lonA, latA); push(lonB, latA); push(lonA, latB);
+    push(lonB, latA); push(lonB, latB); push(lonA, latB);
+  };
+  for (const rect of rects) {
+    const width = rect.east - rect.west;
+    const height = rect.north - rect.south;
+    const inset = Math.min(insetDeg, width * 0.25, height * 0.25);
+    const thick = Math.min(thicknessDeg, width * 0.1, height * 0.1);
+    const length = arm * Math.min(width, height);
+    // [corner longitude, inward longitude direction] and [corner latitude, inward latitude direction]
+    for (const [lon, inLon] of [[rect.west + inset, 1], [rect.east - inset, -1]]) {
+      for (const [lat, inLat] of [[rect.north - inset, -1], [rect.south + inset, 1]]) {
+        quad(lon, lat, lon + inLon * length, lat + inLat * thick); // arm along the top or bottom edge
+        quad(lon, lat, lon + inLon * thick, lat + inLat * length); // arm along the west or east edge
+      }
     }
   }
   return new Float32Array(positions);
