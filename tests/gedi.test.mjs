@@ -51,12 +51,21 @@ test("the browser plans match the Python science reference for both axes", () =>
   const script = fileURLToPath(new URL("sonification.py", science));
   const modes = [
     ["horizontal", ["--band", "4", "10"]],
+    ["horizontal", ["--band", "-10", "22"]],
+    ["horizontal", ["--band", "21", "22"]],
     ...data.footprints.map((row) => ["vertical", ["--shot", row.id]]),
   ];
   for (const [axis, args] of modes) {
     const reference = JSON.parse(execFileSync(python, ["-B", script, axis, ...args], { encoding: "utf8" }));
-    const plan = makePlan(data, { ...selection, axis, shotId: axis === "vertical" ? args[1] : selection.shotId });
+    const plan = makePlan(data, { ...selection, axis,
+      shotId: axis === "vertical" ? args[1] : selection.shotId,
+      bandM: axis === "horizontal" ? args.slice(1).map(Number) : selection.bandM,
+    });
     assert.equal(plan.mappingVersion, reference.mapping_version);
+    for (const { tone } of plan.events.filter((event) => event.tone)) {
+      assert.deepEqual([tone.frequencyHz, tone.durationS, tone.attackS, tone.releaseS],
+        [reference.tone.frequency_hz, reference.tone.duration_s, reference.tone.linear_attack_s, reference.tone.linear_release_s]);
+    }
     assert.deepEqual(plan.events.map((event) => [
       event.evidence.observationId, event.evidence.band, event.onsetS, event.evidence.value,
       event.tone?.gain ?? null, event.evidence.observationStatus,
@@ -65,6 +74,46 @@ test("the browser plans match the Python science reference for both axes", () =>
       { positive_residual: "measured", below_processing_threshold: "below_threshold", unavailable: "missing" }[event.status],
     ]));
   }
+});
+
+test("guided preview schedules only the chosen tone and vertical discovery keeps its source", async () => {
+  let elapsed = 0;
+  const scheduled = [];
+  const audioParam = () => ({ setValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {} });
+  const context = {
+    state: "running",
+    get currentTime() { return elapsed; },
+    createGain: () => ({ gain: audioParam(), connect() {} }),
+    createOscillator: () => ({ frequency: {}, connect() {}, start: (when) => scheduled.push(when), stop() {} }),
+  };
+  const { transport, advance } = testClock({ createContext: () => context });
+  const { dispatch, snapshot } = createSession(data, transport);
+  await dispatch({ type: "compare", shotId: data.guide.low, preview: true });
+  assert.equal(scheduled.length, 1);
+  elapsed += 0.15;
+  advance(0.15);
+  assert.equal(snapshot().transport.status, "paused");
+  assert.equal(snapshot().observation.id, data.guide.low);
+  dispatch({ type: "inspect", shotId: data.guide.high });
+  assert.equal(snapshot().inspected.observationId, data.guide.high);
+  assert.deepEqual(snapshot().inspected.band, [4, 10]);
+  await dispatch({ type: "guide-vertical" });
+  assert.equal(snapshot().plan.axis, "vertical");
+  assert.equal(snapshot().observation.id, data.guide.high);
+  assert.equal(snapshot().transport.status, "playing");
+});
+
+test("track gaps keep the previous observation separate from the next sampled event", async () => {
+  const { transport, advance } = testClock();
+  const { dispatch, snapshot } = createSession(data, transport);
+  await dispatch({ type: "replay", mode: "silent" });
+  assert.equal(snapshot().inTrackGap, false);
+  advance(0.2);
+  assert.equal(snapshot().inTrackGap, true);
+  assert.equal(snapshot().observation.id, data.footprints[0].id);
+  advance(snapshot().plan.events[1].onsetS - 0.2);
+  assert.equal(snapshot().inTrackGap, false);
+  assert.equal(snapshot().observation.id, data.footprints[1].id);
 });
 
 test("guided comparison, live position, step and locked evidence use the same observation", async () => {

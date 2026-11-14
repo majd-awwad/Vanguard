@@ -14,6 +14,7 @@ export function createTransport({
   let revision = 0;
   let token = 0;
   let position = 0;
+  let limit;
   let origin = 0;
   let clock = now;
   let status = "idle";
@@ -25,7 +26,7 @@ export function createTransport({
 
   function snapshot() {
     const positionS = status === "playing"
-      ? Math.min(plan.durationS, position + Math.max(0, clock() - origin) * speed) : position;
+      ? Math.min(limit, position + Math.max(0, clock() - origin) * speed) : position;
     const current = plan?.events.findLast((event) => event.onsetS <= positionS + 1e-9);
     return {
       planRevision: revision, status, positionS, activeEventId: current?.id ?? null,
@@ -54,36 +55,44 @@ export function createTransport({
 
   function scheduleAudio() {
     for (const event of plan.events) {
-      if (!event.tone || event.onsetS < position - 1e-9) continue;
-      const { frequencyHz, attackS, releaseS, durationS, gain } = event.tone;
-      const start = origin + (event.onsetS - position) / speed;
-      const end = start + durationS / speed;
-      const oscillator = context.createOscillator();
-      const envelope = context.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequencyHz;
-      envelope.gain.setValueAtTime(0, start);
-      envelope.gain.linearRampToValueAtTime(gain, start + attackS / speed);
-      envelope.gain.setValueAtTime(gain, end - releaseS / speed);
-      envelope.gain.linearRampToValueAtTime(0, end);
-      oscillator.connect(envelope);
-      envelope.connect(master);
-      pending.add(oscillator);
-      oscillator.onended = () => {
-        pending.delete(oscillator);
-        oscillator.disconnect();
-        envelope.disconnect();
-      };
-      oscillator.start(start);
-      oscillator.stop(end);
+      if (!event.tone || event.onsetS >= limit) continue;
+      const voices = event.tone.pulses ?? [0];
+      for (const offset of voices) scheduleTone(event.tone, event.onsetS + offset);
     }
+  }
+
+  function scheduleTone(tone, onset) {
+      const { frequencyHz, attackS, releaseS, durationS, gain, waveform = "sine" } = tone;
+      if (onset < position - 1e-9 || onset >= limit) return;
+      const start = origin + (onset - position) / speed;
+      const end = start + Math.min(durationS, limit - onset) / speed;
+      const span = (end - start) * speed;
+      if (span < attackS + releaseS) return;
+    const oscillator = context.createOscillator();
+    const envelope = context.createGain();
+    oscillator.type = waveform;
+    oscillator.frequency.value = frequencyHz;
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(gain, start + attackS / speed);
+    envelope.gain.setValueAtTime(gain, end - releaseS / speed);
+    envelope.gain.linearRampToValueAtTime(0, end);
+    oscillator.connect(envelope);
+    envelope.connect(master);
+    oscillator.onended = () => {
+      pending.delete(oscillator);
+      oscillator.disconnect();
+      envelope.disconnect();
+    };
+    oscillator.start(start);
+    pending.add(oscillator);
+    oscillator.stop(end);
   }
 
   function tick() {
     if (status !== "playing") return;
-    if (snapshot().positionS >= plan.durationS) {
-      position = plan.durationS;
-      status = "ended";
+    if (snapshot().positionS >= limit) {
+      position = limit;
+      status = limit === plan.durationS ? "ended" : "paused";
       frame = undefined;
       emit();
       return;
@@ -101,9 +110,10 @@ export function createTransport({
     tick();
   }
 
-  async function play(mode = "audio") {
+  async function play(mode = "audio", previewDuration) {
     if (!plan || status === "playing" || status === "starting") return;
     if (status === "ended") position = 0;
+    limit = previewDuration === undefined ? plan.durationS : Math.min(plan.durationS, position + previewDuration);
     audioUnavailable = false;
     if (mode === "silent") {
       startRunning("silent");
@@ -180,6 +190,7 @@ export function createTransport({
       }
     },
     setVolume(next) {
+      if (!Number.isFinite(next)) return;
       volume = Math.max(0, Math.min(1, next));
       updateVolume();
       emit();

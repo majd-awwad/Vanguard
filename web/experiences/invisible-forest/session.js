@@ -1,4 +1,4 @@
-import { makePlan, bandEvidence } from "../../audio/gedi-plan.js";
+import { makePlan, bandEvidence, tone } from "../../audio/gedi-plan.js";
 
 export function createSession(data, transport) {
   const listeners = new Set();
@@ -13,7 +13,9 @@ export function createSession(data, transport) {
   function snapshot() {
     const event = plan.events.find((item) => item.id === transportState.activeEventId) ?? plan.events[0];
     const observation = shotAt(event.evidence.observationId);
-    return { selection, plan, transport: transportState, event, observation, inspected, revealed, exploration };
+    const inTrackGap = plan.axis === "horizontal" && transportState.status === "playing"
+      && event !== plan.events.at(-1) && transportState.positionS >= event.onsetS + tone.durationS;
+    return { selection, plan, transport: transportState, event, observation, inspected, revealed, exploration, inTrackGap };
   }
 
   function emit() {
@@ -38,6 +40,7 @@ export function createSession(data, transport) {
 
   function dispatch(intent) {
     const current = snapshot();
+    const preview = () => intent.preview ? transport.play(current.transport.playback, tone.durationS) : undefined;
     switch (intent.type) {
       case "axis": {
         if (selection.axis === intent.axis) return;
@@ -52,32 +55,47 @@ export function createSession(data, transport) {
         } else {
           transport.seek(startOfShot(intent.shotId)(plan));
         }
-        return;
+        return preview();
       }
       case "band":
         if (selection.axis !== "horizontal") return;
         select({ ...selection, bandM: intent.band, shotId: current.observation.id }, startOfShot(current.observation.id));
-        return;
+        return preview();
       case "height":
         if (selection.axis === "vertical" && plan.events[intent.index]) {
           transport.seek(plan.events[intent.index].onsetS);
+          return preview();
         }
         return;
-      case "compare":
+      case "compare": {
         if (![data.guide.low, data.guide.high].includes(intent.shotId)) return;
         select({ axis: "horizontal", shotId: intent.shotId, bandM: data.guide.band }, startOfShot(intent.shotId));
-        return;
+        return preview();
+      }
       case "step": {
         const index = plan.events.indexOf(current.event);
         const next = Math.max(0, Math.min(plan.events.length - 1, index + intent.direction));
         transport.seek(plan.events[next].onsetS);
-        return;
+        return preview();
       }
-      case "inspect":
+      case "inspect": {
+        const event = intent.shotId === undefined ? current.event : comparison.find(
+          (entry) => entry.observation.id === intent.shotId,
+        );
+        if (!event) return;
         transport.pause();
-        inspected = { ...current.event.evidence, observation: current.observation };
+        inspected = { ...event.evidence, observation: shotAt(event.evidence.observationId) };
         emit();
         return;
+      }
+      case "guide-vertical":
+        if (intent.restart) {
+          revealed = false;
+          exploration = false;
+        }
+        select({ axis: "vertical", shotId: data.guide.high, bandM: data.guide.band });
+        if (intent.prepare) return;
+        return transport.play(intent.mode ?? current.transport.playback);
       case "reveal":
         revealed = true;
         emit();
@@ -97,11 +115,13 @@ export function createSession(data, transport) {
     }
   }
 
+  const comparison = [data.guide.low, data.guide.high].map((id) => {
+    const observation = shotAt(id);
+    return { observation, evidence: bandEvidence(data, observation, data.guide.band) };
+  });
+
   return {
-    data, snapshot, dispatch,
-    comparison: data.footprints.map((row) => ({
-      observation: row, evidence: bandEvidence(data, row, data.guide.band),
-    })).filter(({ observation }) => [data.guide.low, data.guide.high].includes(observation.id)),
+    data, snapshot, dispatch, comparison,
     subscribe(listener) {
       listeners.add(listener);
       listener(snapshot());

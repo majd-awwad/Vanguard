@@ -18,8 +18,9 @@ export function renderEvidence(root, evidence, data, language, text) {
   }[observationStatus];
   const values = [
     ["observationId", observation.id, true],
-    ["heightBand", `[${number(band[0])}, ${number(band[1])}) ${metre}`],
+    ["heightBand", `[${number(band[0])}, ${number(band[1])}) ${metre}`, true],
     ["returnShare", value === null ? text(label) : percent(value)],
+    ["exactFraction", value === null ? "—" : String(value), true],
     ["evidenceStatus", text(label)],
     ["time", observation.utc, true],
     ["center", observation.coordinates.join(", "), true],
@@ -29,6 +30,7 @@ export function renderEvidence(root, evidence, data, language, text) {
     ["ground", `${number(raw.l2a_elev_lowestmode_m_ellipsoid, 4)} ${metre}`],
     ["acquisitionQuality", `${raw.flags.quality_flag} / ${raw.flags.degrade_flag} / ${raw.l2a_sensitivity}`, true],
     ["rxIndex", `${raw.l1b_rx_sample_start_index_1_based} / ${raw.l1b_rx_sample_count}`, true],
+    ["granuleRows", `${raw.l1b_row_0_based} / ${raw.l2a_row_0_based}`, true],
     ["mappingVersion", mappingVersion, true],
   ];
   const list = document.createElement("dl");
