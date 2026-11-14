@@ -326,3 +326,39 @@ test("places: summaries use real cells and missing is counted; fingerprints are 
   assert.deepEqual([...new Set(joined.events.map((e) => e.place))], ["a", "b"]);
   assert.ok(joined.durationS > fpCell.durationS + fpArea.durationS);
 });
+
+import { decodeShare, encodeShare } from "../web/studio/share.js";
+
+test("share links: round trip, validated, nothing outside the region or catalog survives", () => {
+  const dates = Object.fromEntries(catalog.snapshots.map((s) => [s.id, s.date]));
+  const apr = idOfDate("2025-04-15");
+  const jul = idOfDate("2025-07-15");
+  const params = encodeShare({ snapshotId: apr, comparison: { a: apr, b: jul }, rect: { west: 0, south: 22, east: 20, north: 32 }, path: [{ lon: -10, lat: 30 }, { lon: 10, lat: 26 }] }, dates);
+  const back = decodeShare("?" + params.toString(), catalog, bounds);
+  assert.equal(back.snapshotId, apr);
+  assert.equal(back.cmp.status, "published");
+  assert.deepEqual(back.rect, { west: 0, south: 22, east: 20, north: 32 });
+  assert.equal(back.path.length, 2);
+  const hostile = decodeShare("?date=2030-01-01&cmp=2025-01-15,2025-04-15&rect=-90,0,300,500&path=999,999;10,26;x,y;" + "1,20;".repeat(100), catalog, bounds);
+  assert.equal(hostile.snapshotId, undefined);
+  assert.equal(hostile.cmp, undefined, "an unavailable cross-build comparison is never restored");
+  assert.equal(hostile.rect, undefined);
+  assert.ok(hostile.path.length <= 40 && hostile.path.every((p) => p.lon >= -20 && p.lon <= 50 && p.lat >= 15 && p.lat <= 45));
+  assert.ok(!/audio|sound/i.test(params.toString()));
+});
+
+test("studio page: spoiler lock, shared nav link, no NASA logo, no invented sources", () => {
+  const html = read("web/pages/studio.html");
+  assert.match(html, /id="site-nav"/);
+  const studio = read("web/studio/studio.js");
+  assert.match(studio, /spoilersUnlocked\(\)/);
+  assert.match(studio, /allowSpoilersThisVisit/);
+  const nav = read("web/cinematic/site/nav.js");
+  assert.match(nav, /pages\/studio\.html/);
+  const all = ["studio.js", "tools.js", "compare.js", "share.js", "renderer-gl.js", "renderer-2d.js", "studio-copy.js", "mapping.js", "field.js"].map((f) => read("web/studio/" + f)).join("\n");
+  assert.ok(!/nasa-logo|insignia|meatball/i.test(all));
+  assert.ok(!/svs-5669/.test(all), "the SVS image is never drawn on the map");
+  assert.match(JSON.stringify(studioCopy.en), /not a daily, monthly or seasonal average/);
+  assert.match(JSON.stringify(studioCopy.en), /Display smoothing/);
+  assert.match(JSON.stringify(studioCopy.en), /pitch carries latitude/);
+});

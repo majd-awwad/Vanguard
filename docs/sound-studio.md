@@ -67,3 +67,75 @@ analyser tap the rest of the site uses, so the waveform shown is the real output
 
 Touch: with sound on, one finger pressed and dragged listens; two fingers pan and zoom. Keyboard: the map is focusable;
 arrows move a cursor cell by cell (left is always west), `R` reads the value as text, `Space` plays the cell.
+
+## Play an area (M3)
+
+"Play visible area" scans the part of the dataset region currently on screen; "Play selected area" scans a rectangle
+drawn with the Select-area tool (drag, or `Enter` at two corners). The scan reads cells west to east along each row,
+rows from north to south, one tone per cell (0.07 s per cell at 1x; speed 0.5x to 4x). When an area has more than 300
+cells, every k-th row and column is read (k shown in the summary), so a scan never exceeds 300 cells. A white line and a
+box show the cell being read; they follow the transport's own clock, and the Understand panel shows the same cell
+and value. When the scan ends, the summary gives the number of cells read, lowest, highest, and mean of the real cell
+values, the number missing, and the area. The mean is a plain average of cell values (cells are equal in degrees, not
+in area).
+
+## Draw a path (M4)
+
+With the Draw-path tool, click or tap to add points, or press `Enter` at the keyboard cursor (`Backspace` removes the
+last point, `Escape` clears). The path is sampled at equal great-circle distance (about one sample per 130 km, at most
+160), linear in longitude/latitude between points; each sample uses the value of the nearest cell (samples outside the
+region count as missing). The path plays at 0.12 s per sample with a progress marker on the map and on the profile chart,
+which plots the same real cell values on the fixed log scale, with missing samples drawn as grey bars. A summary
+(samples, lowest, highest, mean, missing, distance) follows the end of playback.
+
+## Compare (M5)
+
+**Dates.** Pick any two of the 13 snapshots; the earlier is always the first and the change is *second minus first*.
+- If the catalog publishes that pair (`catalog.comparisons`: 2025-04-15 to 2025-07-15, 2025-07-15 to 2025-10-15), the
+  published file is loaded.
+- Otherwise, if both dates are in the same compatibility group (same literal model build label), the difference is
+  computed in the browser with `compareDustSnapshots`, and the page says so.
+- Across the two build groups the comparison is **unavailable**, with the catalog's own reason
+  ("Different literal model build labels; numerical build equivalence unverified."). Nothing is computed or drawn.
+- Colours (fixed for every pair): increase purple, decrease orange, near zero neutral grey. The near-zero display band is
+  `|change| < 0.02` (about 1% of the highest value in the catalog); it is a display band, not a scientific threshold.
+  The colour scale saturates at +/-1.5. Missing is hatched grey and stays missing ("unavailable"), never zero or no change.
+- Sound: a rising two-note step (440 Hz up) for an increase, a falling step for a decrease, a wider step for a bigger
+  change (1 to 12 semitones), one steady 440 Hz note inside the near-zero band, a soft click for missing.
+
+**Places A and B.** Set each place from the cursor cell or from the selected rectangle. Both show their real value (cell)
+or min/max/mean/missing (area) and the difference of the means. "Play A then B" plays each place's sound fingerprint
+back to back with a short gap: a cell repeats its tone three times; an area plays up to 24 of its cells west to east.
+
+## Share link (optional)
+
+"Copy link" stores `date`, `cmp` (two dates), `rect` and `path` in the URL. On load every field is validated against the
+catalog and the region; an unavailable comparison or out-of-region point is dropped. No audio is stored.
+
+## Accessibility
+
+The map is one focusable region (`role="application"`): arrows move a cell cursor (left is always west, also in
+Arabic), `R` reads the value as text in a live region, `Space` plays the cell, `+`/`-` zoom, `Home` resets, Shift+arrows pan,
+and the tools have keyboard equivalents. All controls are real buttons, selects and sliders. Reduced motion turns off
+view animation. Without WebGL a 2D canvas map shows the same layer (`?renderer=2d` forces it).
+
+## Notes for Majd and Mohammad
+
+- `web/sources/decode/dust-visual.js` was used as is. `compareDustSnapshots` validates statistics strictly, which the
+  tests rely on. A `catalog.bounds` and a documented `validRange` would let the fixed scales be read from the catalog
+  instead of being constants (`field.js`: `VALUE_MIN`, `VALUE_MAX`, `DIFF_MAX`); a test checks every real value lies inside.
+- The catalog's `unavailableComparisons` lists only one pair; the Studio derives the others from `compatibilityGroups`
+  and shows the catalog's reason text for all of them.
+- `docs/dust-v2-data.md` says a season selection only enumerates sampled dates; the Studio follows that.
+- The shared nav now has a "Sound Studio" link (`web/cinematic/site/nav.js`, also used by the Decode 3D page). Linking from
+  `web/index.html` is still Majd's file.
+- Mohammad's commit 49a9406 (which deletes atlas/forest files) is not merged into this branch.
+
+## Limitations
+
+- The Studio is a flat plate carree map textured with the same NASA Blue Marble used by the globe; the Decode globe's own
+  scene (`web/cinematic/scene.js`, read-only for this feature) is locked to the Decode grid registration, so it was not
+  reused as a renderer. The textures, three.js and site shell are shared.
+- Sound was verified through the real Web Audio analyser in headless Edge (peak frequency matches the mapping), not by ear;
+  touch listening was not tested on a real touch device.
+- The 25 x 40 grid is 1.2 x 1.75 degrees; zoomed in, the smooth field is interpolation, which the page says.

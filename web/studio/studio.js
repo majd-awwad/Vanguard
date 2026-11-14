@@ -9,6 +9,7 @@ import { createGlRenderer } from "./renderer-gl.js";
 import { studioCopy } from "./studio-copy.js";
 import { createStudioAudio } from "./audio.js";
 import { mountCompare } from "./compare.js";
+import { decodeShare, mountShare } from "./share.js";
 import { mountTools } from "./tools.js";
 import { drawWaveform } from "../cinematic/audio-tap.js";
 import { loadSettings, saveSettings } from "../cinematic/site/settings.js";
@@ -50,7 +51,9 @@ async function mountStudio(document, root, language) {
   const getSnapshot = async (id) => { if (!cache.has(id)) cache.set(id, await loadDustSnapshot(id)); return cache.get(id); };
   try {
     [catalog, grid] = await Promise.all([loadDustCatalog(), loadDustGrid()]);
-    cache.set(DEFAULT_SNAPSHOT, await loadDustSnapshot(params.get("date") && catalog.snapshots.some((s) => s.id === params.get("date")) ? params.get("date") : DEFAULT_SNAPSHOT));
+    const wanted = decodeShare(new URL(document.URL).search, catalog, catalog.bounds ?? grid.bounds);
+    const startId = wanted.snapshotId ?? DEFAULT_SNAPSHOT;
+    cache.set(startId, await loadDustSnapshot(startId));
   } catch (error) {
     console.error(error);
     const retry = h(document, "button", { type: "button", class: "button", text: c.retry });
@@ -71,7 +74,7 @@ async function mountStudio(document, root, language) {
   const fmtChange = (value) => (value === null || value === undefined ? "—" : (value > 0 ? "+" : value < 0 ? "−" : "") + trimNumber(Math.abs(value), Math.abs(value) < 0.01 ? 4 : 3));
 
   // ---- Map frame
-  el.frame = h(document, "div", { class: "st-map", tabindex: "0", role: "application", "aria-label": c.map.label, "aria-describedby": "st-keys" });
+  el.frame = h(document, "div", { class: "st-map", dir: "ltr", tabindex: "0", role: "application", "aria-label": c.map.label, "aria-describedby": "st-keys" });
   el.overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   el.overlay.setAttribute("class", "st-overlay");
   el.overlay.setAttribute("aria-hidden", "true");
@@ -433,5 +436,6 @@ async function mountStudio(document, root, language) {
   state.api = api;
   mountTools(api);
   mountCompare(api);
+  mountShare(api);
   return api;
 }
