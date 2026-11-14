@@ -77,3 +77,10 @@ export function textureCrop(bounds) {
 export function fill(template, values) {
   return String(template).replace(/\{(\w+)\}/g, (_, key) => (key in values ? String(values[key]) : "{" + key + "}"));
 }
+
+/** Like fill(), but in Arabic isolates each value left-to-right so numbers and Latin codes keep their order. */
+export function fillIso(template, values, language) {
+  const out = {};
+  for (const [key, value] of Object.entries(values)) out[key] = language === "ar" && typeof value !== "object" ? "\u2066" + value + "\u2069" : value;
+  return fill(template, out);
+}

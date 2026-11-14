@@ -218,3 +218,53 @@ test("every site page and the Decode 3D page link to the shared settings and nav
   }
   assert.ok(read("web/cinematic/main.js").includes("NAV_ITEMS"));
 });
+
+import { compareValues, levelMax, cellOf, ZOOM_MAX, ZOOM_MIN } from "../web/cinematic/site/explore.js";
+import { exploreCopy } from "../web/cinematic/site/explore-copy.js";
+import { mountCellGrid } from "../web/cinematic/site/cell-grid.js";
+
+test("explore: comparison is numerical, pure and handles missing values", () => {
+  assert.deepEqual(compareValues(0.3, 0.1), { difference: 0.19999999999999998, higher: "a" });
+  assert.equal(compareValues(0.1, 0.1).higher, null);
+  assert.equal(compareValues(null, 0.1), null);
+  const snapshot = { grid: { cells: [{ row: 0, col: 0, value: 0.2 }, { row: 0, col: 1, value: null }, { row: 1, col: 0, value: 0.5 }] } };
+  assert.equal(levelMax(snapshot), 0.5);
+  assert.equal(cellOf(snapshot, 1, 0).value, 0.5);
+  assert.ok(ZOOM_MIN === 1 && ZOOM_MAX > 1);
+});
+
+test("explore: copy parity, spoiler lock wiring, learning mode, no invented content", () => {
+  const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "object" ? k + "{" + keys(o[k]) + "}" : k)).join();
+  assert.equal(keys(exploreCopy.en), keys(exploreCopy.ar));
+  const src = read("web/cinematic/site/explore.js");
+  assert.match(src, /spoilersUnlocked\(\)/);
+  assert.match(src, /mode: "learning"/);
+  assert.match(src, /mode: "contrast"/);
+  assert.ok(!/rainfall|timeline|global/i.test(JSON.stringify(exploreCopy)));
+  assert.match(JSON.stringify(exploreCopy.en), /positions inside a cell are artistic/);
+});
+
+test("cell grid: roving tabindex, geography never mirrors, aria states are strings", () => {
+  const made = [];
+  const node = (tag) => { const n = { tag, attrs: {}, children: [], style: {}, dataset: {}, listeners: {},
+    setAttribute(k, v) { n.attrs[k] = String(v); }, removeAttribute(k) { delete n.attrs[k]; }, append(...c) { n.children.push(...c); }, replaceChildren() { n.children = []; },
+    addEventListener(t, f) { n.listeners[t] = f; }, closest: () => n, focus() { n.focused = true; }, set className(v) { n.attrs.class = v; }, set textContent(v) { n.text = v; }, set tabIndex(v) { n.attrs.tabindex = String(v); }, get tabIndex() { return Number(n.attrs.tabindex); } }; made.push(n); return n; };
+  const doc = { createElement: node };
+  const host = node("div");
+  const api = mountCellGrid(doc, host, { rows: 2, cols: 3, label: "grid", describe: () => "cell", onChoose() {}, helpId: "help" });
+  assert.equal(api.buttons.length, 2);
+  assert.equal(api.buttons[0].length, 3);
+  assert.equal(api.buttons[0][0].attrs.tabindex, "0");
+  assert.equal(api.buttons[1][2].attrs.tabindex, "-1");
+  api.setSelected({ a: [0, 1], b: [1, 2] });
+  assert.equal(api.buttons[0][1].attrs["aria-selected"], "true");
+  assert.equal(api.buttons[0][1].dataset.role, "a");
+  assert.equal(api.buttons[0][0].attrs["aria-selected"], "false");
+  // ArrowRight from [0,0] goes east (col + 1) regardless of text direction.
+  const target = api.buttons[0][0];
+  target.dataset.row = "0"; target.dataset.col = "0";
+  let prevented = false;
+  host.listeners.keydown({ key: "ArrowRight", target, preventDefault() { prevented = true; } });
+  assert.ok(prevented);
+  assert.equal(api.buttons[0][1].focused, true);
+});

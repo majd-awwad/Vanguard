@@ -26,3 +26,18 @@ Sound Lab, Accessibility & Settings, Explore Earth. Status is tracked at the bot
 - [x] About: `/pages/about.html` (six first names only, no roles, bios or photos; listening study stated as planned)
 - [x] Sound Lab: `/pages/sound-lab.html`
 - [x] Accessibility & Settings: `/pages/settings.html`
+- [x] Explore Earth: `/pages/explore.html` (locked until Decode finished once; "Show anyway" per tab)
+
+## Notes for Majd (additions)
+
+- `web/cinematic/main.js` (Decode 3D) now reads the shared settings and sets `earthpulse.decode.completed.v1` when a *discovery* session reaches Reveal; no file outside the allowed set changed.
+- `web/decode.js` could expose a stable `onComplete` hook so the flag does not depend on the snapshot shape.
+- Sound Lab hides the numeric value, the threshold result and the gain of a cell until Decode is finished (or "Show anyway"), because gain is a monotonic function of the value.
+- In the spatial plan only `measured` cells sound: below-threshold cells are silent. Pages say "silence does not mean dust-free".
+- Explore Earth zoom scales the registered stage (1x to 1.35x); the scene's own `zoom()` only affects the hero pose.
+
+## Limitations
+
+- Audio verified through the real AnalyserNode in headless Edge (a signal is present), not by ears.
+- Arabic text is a first translation and needs native review.
+- Spoken instructions are offered only if a voice for the current language is installed.
