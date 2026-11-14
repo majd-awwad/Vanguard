@@ -15,6 +15,7 @@ const playbackCompletionKeys = new Map([
   ["contrast", "listen.contrastCompleted"],
   ["cell", "grid.probeCompleted"],
 ]);
+const visualRelations = new Set(["SAME_DATA", "SAME_MODEL_DIFFERENT_RUN", "RELATED_CONTEXT"]);
 const positionKey = ([row, col]) => `${row}:${col}`;
 
 function setAttribute(element, name, value) {
@@ -29,7 +30,7 @@ export function mountDecodeGrid(root, session, { t }) {
   let buttons = [];
   let disposed = false;
   let revealedScore;
-  let revealedNote;
+  let revealedProvenance;
   let revealAnnouncement;
 
   const announce = (key, params) => {
@@ -73,7 +74,7 @@ export function mountDecodeGrid(root, session, { t }) {
     if (!sameReveal) {
       if (revealAnnouncement && status.textContent === revealAnnouncement) status.textContent = "";
       revealedScore = undefined;
-      revealedNote = undefined;
+      revealedProvenance = undefined;
       revealAnnouncement = undefined;
     }
     if (snapshot.phase !== "reveal") return [];
@@ -91,10 +92,29 @@ export function mountDecodeGrid(root, session, { t }) {
       }
     }
 
-    const note = snapshot.visualLink?.note;
-    if (typeof note === "string" && note.trim() && note !== revealedNote) {
-      parts.push(note);
-      revealedNote = note;
+    const { relation, note } = snapshot.visualLink ?? {};
+    const relationText = visualRelations.has(relation) ? t(`reveal.relation.${relation}`) : "";
+    const originalNote = typeof note === "string" && note.trim() ? note : "";
+    if (relationText || originalNote) {
+      const noteKey = `note.${snapshot.caseId}`;
+      const localizedNote = originalNote ? t(noteKey) : "";
+      const hasTranslation = Boolean(localizedNote) && localizedNote !== noteKey;
+      const noteText = hasTranslation && t("general.languageCode") === "ar" ? localizedNote : originalNote;
+      const englishFallback = Boolean(originalNote) && !hasTranslation;
+      const signature = JSON.stringify([relationText, noteText, englishFallback]);
+
+      if (signature !== revealedProvenance) {
+        if (relationText) parts.push(relationText.endsWith(".") ? relationText : `${relationText}.`);
+        if (englishFallback) {
+          const span = document.createElement("span");
+          span.setAttribute("lang", "en");
+          span.textContent = noteText;
+          parts.push(span);
+        } else if (noteText) {
+          parts.push(noteText);
+        }
+        revealedProvenance = signature;
+      }
     }
     return parts;
   }
@@ -117,7 +137,9 @@ export function mountDecodeGrid(root, session, { t }) {
     for (const [row, cells] of buttons.entries()) {
       for (const [col, button] of cells.entries()) {
         setAttribute(button, "tabindex", row === focusRow && col === focusCol ? 0 : -1);
-        setAttribute(button, "aria-pressed", selected.has(positionKey([row, col])));
+        const isSelected = selected.has(positionKey([row, col]));
+        setAttribute(button, "aria-pressed", isSelected);
+        setAttribute(button, "aria-selected", isSelected);
         setAttribute(button, "aria-label", t("grid.position", { row: row + 1, col: col + 1 }));
       }
     }
@@ -147,9 +169,10 @@ export function mountDecodeGrid(root, session, { t }) {
     }
     const results = revealMessages(snapshot, previous);
     if (messages.length || results.length) {
-      const text = [...messages, ...results].join(" ");
-      if (results.length) revealAnnouncement = text;
-      status.textContent = text;
+      // replaceChildren inserts string arguments as text nodes in one live-region update.
+      const content = [...messages, ...results].flatMap((part, index) => index ? [" ", part] : [part]);
+      status.replaceChildren(...content);
+      if (results.length) revealAnnouncement = status.textContent;
     }
   }
 
@@ -230,6 +253,7 @@ export function mountDecodeGrid(root, session, { t }) {
   }
 
   root.setAttribute("role", "grid");
+  root.setAttribute("aria-multiselectable", "true");
   render(session.getState());
   root.addEventListener("focusin", onFocus);
   root.addEventListener("click", onClick);
@@ -247,7 +271,9 @@ export function mountDecodeGrid(root, session, { t }) {
       root.removeEventListener("keydown", onKeyDown);
       root.removeEventListener("keyup", onKeyUp);
       root.replaceChildren();
-      for (const name of ["role", "aria-label", "data-rows", "data-cols"]) root.removeAttribute(name);
+      for (const name of ["role", "aria-label", "aria-multiselectable", "data-rows", "data-cols"]) {
+        root.removeAttribute(name);
+      }
       if (status) status.textContent = "";
     },
   };

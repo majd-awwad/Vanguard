@@ -29,6 +29,7 @@ const requiredKeys = [
   'reveal.selection.false', 'reveal.cellValue', 'learning.cellValue', 'reveal.source',
   'reveal.relation.SAME_DATA', 'reveal.relation.SAME_MODEL_DIFFERENT_RUN',
   'reveal.relation.RELATED_CONTEXT', 'reveal.visualLinkNote',
+  'note.dust-geos-fp-20250819-1930-north-africa-med', 'general.languageCode',
   'general.loading', 'general.error', 'general.retry', 'general.restart',
   'level.quick', 'level.advanced', 'mode.discovery', 'mode.learning',
   'condition.sound', 'condition.text', 'condition.both', 'accessibility.instructions',
@@ -186,7 +187,14 @@ class TestElement {
     this.children = [];
     this.parent = null;
     this.dataset = {};
-    this.textContent = '';
+  }
+
+  get textContent() {
+    return this.children.map((child) => child.textContent).join('');
+  }
+
+  set textContent(text) {
+    this.replaceChildren(...(text === '' ? [] : [text]));
   }
 
   setAttribute(name, value) {
@@ -202,8 +210,11 @@ class TestElement {
   }
 
   append(...children) {
-    for (const child of children) child.parent = this;
-    this.children.push(...children);
+    for (const child of children) {
+      const node = typeof child === 'string' ? { textContent: child } : child;
+      node.parent = this;
+      this.children.push(node);
+    }
   }
 
   replaceChildren(...children) {
@@ -276,14 +287,11 @@ function gridHarness({ lang = 'en', snapshot = {}, confirmFocus = true } = {}) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const announcements = [];
-  let liveText = '';
-  Object.defineProperty(status, 'textContent', {
-    get: () => liveText,
-    set: (text) => {
-      liveText = text;
-      announcements.push(text);
-    },
-  });
+  const replaceStatusChildren = status.replaceChildren.bind(status);
+  status.replaceChildren = (...children) => {
+    replaceStatusChildren(...children);
+    announcements.push(status.textContent);
+  };
 
   let state = {
     caseId: 'synthetic-test', behavior: 'continuous',
@@ -328,6 +336,7 @@ function gridHarness({ lang = 'en', snapshot = {}, confirmFocus = true } = {}) {
 function assertGrid(root, rows, cols, focus, guesses) {
   assert.equal(root.getAttribute('id'), 'decode-grid');
   assert.equal(root.getAttribute('role'), 'grid');
+  assert.equal(root.getAttribute('aria-multiselectable'), 'true');
   assert.equal(root.getAttribute('data-rows'), String(rows));
   assert.equal(root.getAttribute('data-cols'), String(cols));
   assert.equal(root.children.length, rows);
@@ -344,7 +353,9 @@ function assertGrid(root, rows, cols, focus, guesses) {
       assert.equal(button.className, 'dg-cell');
       assert.equal(button.getAttribute('role'), 'gridcell');
       assert.deepEqual(button.dataset, { row: String(row), col: String(col) });
-      assert.equal(button.getAttribute('aria-pressed'), String(guesses.some(([r, c]) => r === row && c === col)));
+      const selected = String(guesses.some(([r, c]) => r === row && c === col));
+      assert.equal(button.getAttribute('aria-pressed'), selected);
+      assert.equal(button.getAttribute('aria-selected'), selected);
       const tabIndex = button.getAttribute('tabindex');
       assert.equal(tabIndex, row === focus[0] && col === focus[1] ? '0' : '-1');
       if (tabIndex === '0') tabStops += 1;
@@ -384,8 +395,10 @@ test('click, Space and Enter dispatch a single toggle or probe and preserve sess
   target.emit('click');
   assert.deepEqual(intents.splice(0), [{ type: 'toggle', row: 1, col: 2 }]);
   assert.equal(target.getAttribute('aria-pressed'), 'false');
+  assert.equal(target.getAttribute('aria-selected'), 'false');
   update({ guesses: [[0, 1], [2, 3], [1, 2]] });
   assert.equal(target.getAttribute('aria-pressed'), 'true');
+  assert.equal(target.getAttribute('aria-selected'), 'true');
   assert.equal(status.textContent, 'Selected row 2, column 3.');
 
   assert.equal(press(' ').defaultPrevented, true);
@@ -394,6 +407,7 @@ test('click, Space and Enter dispatch a single toggle or probe and preserve sess
   assert.deepEqual(intents.splice(0), [{ type: 'toggle', row: 1, col: 2 }]);
   update({ guesses: [[0, 1], [2, 3]] });
   assert.equal(target.getAttribute('aria-pressed'), 'false');
+  assert.equal(target.getAttribute('aria-selected'), 'false');
   assert.equal(status.textContent, 'Deselected row 2, column 3.');
 
   assert.equal(press('Enter').defaultPrevented, true);
@@ -510,6 +524,7 @@ test('dispose removes grid listeners, rows and subscription while leaving page m
   assert.ok([...root.listeners.values()].every((listeners) => listeners.size === 0));
   assert.deepEqual(root.children, []);
   assert.equal(root.getAttribute('role'), null);
+  assert.equal(root.getAttribute('aria-multiselectable'), null);
   assert.equal(root.parent, page);
   assert.equal(status.parent, page);
   assert.equal(status.textContent, '');
@@ -568,7 +583,12 @@ const syntheticVisualLink = {
   note: '  Synthetic note: <context> & {verbatim}.\nSecond line.  ',
 };
 
-test('entering Reveal announces all score counts and the literal provenance note together', () => {
+const relatedContext = {
+  en: 'The image provides related context for this case.',
+  ar: 'سياق علمي مرتبط، وليس تطابقًا في البيانات',
+};
+
+test('Reveal announces the translated relation before the literal fallback note and tags only the note', () => {
   for (const lang of languages) {
     const { announcements, status, update } = gridHarness({ lang });
     update({ phase: 'reveal', score: syntheticScore, visualLink: syntheticVisualLink });
@@ -577,8 +597,15 @@ test('entering Reveal announces all score counts and the literal provenance note
       ? `النتيجة: التخمينات الصحيحة ${number.format(2)}، الخلايا الفائتة ${number.format(1)}، الاختيارات الخاطئة ${number.format(3)}، والتخمينات القريبة ${number.format(0)}.`
       : 'Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits.';
     assert.deepEqual(announcements, [
-      `${decodeMessage(lang, 'grid.submitted')} ${summary} ${syntheticVisualLink.note}`,
+      `${decodeMessage(lang, 'grid.submitted')} ${summary} ${relatedContext[lang]}${lang === 'ar' ? '.' : ''} ${syntheticVisualLink.note}`,
     ]);
+    const elements = status.children.filter((child) => child.tagName);
+    assert.equal(elements.length, 1);
+    assert.equal(elements[0].tagName, 'span');
+    assert.equal(elements[0].getAttribute('lang'), 'en');
+    assert.equal(elements[0].textContent, syntheticVisualLink.note);
+    assert.equal(elements[0].children.some((child) => child.tagName), false);
+    assert.equal(status.getAttribute('lang'), null);
     assert.equal(status.getAttribute('role'), 'status');
     assert.equal(status.getAttribute('aria-live'), 'polite');
   }
@@ -588,7 +615,7 @@ test('late Reveal results are announced independently and transport ticks do not
   const { announcements, status, update } = gridHarness();
   update({ phase: 'reveal' });
   update({ visualLink: syntheticVisualLink });
-  assert.equal(status.textContent, syntheticVisualLink.note);
+  assert.equal(status.textContent, `${relatedContext.en} ${syntheticVisualLink.note}`);
   update({ score: syntheticScore });
 
   for (const positionS of [0, 1, 2, 3]) {
@@ -599,7 +626,8 @@ test('late Reveal results are announced independently and transport ticks do not
     });
   }
   assert.deepEqual(announcements, [
-    'Guesses submitted.', syntheticVisualLink.note, 'Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits.',
+    'Guesses submitted.', `${relatedContext.en} ${syntheticVisualLink.note}`,
+    'Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits.',
   ]);
 });
 
@@ -713,7 +741,49 @@ test('a completion and simultaneous Reveal results share one polite live-region 
     phase: 'reveal', transport: { status: 'ended' }, score: syntheticScore, visualLink: syntheticVisualLink,
   });
   assert.deepEqual(announcements, [
-    `Spatial sweep complete. Guesses submitted. Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits. ${syntheticVisualLink.note}`,
+    `Spatial sweep complete. Guesses submitted. Results: 2 hits, 1 misses, 3 false alarms, and 0 near hits. ${relatedContext.en} ${syntheticVisualLink.note}`,
   ]);
   assert.equal(status.getAttribute('aria-live'), 'polite');
+});
+
+test('the dust case uses the approved Arabic note and preserves the session note in English', () => {
+  const caseId = 'dust-geos-fp-20250819-1930-north-africa-med';
+  const noteKey = `note.${caseId}`;
+  const english = 'Numerical data are standard GEOS-FP 0.25-degree latitude by 0.3125-degree longitude assimilation, a three-hour mean from 18:00 to 21:00 UTC centered at 19:30 UTC on 2025-08-19. SVS 5669 uses a separate GEOS-FP 2 km Replay at 20:00 UTC. These are related scientific context, not the same visualization dataset or instantaneous field.';
+  const arabic = [
+    'البيانات العددية مأخوذة من نظام GEOS-FP القياسي لاستيعاب بيانات الغلاف الجوي، بدقة مكانية تبلغ 0.25 درجة في خط العرض و0.3125 درجة في خط الطول. وتمثل متوسطًا زمنيًا لثلاث ساعات، من 18:00 إلى 21:00 بالتوقيت العالمي المنسق (UTC)، ومركز الفترة الزمنية هو الساعة 19:30 بتاريخ 19 أغسطس 2025.',
+    'أما مرئية NASA SVS 5669 فتعتمد على تشغيل منفصل من نموذج GEOS-FP بدقة 2 كيلومتر (Replay)، عند الساعة 20:00 UTC.',
+    'لذلك، توجد علاقة علمية وسياقية بين المصدرين، لكنهما لا يمثلان مجموعة البيانات نفسها المستخدمة في المرئية، ولا الحقل الجوي اللحظي نفسه.',
+  ].join('\n\n');
+  assert.equal(decodeMessage('en', noteKey), english);
+  assert.equal(decodeMessage('ar', noteKey), arabic);
+
+  const original = 'Original note from the session. <context>';
+  for (const lang of languages) {
+    const { announcements, status, update } = gridHarness({ lang, snapshot: { caseId } });
+    const visualLink = { ...syntheticVisualLink, note: original };
+    update({ visualLink });
+    assert.deepEqual(announcements, []);
+    update({ phase: 'reveal', visualLink });
+    const provenance = lang === 'ar'
+      ? `${relatedContext.ar}. ${arabic}`
+      : `${relatedContext.en} ${original}`;
+    assert.deepEqual(announcements, [`${decodeMessage(lang, 'grid.submitted')} ${provenance}`]);
+    assert.equal(status.children.some((child) => child.tagName), false);
+  }
+});
+
+test('separate Reveal updates announce a newly supplied relation and keep an untranslated note isolated', () => {
+  const { announcements, status, update } = gridHarness({ lang: 'ar' });
+  const note = syntheticVisualLink.note;
+  update({ phase: 'reveal', visualLink: { note } });
+  assert.ok(status.textContent.endsWith(note));
+  update({ visualLink: { relation: 'SAME_MODEL_DIFFERENT_RUN', note } });
+  assert.equal(status.textContent, `تستند الصورة والقياسات إلى تشغيلين مختلفين للنموذج نفسه. ${note}`);
+  assert.equal(status.children.at(-1).getAttribute('lang'), 'en');
+  update({ visualLink: { relation: 'SAME_MODEL_DIFFERENT_RUN', note } });
+  assert.equal(announcements.length, 2);
+  update({ phase: 'decode' });
+  assert.equal(status.textContent, '');
+  assert.deepEqual(status.children, []);
 });
