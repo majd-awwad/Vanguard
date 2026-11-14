@@ -27,7 +27,7 @@ In Discovery before Reveal, cells contain only `row`, `col`, `lat` and `lon`. Ke
 
 ### Playback highlight
 
-The integration layer publishes `snapshot.activeCell` as zero-based `[row, col]` or `null`. Treat absence in older session snapshots as `null`. `web/decode.js` resolves the event privately against the currently loaded plan using `transport.activeEventId` and matching `planRevision`, case and level. A silent slot has the same timing rules as a sounding slot. Clear the highlight while idle, starting, paused, seeking, in pre-roll, at the end, during Legend, or when revision or cell identity does not match. Resume from the next published playing snapshot. Neither renderer receives the plan or changes grid focus to follow playback.
+Each `SpatialPlan` contains events with an opaque `id`, `row` and `col`. The ID is unique within its plan and can recur in another plan. On load, `web/decode.js` indexes each event's stored coordinates by ID and associates the index with the transport's new `planRevision`. It looks up `transport.activeEventId` as a whole key when the transport and session revisions, case and level match the loaded plan. The integration publishes the result as `snapshot.activeCell`, a zero-based `[row, col]` or `null`. Treat absence in older session snapshots as `null`. A silent slot has the same timing rules as a sounding slot. Clear the highlight while idle, starting, paused, seeking, in pre-roll, at the end, during Legend, or when revision or cell identity does not match. Resume from the next published playing snapshot. Neither renderer receives the plan or changes grid focus to follow playback.
 
 ### Playback completion
 

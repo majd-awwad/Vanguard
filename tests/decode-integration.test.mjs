@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { heardClass, makeSpatialPlan } from "../web/audio/spatial-plan.js";
 import { createTransport } from "../web/audio/transport.js";
 import { validateDecodeCase } from "../web/contracts/validate.js";
 import { createDecodePlayback } from "../web/decode.js";
@@ -25,19 +26,9 @@ function run() {
     ...transport,
     play(_mode) { return transport.play("silent"); },
   });
-  function makePlan(data, { level, mode }) {
-    return {
-      caseId: data.id, level, mode, mappingVersion: "test-only",
-      durationS: 2,
-      events: data.levels[level].cells.slice(0, 2).map((cell, index) => ({
-        id: "slot-" + index, row: cell.row, col: cell.col, onsetS: index,
-        tone: null, evidence: { ...cell, unit: data.unit, mappingVersion: "test-only" },
-      })),
-    };
-  }
   const session = createDecodeSession({
     cases: [caseId], loadCase: async () => source, transport: playback.transport,
-    makePlan, heardClass: () => "silent",
+    makePlan: makeSpatialPlan, heardClass,
   });
   return {
     session, transport,
@@ -83,7 +74,7 @@ test("real dust case publishes only public geography until a submitted guess is 
   assert.equal("value" in state().grid.cells[0], false);
 });
 
-test("the renderer highlight follows the transport through pause, seek, and plan changes", async () => {
+test("the renderer follows real dust plans and ignores reused event IDs from stale revisions", async () => {
   const { session, transport, state, project, tick } = run();
   await session.ready;
   await session.dispatch({ type: "play", mode: "legend" });
@@ -92,12 +83,13 @@ test("the renderer highlight follows the transport through pause, seek, and plan
   await session.dispatch({ type: "play", mode: "sweep" });
   assert.deepEqual(state().activeCell, [0, 0]);
   const first = state();
+  assert.equal(first.transport.activeEventId, "ev-0");
   assert.equal(project({ ...first, caseId: "different" }).activeCell, null);
   assert.equal(project({ ...first, level: "advanced" }).activeCell, null);
   assert.equal(project({ ...first, transport: { ...first.transport, awaitingOnset: true } }).activeCell, null);
   assert.equal(project({ ...first, transport: { ...first.transport, activeEventId: "unknown" } }).activeCell, null);
-  tick(1);
-  assert.deepEqual(state().activeCell, [0, 1]);
+  tick(0.8);
+  assert.deepEqual(state().activeCell, [1, 0]);
   assert.deepEqual(state().focus, first.focus);
 
   session.dispatch({ type: "pause" });
@@ -106,15 +98,21 @@ test("the renderer highlight follows the transport through pause, seek, and plan
   assert.equal(state().activeCell, null);
   await session.dispatch({ type: "replay" });
   assert.deepEqual(state().activeCell, [0, 0]);
-  tick(2);
+  tick(10);
   assert.equal(state().transport.status, "ended");
   assert.equal(state().activeCell, null);
 
-  await session.dispatch({ type: "play", mode: "row" });
-  assert.ok(state().planRevision > first.planRevision);
+  session.dispatch({ type: "next" });
+  session.dispatch({ type: "next" });
+  await session.dispatch({ type: "probe", row: 1, col: 2 });
+  const probe = state();
+  assert.equal(probe.playMode, "cell");
+  assert.equal(probe.transport.activeEventId, first.transport.activeEventId);
+  assert.ok(probe.planRevision > first.planRevision);
   assert.equal(project(first).activeCell, null);
-  assert.deepEqual(state().activeCell, [0, 0]);
-  assert.equal("evidence" in state(), false);
+  assert.equal(project({ ...probe, transport: first.transport }).activeCell, null);
+  assert.deepEqual(probe.activeCell, [1, 2]);
+  assert.deepEqual(Object.keys(probe.grid.cells[0]).sort(), ["col", "lat", "lon", "row"]);
 });
 
 test("the locally packaged NASA context frame matches its recorded WebP checksum", async () => {
