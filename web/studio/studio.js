@@ -8,6 +8,7 @@ import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { studioCopy } from "./studio-copy.js";
 import { createStudioAudio } from "./audio.js";
+import { mountTools } from "./tools.js";
 import { drawWaveform } from "../cinematic/audio-tap.js";
 import { loadSettings, saveSettings } from "../cinematic/site/settings.js";
 import { HIGH_HZ, PITCH_LOW_HZ, changeSemitones, hoverPlan, lonPan, valueHz } from "./mapping.js";
@@ -262,7 +263,7 @@ async function mountStudio(document, root, language) {
     const dir = d.value === null ? "" : Math.abs(d.value) < NEAR_ZERO ? c.understand.flat : d.value > 0 ? c.understand.up : c.understand.down;
     return T(d.value === null ? c.read.changeMissing : c.read.change, { id: d.id, lat: d.lat, lon: d.lon, value: fmtChange(d.value), direction: dir });
   };
-  function onDataChanged() { renderLegend(); renderUnderstand(); invalidate(); if (state.audio) state.onCursor?.(state.cursor); }
+  function onDataChanged() { renderLegend(); renderUnderstand(); invalidate(); for (const hook of state.dataHooks ?? []) hook(); if (state.audio) state.onCursor?.(state.cursor); }
 
   // ---- Cursor
   function setCursor(cell, { announce = false } = {}) {
@@ -427,5 +428,6 @@ async function mountStudio(document, root, language) {
   const api = { state, el, grid, catalog, list, get renderer() { return renderer; }, setView, setCursor, chooseDate, applyLayer, onDataChanged, renderUnderstand, invalidate, toScreen, toGeo, T, c, language, layerValues, layerKind, getSnapshot, audio, soundForCursor, setSound, readText, fmt, fmtChange, document, win, bounds, drawOverlay, reduced, svgNode: svg };
   if (params.has("debug")) win.__studio = api;
   state.api = api;
+  mountTools(api);
   return api;
 }

@@ -242,3 +242,23 @@ test("hover audio: not before the explicit enable, deduplicated, throttled, last
   audio.hover("z", plan(9));
   assert.equal(loaded.length, 3, "muted after disable");
 });
+
+import { PATH_STEP_KM, pathSteps, rectBetween } from "../web/studio/tools.js";
+
+test("path steps: equal distance, nearest real cell, plan follows the path in order", () => {
+  const values = snapshots[0].values;
+  const steps = pathSteps([{ lon: -15, lat: 33 }, { lon: 20, lat: 30 }, { lon: 40, lat: 24 }], values, grid);
+  assert.ok(steps.length > 10);
+  for (const s of steps) { assert.equal(s.value, values[s.index]); assert.deepEqual(cellAt(grid, s.lon, s.lat).index, s.index); }
+  const gaps = steps.slice(1).map((s, i) => s.distanceKm - steps[i].distanceKm);
+  assert.ok(Math.max(...gaps) - Math.min(...gaps) < 1e-6);
+  assert.ok(Math.max(...gaps) < PATH_STEP_KM * 1.5);
+  const plan = sequencePlan("dust", steps, grid, { slotS: 0.12, tag: "path" });
+  assert.equal(plan.events.length, steps.length);
+  assert.ok(plan.events[0].tone.pan < plan.events.at(-1).tone.pan, "a west-to-east path pans left to right");
+  assert.ok(Math.abs(summarize(values, steps).missing) === 0);
+  // A sample outside the region is missing, never zero.
+  const outside = pathSteps([{ lon: 45, lat: 20 }, { lon: 60, lat: 20 }], values, grid);
+  assert.ok(outside.some((s) => s.outside && s.value === null));
+  assert.deepEqual(rectBetween({ lon: 5, lat: 30 }, { lon: -3, lat: 20 }), { west: -3, east: 5, south: 20, north: 30 });
+});
