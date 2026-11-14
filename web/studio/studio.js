@@ -7,6 +7,10 @@ import { cellAt, cellCenter, cellRect, diffInverse, NEAR_ZERO, valueColor, value
 import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { studioCopy } from "./studio-copy.js";
+import { createStudioAudio } from "./audio.js";
+import { drawWaveform } from "../cinematic/audio-tap.js";
+import { loadSettings, saveSettings } from "../cinematic/site/settings.js";
+import { HIGH_HZ, PITCH_LOW_HZ, changeSemitones, hoverPlan, lonPan, valueHz } from "./mapping.js";
 import { clampView, createView, geoToScreen, lerpView, panBy, pixelsPerDegree, screenToGeo, zoomAt } from "./view.js";
 
 export const DEFAULT_SNAPSHOT = "geos-fp-dust-20250819-1930";
@@ -213,6 +217,14 @@ async function mountStudio(document, root, language) {
     const r = cellRect(grid, cell.row, cell.col);
     return { value, kind, id: cellId(cell.row, cell.col), lat: formatLat(center.lat), lon: formatLon(center.lon), r };
   }
+  function soundText(d) {
+    if (d.value === null) return c.understand.missingSound;
+    const pan = lonPan(grid, cellCenter(grid, state.cursor.row, state.cursor.col).lon);
+    const side = pan < -0.2 ? c.understand.left : pan > 0.2 ? c.understand.right : c.understand.centre;
+    const text = d.kind === "dust" ? T(c.understand.soundText, { hz: trimNumber(valueHz(d.value), 0), pan: side })
+      : Math.abs(d.value) < NEAR_ZERO ? c.understand.soundFlat : T(d.value > 0 ? c.understand.soundUp : c.understand.soundDown, { semi: changeSemitones(d.value) }) + " " + side + ".";
+    return audio.enabled ? text : text + " " + c.understand.soundOff;
+  }
   function renderUnderstand() {
     const s = state.snapshot;
     u.source.dd.textContent = T(c.understand.sourceValue, { short: s.source.shortName, variable: s.variable });
@@ -241,6 +253,7 @@ async function mountStudio(document, root, language) {
       u.value.dd.textContent = d.value === null ? "—" : T(c.understand.changeText, { value: fmtChange(d.value), direction: dir });
       u.scale.dd.textContent = d.value === null ? "—" : T(c.legend.near, { band: NEAR_ZERO }) + " / " + c.legend.changeNote;
     }
+    u.sound.dd.textContent = soundText(d);
     for (const extra of state.understandExtras) extra(d);
   }
   const readText = (cell) => {
@@ -249,7 +262,7 @@ async function mountStudio(document, root, language) {
     const dir = d.value === null ? "" : Math.abs(d.value) < NEAR_ZERO ? c.understand.flat : d.value > 0 ? c.understand.up : c.understand.down;
     return T(d.value === null ? c.read.changeMissing : c.read.change, { id: d.id, lat: d.lat, lon: d.lon, value: fmtChange(d.value), direction: dir });
   };
-  function onDataChanged() { renderLegend(); renderUnderstand(); invalidate(); }
+  function onDataChanged() { renderLegend(); renderUnderstand(); invalidate(); if (state.audio) state.onCursor?.(state.cursor); }
 
   // ---- Cursor
   function setCursor(cell, { announce = false } = {}) {
@@ -343,8 +356,54 @@ async function mountStudio(document, root, language) {
     state.onKey?.(event);
   });
 
+  // ---- Sound (M2): explicit enable, hover/keyboard/touch reading, studio-v1 mapping
+  const settings = loadSettings();
+  const audio = createStudioAudio({ volume: settings.volume });
+  state.audio = audio;
+  el.soundButton = h(document, "button", { type: "button", class: "button", "aria-pressed": "false", text: c.sound.enable });
+  el.soundState = h(document, "p", { class: "small", role: "status", "aria-live": "polite", text: c.sound.disabled });
+  el.volume = h(document, "input", { type: "range", id: "st-volume", min: 0, max: 100, step: 1, value: Math.round(settings.volume * 100) });
+  el.wave = h(document, "canvas", { width: 360, height: 60, role: "img", "aria-label": c.sound.wave });
+  el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); saveSettings({ volume: v }); });
+  const setSound = async (on) => {
+    el.soundButton.setAttribute("aria-pressed", String(on));
+    el.soundButton.textContent = on ? c.sound.disable : c.sound.enable;
+    if (on) { await audio.enable(); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : c.sound.enabled; } else { audio.disable(); el.soundState.textContent = c.sound.disabled; }
+    renderUnderstand();
+    if (on && state.cursor) soundForCursor();
+  };
+  el.soundButton.addEventListener("click", () => setSound(!audio.enabled));
+  const cursorKey = () => [state.snapshot.id, state.comparison?.id ?? "dust", state.cursor?.index].join("|");
+  function soundForCursor(force = false) {
+    if (!audio.enabled || !state.cursor || state.busy) return;
+    const cell = state.cursor;
+    const make = () => hoverPlan(layerKind(), cell, layerValues()[cell.index], grid);
+    if (force) audio.play(make()); else audio.hover(cursorKey(), make);
+  }
+  state.onCursor = () => { if (state.tool === "explore") soundForCursor(); };
+  state.onKeyExtra = [];
+  state.onKey = (event) => {
+    if (event.key === " " && state.cursor) { event.preventDefault(); if (audio.enabled) soundForCursor(true); else el.read.textContent = c.sound.disabled + " " + readText(state.cursor); return; }
+    for (const handler of state.onKeyExtra) if (handler(event)) return;
+  };
+  state.pointerHandlers = [];
+  state.onPointer = (type, event, p, pointers) => {
+    for (const handler of state.pointerHandlers) { handler(type, event, p, pointers); if (event.defaultPrevented) return; }
+    // Touch: press and drag listens (one finger) while sound is on; two fingers always pan and zoom.
+    if (event.pointerType === "touch" && state.tool === "explore" && audio.enabled && pointers.size === 1 && (type === "down" || type === "move")) {
+      event.preventDefault();
+      setCursor(cursorAt(p.x, p.y));
+    }
+  };
+  const mapRange = T(c.sound.range, { low: PITCH_LOW_HZ, high: HIGH_HZ, min: VALUE_MIN, max: VALUE_MAX });
+  const soundPanel = h(document, "section", { class: "panel", "aria-labelledby": "st-sound-title" }, h(document, "h2", { id: "st-sound-title", text: c.sound.title }), el.soundButton, el.soundState,
+    h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: c.sound.volume }), el.volume), el.wave,
+    h(document, "h3", { text: c.sound.mapping }), h(document, "ul", { class: "st-keys small" }, h(document, "li", { text: c.sound.mapDust + " " + mapRange }), h(document, "li", { text: c.sound.mapPan }), h(document, "li", { text: c.sound.mapMissing }), h(document, "li", { text: c.sound.changeMap })),
+    h(document, "p", { class: "small", text: c.sound.note }));
+  let waveFrame = win.requestAnimationFrame(function loop() { drawWaveform(el.wave, audio.tap.analyser, { color: "#68e0d0" }); waveFrame = win.requestAnimationFrame(loop); });
+
   // ---- Assemble
-  const left = h(document, "div", { class: "st-left" }, datePanel, viewPanel);
+  const left = h(document, "div", { class: "st-left" }, datePanel, viewPanel, soundPanel);
   state.left = left;
   const centre = h(document, "div", { class: "st-centre" }, el.frame, el.note, el.legend);
   state.centre = centre;
@@ -365,7 +424,7 @@ async function mountStudio(document, root, language) {
   onDateChanged();
   win.addEventListener("resize", resize);
   win.document.addEventListener("visibilitychange", () => { if (!win.document.hidden) invalidate(); });
-  const api = { state, el, grid, catalog, list, get renderer() { return renderer; }, setView, setCursor, chooseDate, applyLayer, onDataChanged, renderUnderstand, invalidate, toScreen, toGeo, T, c, language, layerValues, layerKind, getSnapshot, readText, fmt, fmtChange, document, win, bounds, drawOverlay, reduced, svgNode: svg };
+  const api = { state, el, grid, catalog, list, get renderer() { return renderer; }, setView, setCursor, chooseDate, applyLayer, onDataChanged, renderUnderstand, invalidate, toScreen, toGeo, T, c, language, layerValues, layerKind, getSnapshot, audio, soundForCursor, setSound, readText, fmt, fmtChange, document, win, bounds, drawOverlay, reduced, svgNode: svg };
   if (params.has("debug")) win.__studio = api;
   state.api = api;
   return api;

@@ -138,3 +138,107 @@ test("studio copy: both languages, same keys", () => {
   assert.equal(keys(studioCopy.en), keys(studioCopy.ar));
   assert.equal(studioCopy.en.help.items.length, studioCopy.ar.help.items.length);
 });
+
+import { CHANGE_BASE_HZ, HIGH_HZ, MAX_SCAN_CELLS, PITCH_LOW_HZ, changeSemitones, changeTones, hoverPlan, lonPan, missingTone, scanSteps, sequencePlan, strideFor, valueHz, valueTone } from "../web/studio/mapping.js";
+import { HOVER_INTERVAL_MS, confirmationPlan, createStudioAudio } from "../web/studio/audio.js";
+
+test("studio-v1: pitch is the dust value on one fixed log scale, pan is longitude", () => {
+  assert.equal(PITCH_LOW_HZ, 220);
+  assert.ok(Math.abs(HIGH_HZ - 1760) < 1e-9);
+  assert.ok(Math.abs(valueHz(VALUE_MIN) - 220) < 1e-9 && Math.abs(valueHz(VALUE_MAX) - 1760) < 1e-9);
+  const hz = [0.005, 0.02, 0.1, 0.4, 1.2, 2].map(valueHz);
+  assert.deepEqual([...hz].sort((a, b) => a - b), hz, "higher dust is always higher pitch");
+  assert.equal(lonPan(grid, -20), -1);
+  assert.equal(lonPan(grid, 50), 1);
+  assert.ok(Math.abs(lonPan(grid, 15)) < 1e-12);
+  assert.ok(lonPan(grid, 0) < lonPan(grid, 30), "west is left of east");
+});
+
+test("studio-v1 is deterministic and uses the shared voice shapes", () => {
+  const cell = { row: 12, col: 20, index: 12 * 40 + 20 };
+  const a = hoverPlan("dust", cell, snapshots[0].values[cell.index], grid);
+  const b = hoverPlan("dust", cell, snapshots[0].values[cell.index], grid);
+  assert.deepEqual(a, b);
+  assert.equal(a.events.length, 1);
+  assert.equal(a.mappingVersion, "studio-v1");
+  const tone = a.events[0].tone;
+  assert.equal(tone.voice, "tone");
+  assert.ok(tone.gain <= 0.22 && tone.durationS >= tone.attackS + tone.releaseS, "valid for transport.js");
+  assert.equal(valueTone(0.3, 0).gain, valueTone(2, 0).gain, "gain is constant: pitch carries the value");
+});
+
+test("missing values are a distinct soft click, never silence or zero", () => {
+  const click = missingTone(0);
+  assert.equal(click.voice, "crackle");
+  assert.ok(click.gain > 0 && click.durationS < 0.05);
+  const plan = hoverPlan("dust", { row: 0, col: 0, index: 0 }, null, grid);
+  assert.equal(plan.events[0].tone.voice, "crackle");
+  assert.equal(changeTones(null, 0)[0].tone.voice, "crackle");
+});
+
+test("change sound: increase rises, decrease falls, near zero is one steady note, wider step = bigger change", () => {
+  const up = changeTones(0.6, 0);
+  const down = changeTones(-0.6, 0);
+  const flat = changeTones(NEAR_ZERO / 2, 0);
+  assert.equal(up.length, 2);
+  assert.ok(up[1].tone.frequencyHz > up[0].tone.frequencyHz, "rising");
+  assert.equal(down.length, 2);
+  assert.ok(down[1].tone.frequencyHz < down[0].tone.frequencyHz, "falling");
+  assert.equal(flat.length, 1);
+  assert.equal(flat[0].tone.frequencyHz, CHANGE_BASE_HZ);
+  assert.ok(changeSemitones(1) > changeSemitones(0.05));
+  assert.ok(changeSemitones(0.03) >= 1 && changeSemitones(10) <= 12);
+  assert.notDeepEqual(up.map((n) => n.tone.frequencyHz), down.map((n) => n.tone.frequencyHz));
+});
+
+test("area scan: west to east, rows north to south, bounded cell count, summary of real cells", () => {
+  const cells = rectCells(grid, { west: -20, east: 50, south: 15, north: 45 });
+  assert.equal(cells.length, 1000);
+  assert.equal(strideFor(1000), 2);
+  assert.equal(strideFor(MAX_SCAN_CELLS), 1);
+  const steps = scanSteps(cells, snapshots[0].values, strideFor(cells.length));
+  assert.ok(steps.length <= MAX_SCAN_CELLS && steps.length > 100);
+  assert.ok(steps[1].col > steps[0].col && steps[0].row === steps[1].row, "west to east along a row");
+  const rowChange = steps.findIndex((s, i) => i > 0 && s.row !== steps[i - 1].row);
+  assert.ok(rowChange > 0 && steps[rowChange].row > steps[rowChange - 1].row && steps[rowChange].col < steps[rowChange - 1].col, "next row starts back in the west");
+  const plan = sequencePlan("dust", steps, grid, { slotS: 0.07 });
+  assert.equal(plan.events.length, steps.length);
+  assert.ok(plan.events.every((e, i) => i === 0 || e.onsetS > plan.events[i - 1].onsetS));
+  assert.ok(plan.events.every((e) => e.tone.durationS >= e.tone.attackS + e.tone.releaseS));
+  const s = summarize(snapshots[0].values, steps);
+  assert.equal(s.valid, steps.length);
+  assert.ok(s.min <= s.mean && s.mean <= s.max);
+});
+
+test("hover audio: not before the explicit enable, deduplicated, throttled, last position wins", async () => {
+  let clock = 1000;
+  const timers = [];
+  const audio = createStudioAudio({ now: () => clock, setTimer: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimer: () => {} });
+  const loaded = [];
+  audio.transport.load = (plan) => loaded.push(plan.events[0].id + ":" + plan.mode);
+  audio.transport.play = async () => {};
+  const plan = (n) => () => ({ mode: "hover", events: [{ id: "ev-" + n }] });
+  audio.hover("a", plan(1));
+  assert.equal(loaded.length, 0, "silent until enabled");
+  await audio.enable();
+  assert.equal(loaded.at(-1), "ev-0:confirm");
+  assert.equal(confirmationPlan().events.length, 1);
+  clock += 500;
+  audio.hover("a", plan(1));
+  assert.equal(loaded.length, 2, "first hover plays at once");
+  audio.hover("a", plan(1));
+  assert.equal(loaded.length, 2, "same key does not replay");
+  clock += 10;
+  audio.hover("b", plan(2));
+  audio.hover("c", plan(3));
+  assert.equal(loaded.length, 2, "throttled");
+  assert.equal(timers.length, 1);
+  assert.ok(timers[0].ms <= HOVER_INTERVAL_MS && timers[0].ms > 0);
+  clock += 100;
+  timers[0].f();
+  assert.equal(loaded.length, 3);
+  assert.equal(loaded.at(-1), "ev-3:hover", "the latest position plays");
+  audio.disable();
+  audio.hover("z", plan(9));
+  assert.equal(loaded.length, 3, "muted after disable");
+});
