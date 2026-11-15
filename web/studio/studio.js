@@ -394,11 +394,14 @@ async function mountApp(document, root, language, initialMode) {
   const makeBadge = (mean) => { const node = h(document, "span", { class: "st-badge", dir: "auto" }); fillBadge(node, mean); return node; };
   // Spoken order: meaning phrase, value with unit, short place, the date only when it changed. Resolved when it is actually said.
   let lastSpokenDate = null;
-  function spokenNow(cell) {
+  let lastSpokenPhrase = null;
+  // While exploring, the phrase is spoken the first time and again only when it changes (a new level or phenomenon); explicit requests always say it in full.
+  function spokenNow(cell, always) {
     const d = describeCell(cell);
     const mean = meaningFor(cell.index);
     if (!mean) return readText(cell);
-    const parts = [mean.text];
+    const parts = [];
+    if (always || mean.text !== lastSpokenPhrase) { parts.push(mean.text); lastSpokenPhrase = mean.text; }
     if (d.value !== null && mean.level !== "missing") parts.push(spokenNumber(phen.id, d.value) + " " + unitText());
     const centre = cellCenter(grid, cell.row, cell.col);
     parts.push(formatLat(Math.round(centre.lat * 10) / 10) + ", " + formatLon(Math.round(centre.lon * 10) / 10));
@@ -406,7 +409,7 @@ async function mountApp(document, root, language, initialMode) {
     if (date !== lastSpokenDate) { parts.push(date); lastSpokenDate = date; }
     return parts.join(". ") + ".";
   }
-  const spoken = (cell, prefix = "") => () => (prefix ? prefix + " " : "") + spokenNow(cell);
+  const spoken = (cell, prefix = "", always = false) => () => (prefix ? prefix + " " : "") + spokenNow(cell, always);
 
   // ---- Legend (compact: title, gradient bar, ticks)
   el.legend = h(document, "div", { class: "st-legend" });
@@ -448,7 +451,7 @@ async function mountApp(document, root, language, initialMode) {
     if (play) soundForCursor(true);
     if (say) guided(spoken(cell));
   }
-  const explain = () => { if (state.cursor) speech.say(spoken(state.cursor)); else speech.say(m.info.none); };
+  const explain = () => { if (state.cursor) speech.say(spoken(state.cursor, "", true)); else speech.say(m.info.none); };
 
   // ---- Sound: the user's recordings, chosen by the REAL value (low / mid / high). No synthesized tones.
   const SOUND_PHENOMENA = AMBIENCE_PHENOMENA;
@@ -595,7 +598,7 @@ async function mountApp(document, root, language, initialMode) {
     return false;
   });
   state.onKey = (event) => {
-    if (event.key === " " && state.cursor) { event.preventDefault(); if (audio.enabled) soundForCursor(true); else speech.say(spoken(state.cursor, m.sound.off)); return; }
+    if (event.key === " " && state.cursor) { event.preventDefault(); if (audio.enabled) soundForCursor(true); else speech.say(spoken(state.cursor, m.sound.off, true)); return; }
     for (const handler of state.onKeyExtra) if (handler(event)) return;
   };
   el.frame.addEventListener("keydown", (event) => {
@@ -650,7 +653,7 @@ async function mountApp(document, root, language, initialMode) {
     renderModeButton();
     el.live.textContent = m.mode.switched[mode];
     if (persist) { const next = saveSettings({ guidance: mode === GUIDED }); win.dispatchEvent(new win.CustomEvent("earthpulse:settings", { detail: next })); }
-    if (mode === GUIDED && state.cursor) speak(spoken(state.cursor, m.mode.switched[mode]));
+    if (mode === GUIDED && state.cursor) speak(spoken(state.cursor, m.mode.switched[mode], true));
   }
 
   // ---- Dry dates: explain a date with almost no signal and suggest the wettest real dates
