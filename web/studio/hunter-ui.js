@@ -91,6 +91,10 @@ export function mountHunter(api, container) {
     if (f.delta !== null) return T(a.deltaRow, { id, delta: formatChange(spec(), f.delta), unit: unitText(), first: f.firstDate, second: f.secondDate });
     return T(a.valueRow, { id, value: valueText(f.value), unit: unitText(), date: f.date });
   }
+  function linkPin(button, index) {
+    for (const type of ["mouseenter", "focus"]) button.addEventListener(type, () => api.hoverPin?.(index));
+    for (const type of ["mouseleave", "blur"]) button.addEventListener(type, () => api.hoverPin?.(null));
+  }
   function renderPins() {
     const selected = store.state.selectedFindingId;
     api.setPins(store.state.findings.map((f) => ({ index: f.sampleId, label: f.rank, kind: "finding", selected: f.id === selected })));
@@ -98,13 +102,15 @@ export function mountHunter(api, container) {
   function renderResults() {
     const findings = store.state.findings;
     el.list.replaceChildren(...findings.map((f) => {
-      const b = h(document, "button", { type: "button", class: "em-result", "aria-pressed": String(f.id === store.state.selectedFindingId), "data-id": f.id },
+      const b = h(document, "button", { type: "button", class: "em-result", "aria-pressed": String(f.id === store.state.selectedFindingId), "data-id": f.id, "data-index": f.sampleId },
         h(document, "span", { class: "em-rank", text: String(f.rank) }), h(document, "span", { text: describeFinding(f) }),
         f.delta !== null ? h(document, "span", { class: "small", text: f.percent !== null ? T(a.percent, { p: trimNumber(f.percent, 1) }) : a.percentNo }) : null);
       b.addEventListener("click", () => openFinding(f.id));
+      linkPin(b, f.sampleId);
       return h(document, "li", {}, b);
     }));
     renderPins();
+    if (findings.length) el.list.scrollIntoView?.({ block: "nearest" });
   }
   function renderHow(result, f) {
     if (!f) { el.how.hidden = true; return; }

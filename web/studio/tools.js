@@ -284,6 +284,7 @@ export function mountTools(api) {
   state.right.insertBefore(runPanel, state.right.children[1]);
   state.right.insertBefore(areaPanel, runPanel);
   state.right.insertBefore(pathPanel, runPanel);
+  Object.assign(api.panels, { area: areaPanel, path: pathPanel, run: runPanel });
   Object.assign(api, { setTool, playArea, playVisible: () => playArea(visibleRect()), stopRun, begin, pathSteps: () => pathSteps(state.path, api.layerValues(), grid), addPoint, refreshPath });
   return api;
 }

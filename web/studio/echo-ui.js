@@ -124,12 +124,14 @@ export function mountEcho(api, container) {
   function renderResults() {
     const matches = store.state.echoMatches;
     el.list.replaceChildren(...matches.map((mt) => {
-      const b = h(document, "button", { type: "button", class: "em-result", "aria-pressed": String(mt.sampleId === store.state.selectedSampleId) },
+      const b = h(document, "button", { type: "button", class: "em-result", "aria-pressed": String(mt.sampleId === store.state.selectedSampleId), "data-index": mt.sampleId },
         h(document, "span", { class: "em-rank", text: String(mt.rank) }), h(document, "span", { text: cellId(mt.row, mt.col) + " · " + T(a.distance, { d: trimNumber(mt.distance, 3) }) }));
       b.addEventListener("click", () => openMatch(mt.sampleId));
+      for (const type of ["mouseenter", "focus"]) b.addEventListener(type, () => api.hoverPin?.(mt.sampleId));
+      for (const type of ["mouseleave", "blur"]) b.addEventListener(type, () => api.hoverPin?.(null));
       return h(document, "li", {}, b);
     }));
-    if (matches.length) el.list.append(h(document, "li", { class: "small", text: a.distanceHelp }));
+    if (matches.length) { el.list.append(h(document, "li", { class: "small", text: a.distanceHelp })); el.list.scrollIntoView?.({ block: "nearest" }); }
     renderPins();
   }
 

@@ -77,7 +77,7 @@ test("SAFETY: no autoplay, one AudioContext, sound only after an explicit action
 
 test("ACCESS-A: every main tool is a real control with a role and a name", async () => {
   const studio = await text("web/studio/studio.js");
-  for (const needle of ['role: "application"', 'role: "tablist"', 'role: "tab"', 'role: "tabpanel"', 'role: "dialog"', '"aria-modal": "true"', 'role: "group"', "aria-pressed", "aria-selected"]) assert.ok(studio.includes(needle), needle);
+  for (const needle of ['role: "application"', 'class: "st-rail st-pill floating", "aria-label"', 'role: "dialog"', '"aria-modal": "true"', 'role: "group"', "aria-pressed", 'aria-labelledby: "st-flyout-title"'.replace('aria-labelledby: ', '"aria-labelledby": ')]) assert.ok(studio.includes(needle), needle);
   assert.ok(!/<div[^>]*onclick/.test(studio));
   assert.match(studio, /if \(event\.key === "Escape"\) \{ speech\.cancel\(\); return; \}/);
   assert.match(studio, /"Home"/);
@@ -88,15 +88,14 @@ test("ACCESS-A: every main tool is a real control with a role and a name", async
   assert.match(hunter, /aria-live/);
 });
 
-test("RESPONSIVE: 44px targets, bottom sheet, three tabs always visible on phones, no horizontal overflow rules", async () => {
+test("RESPONSIVE: 44px targets, one bottom sheet with three snap points, icon bar on phones, geography never mirrors", async () => {
   const css = await text("web/studio/earthmap.css");
-  assert.match(css, /min-height: 2\.75rem/);
   assert.match(css, /@media \(max-width: 900px\)/);
-  assert.match(css, /\.em-bar \{ position: fixed/);
-  assert.match(css, /\.em-tools \{ position: fixed/);
-  assert.match(css, /\.em-tools\[data-open="true"\]/);
+  assert.match(css, /\.st-flyout\[data-snap="peek"\]/);
+  assert.match(css, /\.st-flyout\[data-snap="full"\]/);
+  assert.match(css, /\.st-date \{[^}]*min-height: 2\.75rem/);
   const studio = await text("web/studio/studio.js");
-  assert.match(studio, /em-sheet-toggle/);
+  assert.match(studio, /st-handle/);
   assert.match(studio, /dir: "ltr", tabindex: "0", role: "application"/, "geography never mirrors");
 });
 

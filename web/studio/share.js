@@ -44,13 +44,15 @@ export function mountShare(api) {
   const { state, el, c, document, win } = api;
   const button = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy });
   const status = h(document, "p", { class: "small", role: "status", "aria-live": "polite", text: c.share.note });
-  button.addEventListener("click", async () => {
+  const copy = async () => {
     const dates = Object.fromEntries(api.list.map((s) => [s.id, s.date]));
     const params = encodeShare({ phenomenon: api.phenomenonId(), snapshotId: state.snapshot.id, comparison: state.cmpSources ? { a: state.cmpSources.a.id, b: state.cmpSources.b.id } : null, rect: state.rect, path: state.path }, dates);
     const url = new URL(document.URL);
     url.search = params.toString() + (new URLSearchParams(url.search).get("lang") ? "&lang=" + new URLSearchParams(url.search).get("lang") : "");
     try { await win.navigator.clipboard.writeText(url.href); status.textContent = c.share.copied; } catch { status.textContent = url.href; }
-  });
+  };
+  button.addEventListener("click", copy);
+  api.copyLink = async () => { await copy(); api.toast?.(status.textContent.length > 120 ? c.share.copied : status.textContent); };
   state.right.append(h(document, "section", { class: "panel" }, button, status));
   // Apply a link on load.
   const wanted = decodeShare(new URL(document.URL).search, api.catalog, api.bounds);

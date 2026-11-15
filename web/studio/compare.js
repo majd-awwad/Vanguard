@@ -213,6 +213,7 @@ export function mountCompare(api) {
     h(document, "div", { class: "st-tools-row" }, ...placeButtons("a")), h(document, "div", { class: "st-tools-row" }, ...placeButtons("b")), el.placeTable,
     h(document, "div", { class: "st-tools-row" }, playBoth), el.placeNote, h(document, "p", { class: "small", text: c.compare.fingerprint + " " + c.compare.pointFp + " " + T(c.compare.areaFp, { n: FINGERPRINT_CELLS }) }));
   state.right.insertBefore(panel, state.right.children[state.right.children.length - 1]);
+  api.panels.compare = panel;
   describe();
   refreshPlaces();
   api.phenomenonHooks = api.phenomenonHooks ?? [];
