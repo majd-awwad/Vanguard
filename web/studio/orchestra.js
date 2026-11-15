@@ -1,7 +1,7 @@
 import { h } from "../cinematic/site/dom.js";
 import { isLocked, formatValue, PHENOMENA } from "./datasets.js";
 import { spoilersUnlocked } from "../cinematic/site/progress.js";
-import { ORCHESTRA_IDS, channelCompatibility, defaultChannels, orchestraPlan, timeKey } from "./orchestra-data.js";
+import { ORCHESTRA_IDS, channelCompatibility, defaultChannels, orchestraPlan, recordingSpec, timeKey } from "./orchestra-data.js";
 import { orchestraCopy } from "./orchestra-copy.js";
 import { channelPresentation, chooseListeningWindow, windowIdentity } from "./orchestra-state.js";
 
@@ -136,8 +136,12 @@ export function mountOrchestra(api, app) {
       ui.jump.setAttribute("aria-label", `${c.jumpLabel} · ${c.names[id]} · ${ui.availability.textContent}`);
     }
   }
-  function change(id, key, value) { settings[id][key] = value; audio.transport.setChannels(effective()); render(); }
-  function stopPlayback() { action++; wantsPlay = false; speech.cancel(); audio.stop(); audio.transport.stop(); playback = "stopped"; render(); }
+  // The sound itself: the user's recordings, one loop per channel at the level of its real value (no synthesized tones).
+  const rec = api.rec;
+  const sounding = () => playback === "playing" && audio.enabled;
+  function syncRecordings() { if (!rec) return; if (open && sounding()) rec.ensemble(recordingSpec(observations, settings)); else rec.ensembleStop(); }
+  function change(id, key, value) { settings[id][key] = value; audio.transport.setChannels(effective()); syncRecordings(); render(); }
+  function stopPlayback() { action++; wantsPlay = false; speech.cancel(); rec?.ensembleStop(); audio.stop(); audio.transport.stop(); playback = "stopped"; render(); }
 
   async function refresh({ resume = wantsPlay } = {}) {
     if (!open) return;
@@ -146,7 +150,7 @@ export function mountOrchestra(api, app) {
     const contextKey = `${api.phen.id}|${state.snapshot.id}`;
     lastContext = contextKey;
     // Clear stale sound and speech BEFORE asynchronous data access.
-    speech.cancel(); loadedKey = null; audio.stop(); wantsPlay = resume; playback = "idle"; loading = true;
+    speech.cancel(); loadedKey = null; rec?.ensembleStop(); audio.stop(); wantsPlay = resume; playback = "idle"; loading = true;
     explanation.hidden = true; render();
     await Promise.all(ORCHESTRA_IDS.map(async id => {
       try { datasets[id] = await pkg.openPhenomenon(id); } catch { datasets[id] = null; }
@@ -215,13 +219,13 @@ export function mountOrchestra(api, app) {
     if (snap.status === "ended") wantsPlay = false;
     // Transport emits every animation frame; update the UI only on state transitions.
     const key = [playback, snap.awaitingOnset, snap.playback, snap.audioUnavailable, snap.volume > 0, snap.muted, audio.enabled].join("|");
-    if (lastTransportRender !== key) { lastTransportRender = key; render(); }
+    if (lastTransportRender !== key) { lastTransportRender = key; syncRecordings(); render(); }
   });
   state.selectHooks ??= [];
   state.selectHooks.push(() => { if (open) refresh(); });
   state.dataHooks.push(() => { if (open) refresh(); });
   api.win.addEventListener("pagehide", event => {
-    revision++; action++; wantsPlay = false; speech.cancel(); audio.disable();
+    revision++; action++; wantsPlay = false; speech.cancel(); rec?.ensembleStop(); audio.disable();
     // A cached Back/Forward page keeps its controller and subscriptions for return.
     if (!event.persisted) { unsubscribe(); audio.transport.dispose(); }
   });

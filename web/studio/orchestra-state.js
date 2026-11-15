@@ -1,5 +1,4 @@
-import { ORCHESTRA_IDS } from "./orchestra-data.js";
-import { soundParams } from "./sonify.js";
+import { ORCHESTRA_IDS, recordingLevel } from "./orchestra-data.js";
 
 // A preference identifies an actual averaging window, independently of date and map layer.
 export function windowIdentity(key) {
@@ -22,9 +21,9 @@ export function channelPresentation(observations, settings, { playing = false, o
   const channels = Object.fromEntries(ORCHESTRA_IDS.map(id => {
     const item = observations[id], s = settings[id];
     const compatible = Boolean(item?.ok), enabled = compatible && s.enabled;
-    const params = compatible ? soundParams(id, item.info ?? { value: item.value }) : null;
-    const silent = Boolean(params?.silent), excluded = Boolean(soloed && !s.solo);
-    const canSound = Boolean(enabled && !silent && !params?.missing && !s.muted && !excluded && s.gain > 0);
+    const level = compatible ? (item.level !== undefined ? item.level : recordingLevel(id, item.value)) : null;
+    const silent = compatible && !level, excluded = Boolean(soloed && !s.solo);
+    const canSound = Boolean(enabled && !silent && !s.muted && !excluded && s.gain > 0);
     return [id, { compatible, enabled: Boolean(enabled), silent, excluded, canSound, audible: Boolean(playing && outputOn && canSound) }];
   }));
   const count = key => Object.values(channels).filter(c => c[key]).length;

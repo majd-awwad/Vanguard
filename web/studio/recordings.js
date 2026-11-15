@@ -30,6 +30,7 @@ export function createRecordings({
   let previewTimer = null;
   const buffers = new Map();
   const slices = new Set();
+  const ensembleLoops = new Map(); // Orchestra: channelId -> { key, gain, loop }
 
   const level = () => volume * duck;
   const applyLevel = () => { if (master && context) { master.gain.cancelScheduledValues(context.currentTime); master.gain.setTargetAtTime(level(), context.currentTime, 0.05); } };
@@ -97,6 +98,14 @@ export function createRecordings({
       node, panner,
       stop() { stopped = true; clearTick(tick); for (const s of sources) { try { s.stop(); } catch { /* already stopped */ } } node.disconnect(); panner?.disconnect(); },
     };
+  }
+
+  function fadeOut(loop, seconds) {
+    const now = context.currentTime;
+    loop.node.gain.cancelScheduledValues(now);
+    loop.node.gain.setValueAtTime(loop.node.gain.value, now);
+    loop.node.gain.linearRampToValueAtTime(0, now + seconds);
+    setTimer(() => loop.stop(), seconds * 1000 + 80);
   }
 
   async function apply() {
@@ -192,10 +201,52 @@ export function createRecordings({
       if (!context) return;
       for (const { source, gain } of slices) { gain.gain.cancelScheduledValues(context.currentTime); gain.gain.setValueAtTime(gain.gain.value, context.currentTime); gain.gain.linearRampToValueAtTime(0, context.currentTime + fadeS); try { source.stop(context.currentTime + fadeS + 0.01); } catch { /* ended */ } }
     },
+    /**
+     * Scientific Orchestra: one looping recording per channel, all at once. spec = { [channelId]: { phenomenon, level, gain, pan } | null }.
+     * A channel keeps its loop while its level is unchanged (only the gain moves); a new level crossfades.
+     */
+    async ensemble(spec) {
+      ensureContext();
+      if (context.state === "suspended") await context.resume?.();
+      const seconds = fadeTime();
+      const ids = new Set([...ensembleLoops.keys(), ...Object.keys(spec)]);
+      await Promise.all([...ids].map(async (id) => {
+        const want = spec[id];
+        const key = want?.phenomenon && want?.level ? `${want.phenomenon}-${want.level}` : null;
+        const have = ensembleLoops.get(id);
+        if (have && key && have.key === key) {
+          have.gain = want.gain;
+          if (have.loop) have.loop.node.gain.setTargetAtTime(want.gain, context.currentTime, 0.05);
+          return;
+        }
+        if (have) { if (have.loop) fadeOut(have.loop, seconds); ensembleLoops.delete(id); }
+        if (!key) return;
+        const entry = { key, gain: want.gain, loop: null };
+        ensembleLoops.set(id, entry);
+        try {
+          const loop = await startLoop(fileFor(want.phenomenon, want.level), want.pan ?? 0);
+          if (ensembleLoops.get(id) !== entry) { loop.stop(); return; } // stopped or changed while loading
+          entry.loop = loop;
+          const at = context.currentTime;
+          loop.node.gain.setValueAtTime(0, at);
+          loop.node.gain.linearRampToValueAtTime(entry.gain, at + seconds);
+        } catch (error) {
+          if (ensembleLoops.get(id) === entry) ensembleLoops.delete(id);
+          console.warn("Recording unavailable", error);
+        }
+      }));
+    },
+    /** Fades out and releases every Orchestra channel. */
+    ensembleStop() {
+      if (context) for (const entry of ensembleLoops.values()) if (entry.loop) fadeOut(entry.loop, fadeTime());
+      ensembleLoops.clear();
+    },
+    /** Orchestra channels sounding now, as "channel:phenomenon-level". */
+    get voices() { return [...ensembleLoops].filter(([, e]) => e.loop).map(([id, e]) => `${id}:${e.key}`); },
     setVolume(value) { volume = value; applyLevel(); },
     setDuck(on) { duck = on ? SPEECH_DUCK : 1; applyLevel(); },
     /** Mute or sound off: everything fades out and is released. */
-    stop() { clearTimer(previewTimer); api.silence(); api.stopSlices(); },
+    stop() { clearTimer(previewTimer); api.silence(); api.stopSlices(); api.ensembleStop(); },
     get active() { return current?.key ?? null; },
     get gain() { return level(); },
     get alive() { return (current ? 1 : 0) + (fading ? 1 : 0); },

@@ -1,5 +1,6 @@
 import { PHENOMENA } from "./datasets.js";
-import { cellInfo, soundParams, valueTones } from "./sonify.js";
+import { cellInfo } from "./sonify.js";
+import { DOCUMENTED_BREAKPOINTS, levelFor } from "./ambience-core.js";
 
 export const ORCHESTRA_IDS = ["rainfall", "wind", "dust"];
 export const ORCHESTRA_SECONDS = 12;
@@ -23,6 +24,9 @@ function variableValid(id, s, index) {
   return false;
 }
 
+/** The recording level (low / mid / high) for a real value, or null for silence (no measurable rain). Same rule as the Studio. */
+export const recordingLevel = (id, value) => levelFor({ phenomenon: id, value, breakpoints: DOCUMENTED_BREAKPOINTS[id] });
+
 /** Strict compatibility, never nearest-time matching or inferred build equivalence.
  * Checks the physical target footprint, exact averaging interval, source provenance,
  * supported aggregation, units and derived values. Catalog groups alone cannot pass it.
@@ -45,15 +49,33 @@ export function channelCompatibility({ primary, anchor, candidate, grid, referen
   const value = candidate.values[index];
   if (!Number.isFinite(value)) return no("missing");
   if (value < 0 || !variableValid(id, candidate, index)) return no("variable");
-  return { ok: true, reason: null, value, info: cellInfo(id, candidate, index) };
+  return { ok: true, reason: null, value, level: recordingLevel(id, value), info: cellInfo(id, candidate, index) };
 }
 
 export function defaultChannels() {
   return Object.fromEntries(ORCHESTRA_IDS.map(id => [id, { enabled: true, muted: false, solo: false, gain: 0.7 }]));
 }
 
-/** One shared transport plan and clock; three fixed-scale buses, no recorded ambience.
- * Reuse the existing earthmap-v1 voices; preserve fractional pulse rates across the full excerpt.
+/** The listening level of one channel: 0 when inactive, muted or left out by another channel's solo. */
+export function channelGain(settings, id, observations = null) {
+  const usable = (key) => settings[key]?.enabled && (!observations || observations[key]?.ok);
+  const soloed = ORCHESTRA_IDS.some(key => usable(key) && settings[key].solo);
+  const s = settings[id];
+  if (!s || !usable(id) || s.muted || (soloed && !s.solo)) return 0;
+  return Math.max(0, Math.min(1, s.gain ?? 1));
+}
+
+/** What each channel plays: its recording at the level of its real value, at its listening level. */
+export function recordingSpec(observations, settings) {
+  return Object.fromEntries(ORCHESTRA_IDS.map(id => {
+    const item = observations[id];
+    if (!item?.ok || !item.level) return [id, null];
+    return [id, { phenomenon: id, level: item.level, gain: channelGain(settings, id, observations), pan: 0 }];
+  }));
+}
+
+/** One shared clock for play / pause / stop and position. The plan carries markers only (no synthesized tones):
+ * each channel's sound is the user's recording for its real value (recordingSpec), played by the Studio's recordings.
  * Twelve listening seconds repeat the selected model mean; they are NOT a time series.
  */
 export function orchestraPlan(observations, settings, durationS = ORCHESTRA_SECONDS) {
@@ -63,13 +85,8 @@ export function orchestraPlan(observations, settings, durationS = ORCHESTRA_SECO
     const item = observations[id];
     channels[id] = { ...settings[id], enabled: Boolean(item?.ok && settings[id].enabled) };
     if (!item?.ok) continue;
-    const params = soundParams(id, item.info);
-    const tones = valueTones(id, item.info, { pan: 0, eventS: 1 });
-    for (const { offsetS, tone } of tones) {
-      const voice = params.rate ? { ...tone, pulses: Array.from({ length: Math.ceil(params.rate * durationS) }, (_, k) => k / params.rate).filter(t => t < durationS) } : tone;
-      events.push({ id: `${id}-0`, channelId: id, onsetS: offsetS, tone: voice, evidence: { mappingVersion: "earthmap-v1", snapshotId: item.snapshot.id, index: item.index, value: item.value, time: item.snapshot.time, variable: PHENOMENA[id].variable, unit: PHENOMENA[id].unit } });
-    }
+    events.push({ id: `${id}-0`, channelId: id, onsetS: 0, level: item.level ?? null, evidence: { mappingVersion: "recordings-v1", snapshotId: item.snapshot.id, index: item.index, value: item.value, level: item.level ?? null, time: item.snapshot.time, variable: PHENOMENA[id].variable, unit: PHENOMENA[id].unit } });
   }
   events.sort((a, b) => a.onsetS - b.onsetS || a.id.localeCompare(b.id));
-  return { caseId: "earthmap", mode: "orchestra", mappingVersion: "earthmap-v1", durationS, channels, events };
+  return { caseId: "earthmap", mode: "orchestra", mappingVersion: "recordings-v1", durationS, channels, events };
 }
