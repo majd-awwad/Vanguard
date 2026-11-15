@@ -70,7 +70,7 @@ export const gameCopy = {
       ns: { north: "northern", south: "southern" }, ew: { west: "western", east: "eastern" },
     },
     result: {
-      title: "Level {n} complete", score: "Level score", best: "Best score", total: "Total", points: "{earned}/{points}", wrong: "{n} wrong tries", hints: "{n} hints", shown: "answer shown", perfect: "A perfect level.", improved: "New best score!",
+      title: "Level {n} complete", score: "Level score", best: "Best score", total: "Total", points: "{earned}/{points}", wrong: "Wrong tries: {n}", hints: "Hints used: {n}", shown: "answer shown", perfect: "A perfect level.", improved: "New best score!",
       next: "Next level", replay: "Replay this level", levels: "All levels", finish: "See my award", review: "Review the data", reviewNote: "Now that the level is finished, the real values are shown. Colours follow the data scale; select a cell to read its value.",
       value: "Value", layer: "Layer", unit: { dust: "unitless (dust optical depth)", rain: "mm/h", wind: "m/s" }, direction: "Wind from {dir}", missing: "No data for this cell", legendLow: "low", legendHigh: "high",
       objectives: "Objectives", unlocked: "Level {n} is unlocked.", types: { "pick-higher": "Compare two cells", "find-max": "Find the highest level", "mark-set": "Mark the matching cells", direction: "Read the wind direction" },
@@ -150,7 +150,7 @@ export const gameCopy = {
       ns: { north: "الشمالي", south: "الجنوبي" }, ew: { west: "الغربي", east: "الشرقي" },
     },
     result: {
-      title: "اكتملت المرحلة {n}", score: "نتيجة المرحلة", best: "أفضل نتيجة", total: "المجموع", points: "{earned}/{points}", wrong: "{n} محاولات خاطئة", hints: "{n} تلميحات", shown: "أُظهرت الإجابة", perfect: "مرحلة مثالية.", improved: "نتيجة قياسية جديدة!",
+      title: "اكتملت المرحلة {n}", score: "نتيجة المرحلة", best: "أفضل نتيجة", total: "المجموع", points: "{earned}/{points}", wrong: "المحاولات الخاطئة: {n}", hints: "التلميحات: {n}", shown: "أُظهرت الإجابة", perfect: "مرحلة مثالية.", improved: "نتيجة قياسية جديدة!",
       next: "المرحلة التالية", replay: "أعد هذه المرحلة", levels: "كل المراحل", finish: "شاهد جائزتي", review: "راجع البيانات", reviewNote: "بعد انتهاء المرحلة تظهر القيم الحقيقية. الألوان تتبع مقياس البيانات؛ اختر خلية لتقرأ قيمتها.",
       value: "القيمة", layer: "الطبقة", unit: { dust: "بلا وحدة (العمق البصري للغبار)", rain: "ملم/س", wind: "م/ث" }, direction: "الرياح من {dir}", missing: "لا توجد بيانات لهذه الخلية", legendLow: "منخفض", legendHigh: "مرتفع",
       objectives: "الأهداف", unlocked: "فُتحت المرحلة {n}.", types: { "pick-higher": "قارن بين خليتين", "find-max": "اعثر على أعلى مستوى", "mark-set": "علّم الخلايا المطابقة", direction: "اقرأ اتجاه الرياح" },
