@@ -13,28 +13,28 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 export const PHENOMENA = Object.freeze({
   dust: {
     id: "dust", short: "DFPT3NXAER", variable: "DUEXTTAU", measure: "values", unit: "1", unitLabel: "", decimals: 3,
-    window: "three-hour mean", transform: "log", min: 0.001, max: 2.5, ticks: [0.01, 0.1, 1],
+    window: "three-hour mean", defaultThreshold: 0.2, transform: "log", min: 0.001, max: 2.5, ticks: [0.01, 0.1, 1],
     stops: [[0, hex(0x0f3b66)], [0.22, hex(0x1f9fb5)], [0.45, hex(0xe9d66b)], [0.7, hex(0xf29a2e)], [0.88, hex(0xd4451b)], [1, hex(0x7a1410)]],
     change: { max: 1.5, nearZero: 0.02 }, decodeThreshold: 0.2,
     related: [{ label: "SVS 5669", url: "https://svs.gsfc.nasa.gov/5669/", relation: "RELATED_CONTEXT", only: "2025-08-19" }],
   },
   rainfall: {
     id: "rainfall", short: "DFPT1NXFLX", variable: "PRECTOT", measure: "intervalAccumulationMm", unit: "mm", unitLabel: "mm / h", decimals: 3,
-    window: "one-hour mean", transform: "sqrt", min: 0, max: 4, ticks: [0.1, 1, 3],
+    window: "one-hour mean", defaultThreshold: 0.5, transform: "sqrt", min: 0, max: 4, ticks: [0.1, 1, 3],
     stops: [[0, hex(0x17324d)], [0.25, hex(0x2a73c9)], [0.55, hex(0x46c2f0)], [0.8, hex(0xb6f0ff)], [1, hex(0xffffff)]],
     change: { max: 3, nearZero: 0.05 },
     related: [{ label: "SVS 4285 (IMERG, a different product)", url: "https://svs.gsfc.nasa.gov/4285/", relation: "RELATED_CONTEXT" }],
   },
   temperature: {
     id: "temperature", short: "DFPT1NXSLV", variable: "T2M", measure: "celsius", unit: "degC", unitLabel: "°C", decimals: 1,
-    window: "one-hour mean", transform: "linear", min: -15, max: 45, ticks: [0, 20, 40],
+    window: "one-hour mean", defaultThreshold: 35, transform: "linear", min: -15, max: 45, ticks: [0, 20, 40],
     stops: [[0, hex(0x3b4cc0)], [0.25, hex(0x6fa8dc)], [0.45, hex(0xf2e9c9)], [0.65, hex(0xf6b26b)], [0.85, hex(0xe8563a)], [1, hex(0x8b0f1c)]],
     change: { max: 20, nearZero: 0.5 },
     related: [{ label: "SVS 5147", url: "https://svs.gsfc.nasa.gov/5147/", relation: "RELATED_CONTEXT" }],
   },
   wind: {
     id: "wind", short: "DFPT1NXSLV", variable: "U10M, V10M", measure: "speedMps", unit: "m s-1", unitLabel: "m/s", decimals: 1,
-    window: "one-hour mean", transform: "linear", min: 0, max: 16, ticks: [2, 8, 14],
+    window: "one-hour mean", defaultThreshold: 10, transform: "linear", min: 0, max: 16, ticks: [2, 8, 14],
     stops: [[0, hex(0x0b2a3a)], [0.3, hex(0x127c8a)], [0.55, hex(0x5fd1b0)], [0.8, hex(0xe6f08a)], [1, hex(0xfff6d6)]],
     change: { max: 12, nearZero: 0.3 }, vector: true,
     related: [],

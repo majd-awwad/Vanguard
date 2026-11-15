@@ -6,10 +6,13 @@ import { allowSpoilersThisVisit, spoilersUnlocked } from "../cinematic/site/prog
 import { loadSettings, saveSettings } from "../cinematic/site/settings.js";
 import { createStudioAudio } from "./audio.js";
 import {
-  PHENOMENA, PHENOMENON_IDS, changeNormalizer, formatChange, formatValue, isLocked, normalizer, openPackage, rampFromStops,
+  DECODE_LOCKED_DATES, PHENOMENA, PHENOMENON_IDS, changeNormalizer, formatChange, formatValue, isLocked, normalizer, openPackage, rampFromStops,
 } from "./datasets.js";
 import { cellAt, cellCenter, cellRect, rampTable } from "./field.js";
+import { createAnalysisClient } from "./analysis-client.js";
 import { mountCompare } from "./compare.js";
+import { mountEcho } from "./echo-ui.js";
+import { mountHunter } from "./hunter-ui.js";
 import { changeSemitones, changeTones, hoverPlan as changeHoverPlan } from "./mapping.js";
 import { cellInfo, hoverPlan as valueHoverPlan, soundParams, stepTones } from "./sonify.js";
 import { createCanvasRenderer } from "./renderer-2d.js";
@@ -329,13 +332,14 @@ async function mountApp(document, root, language, initialMode) {
     if (announce && cell) speech.say(readText(cell));
   }
   const cursorAt = (x, y) => { const g = toGeo(x, y); return cellAt(grid, g.lon, g.lat); };
-  function selectCell(cell, { play = true, say = true } = {}) {
+  function selectCell(cell, { play = true, say = true, user = true } = {}) {
     if (!cell) return;
     state.selected = cell;
     state.cursor = cell;
     store.dispatch("SELECT_SAMPLE", { sampleId: cell.index });
     renderInfo();
     invalidate();
+    for (const hook of state.selectHooks ?? []) hook(cell, { user });
     if (play) soundForCursor(true);
     if (say) guided(readText(cell));
   }
@@ -694,6 +698,28 @@ async function mountApp(document, root, language, initialMode) {
     refreshDateInfo: () => { el.dateInfo.textContent = ""; },
     setPins: (pins) => { state.pins = pins; invalidate(); },
     reduced,
+    analysis: createAnalysisClient(),
+    lockedDates: () => (phen.id === "dust" && !unlocked() ? [...DECODE_LOCKED_DATES] : []),
+    refreshLocks: () => { fillDates(); renderTimeline(); for (const hook of state.lockHooks ?? []) hook(); if (state.snapshot && isLocked(phen.id, state.snapshot.date, unlocked())) requestDate(firstOpen().id); },
+    playCurrent: () => soundForCursor(true),
+    showValues: async (date) => {
+      if (state.comparison) api.hideChange();
+      const target = phen.byDate(date);
+      if (target && state.snapshot.id !== target.id) await requestDate(target.id);
+    },
+    showChangeFor: async (firstDate, secondDate) => {
+      const A = phen.byDate(firstDate)?.id;
+      const B = phen.byDate(secondDate)?.id;
+      if (!A || !B) return;
+      if (state.comparison) {
+        if (state.cmpSources?.a.id === A && state.cmpSources?.b.id === B) return;
+        api.hideChange();
+      }
+      el.cmpA.value = A;
+      el.cmpB.value = B;
+      api.describeComparison();
+      await api.showChange();
+    },
   };
   makeRenderer(params.get("renderer") === "2d");
   new win.ResizeObserver(resize).observe(el.frame);
@@ -707,6 +733,8 @@ async function mountApp(document, root, language, initialMode) {
   mountTools(api);
   mountCompare(api);
   mountShare(api);
+  mountHunter(api, hunterPanel);
+  mountEcho(api, echoPanel);
   if (params.has("debug")) win.__studio = api;
   if (initialMode === GUIDED) speak(m.voice.welcome.GUIDED_VOICE);
   return api;
