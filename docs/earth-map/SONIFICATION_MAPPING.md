@@ -121,5 +121,6 @@ At or below the low breakpoint is the first word, at or below the high breakpoin
 
 - Rain below 0.1 mm/h: "Rain: no measurable rain". A missing value: "no data here".
 - Arabic: «غبار منخفض / متوسط / مرتفع مقارنة ببقية البيانات» · «لا يوجد مطر يُقاس» / «مطر قليل / متوسط / مرتفع مقارنة ببقية البيانات» · «رياح ضعيفة / متوسطة / قوية مقارنة ببقية البيانات» · «حرارة أبرد / متوسطة / أدفأ مقارنة ببقية البيانات» · «لا توجد بيانات هنا».
+- While exploring, the phrase is spoken the first time and again only when it changes (a new level or phenomenon); an explicit request (explain, Space, switching to Guided) always says it in full. The badge is always visible.
 - Spoken order (after the movement settles, stale speech cancelled): the phrase, the value with its unit (dust and rain 2 decimals, wind 1, temperature whole degrees), the place (latitude and longitude to 1 decimal), and the date only when it changed since the last spoken one.
 - The badge appears in the selected-place card and in the hover tooltip in both modes. Pure Sonification never speaks it. The comparison (change) layer has no phrase.

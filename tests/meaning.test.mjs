@@ -94,6 +94,8 @@ test("spoken order and badges are wired into the Studio: phrase, value, place, d
   const order = ["mean.text", "spokenNumber(", "formatLat(", "lastSpokenDate"].map((s) => body.indexOf(s));
   assert.ok(order.every((i) => i >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]), "phrase, value, place, date in that order");
   assert.ok(studio.includes("if (date !== lastSpokenDate)"));
+  assert.ok(studio.includes("always || mean.text !== lastSpokenPhrase"), "while exploring the phrase is spoken only the first time and when it changes");
+  assert.ok(studio.includes("spoken(state.cursor, \"\", true)"), "an explicit request always says the full phrase");
   assert.ok(studio.includes("fillBadge(el.insBadge"), "badge in the selected-place card");
   assert.ok(studio.includes("makeBadge(mean)"), "badge in the hover tooltip");
   assert.ok(!/GUIDED/.test(body), "the text does not depend on the mode; only speech does");
