@@ -48,6 +48,16 @@ export function mountEcho(api, container) {
   let lastResult = null;
   let group = null;
   let playing = null;
+  let playStatus = null;
+  // One subscription for the whole page life (no listener per opened match).
+  api.audio.transport.subscribe((snap) => {
+    if (!playing || snap.planRevision !== playing.revision) return;
+    if (snap.status === "playing" && snap.activeEventId) {
+      const event = playing.plan.events.findLast((e) => e.id === snap.activeEventId);
+      if (event && event.place !== playing.place) { playing.place = event.place; if (playStatus) playStatus.textContent = T(a.playing, { which: event.place === "a" ? a.sourceLabel : a.matchLabel }); }
+    }
+    if (snap.status === "ended") { playing = null; api.state.busy = false; if (playStatus) playStatus.textContent = ""; }
+  });
 
   const spec = () => api.phen.spec;
   const unitName = () => m.phen.unitName[api.phen.id];
@@ -200,14 +210,7 @@ export function mountEcho(api, container) {
         h(document, "figure", {}, lineChart(document, { series: [{ values: mt.series, cls: "match" }], dates, unit: unitName(), label: `${a.matchLabel} ${cellId(mt.row, mt.col)}` }), h(document, "figcaption", { class: "small", text: a.matchLabel + " " + cellId(mt.row, mt.col) + " · " + T(a.distance, { d: trimNumber(mt.distance, 3) }) }))),
       listen, status, h(document, "p", { class: "small callout", text: SIMILARITY_NOTE }));
     el.detail.hidden = false;
-    api.audio.transport.subscribe((snap) => {
-      if (!playing || snap.planRevision !== playing.revision) return;
-      if (snap.status === "playing" && snap.activeEventId) {
-        const event = playing.plan.events.findLast((e) => e.id === snap.activeEventId);
-        if (event && event.place !== playing.place) { playing.place = event.place; status.textContent = T(a.playing, { which: event.place === "a" ? a.sourceLabel : a.matchLabel }); }
-      }
-      if (snap.status === "ended") { playing = null; api.state.busy = false; status.textContent = ""; }
-    });
+    playStatus = status;
     api.guided(T(a.opened, { rank: mt.rank, id: cellId(mt.row, mt.col) }));
   }
 
