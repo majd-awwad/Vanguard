@@ -85,3 +85,7 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - One sound button and one volume. The sound-style selector and the separate ambience toggle are gone (spoken guidance follows the "Spoken instructions" setting). Old stored sound settings are reset once.
 - Scans, paths, Region A/B and Echo play one slice (about 0.7 s, 80 ms fades) of the matching recording per step, in order, with the clock and playhead in sync. Pan follows longitude.
 - Credits: every recording is listed with its source in the manifest, the Science page credits and the table above; all licences are "to verify".
+
+## Guided Voice / Pure Sonification restored (recordings stay the only sound)
+- The entry dialog (two choices) and the Guided / Pure switch in the Studio sound controls are back. Guided Voice = spoken guidance (live region and visible text when no voice exists) plus the recordings, ducked while speaking. Pure Sonification = the recordings only, no automatic speech.
+- One source of truth: the "Spoken instructions" setting (`guidance`). The dialog, the Studio switch, the settings drawer and the settings page all read and write it and stay in sync through the `earthpulse:settings` event. Switching keeps position, tab, findings and matches.
