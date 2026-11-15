@@ -9,9 +9,11 @@ import { loadSettings, saveSettings } from "./settings.js";
 import { describeRule, gameCopy } from "./decode-game-copy.js";
 import { CERT_SIZE, downloadCanvas, drawCertificate } from "../../experiences/levels/award.js";
 import { createRun } from "../../experiences/levels/engine.js";
+import { createEffect } from "../../experiences/levels/effects.js";
 import { LEVELS, LEVEL_COUNT, PACKAGE_ID, buildLevelData, levelOf } from "../../experiences/levels/levels.js";
 import { AVATARS, createProfileStore } from "../../experiences/levels/profiles.js";
 import { PHENOMENA, colorAt, formatValue, openPackage } from "../../studio/datasets.js";
+import { meaningPhrase } from "../../studio/meaning.js";
 import { createRecordings } from "../../studio/recordings.js";
 
 const TEXTURE = "../assets/earth/blue-marble-4096.jpg";
@@ -177,7 +179,7 @@ function mountPlay(app, level, run) {
   const profile = store.active();
   const { rows, cols } = level.grid;
   const phenLabel = (id) => c.phen[id];
-  const st = { sel: null, marks: new Set(), listenPhen: null, hit: new Set(), awaiting: null, feedback: "", cue: "", hints: [] };
+  const st = { sel: null, marks: new Set(), listenPhen: null, reveal: null, awaiting: null, feedback: "", cue: "", hints: [] };
   const el = {};
   app.rec ??= createRecordings({ baseUrl: new URL("../../assets/ambient/", import.meta.url), reduced: reducedMotion });
   app.rec.setVolume(app.settings.volume);
@@ -199,15 +201,22 @@ function mountPlay(app, level, run) {
     const v = run.view();
     const cur = v.current;
     const candidates = new Set((cur?.candidates ?? []).map((x) => x.index));
+    const revealed = new Map((st.reveal?.cells ?? []).map((x) => [x.index, x]));
     api.buttons.forEach((line, r) => line.forEach((b, col) => {
       const i = idx(r, col);
       b.dataset.mark = st.marks.has(i) ? "1" : "";
-      b.dataset.hit = st.hit.has(i) ? "1" : "";
       b.dataset.cand = candidates.has(i) ? "1" : "";
       b.dataset.dim = cur?.candidates && !candidates.has(i) ? "1" : "";
       b.dataset.pair = cur?.pair ? (cur.pair.A.index === i ? "A" : cur.pair.B.index === i ? "B" : "") : "";
       b.dataset.rev = v.finished ? "1" : "";
-      b.setAttribute("aria-label", label(r, col) + (st.marks.has(i) ? ", ✓" : "") + (b.dataset.pair ? ", " + b.dataset.pair : ""));
+      const rc = revealed.get(i);
+      b.dataset.outcome = rc ? rc.outcome : "";
+      b.style.background = rc && !rc.withheld ? `rgb(${colorAt(PHENOMENA[PACKAGE_ID[st.reveal.objective.phen]], rc.layers[0].value ?? 0).join(" ")} / .78)` : "";
+      b.querySelector(".dg-sym")?.remove();
+      b.querySelector(".dg-cellval")?.remove();
+      if (rc && p.sym[rc.outcome]) b.append(h(document, "span", { class: "dg-sym", "aria-hidden": "true", "data-outcome": rc.outcome, text: p.sym[rc.outcome] }));
+      if (rc && !rc.withheld && rc.layers[0].value !== null) b.append(h(document, "span", { class: "dg-cellval ltr", "aria-hidden": "true", text: short(rc.layers[0].phen, rc.layers[0].value) }));
+      b.setAttribute("aria-label", label(r, col) + (st.marks.has(i) ? ", ✓" : "") + (b.dataset.pair ? ", " + b.dataset.pair : "") + (rc ? ", " + revealWords(rc) : ""));
       b.querySelector(".dg-arrow")?.remove();
       if (cur?.arrow && cur.arrow.cell.index === i) b.append(h(document, "span", { class: "dg-arrow", "aria-hidden": "true", style: `transform:rotate(${Math.round(cur.arrow.toDegrees)}deg)`, text: "↑" }));
     }));
@@ -252,33 +261,61 @@ function mountPlay(app, level, run) {
     paint(); renderSide();
   }
   const cellsText = (cells) => cells.map((x) => cellId(x.row, x.col)).join(", ");
-  function afterCompletion(result, kind) {
-    st.hit = new Set((result.truth ?? []).map((x) => x.index));
+  // ---- the reveal after an answer: only the cells involved, with their real values and the outcome
+  const unitOf = (phen) => p.unitShort[phen];
+  /** Compact real numbers for the feedback: two significant digits (wind one decimal), never rounded to zero. */
+  const short = (phen, value) => String(phen === "wind" ? Number(value.toFixed(1)) : Number(value.toPrecision(2)));
+  const valueText = (phen, value) => short(phen, value) + unitOf(phen);
+  const phrase = (phen, value) => meaningPhrase({ phenomenon: PACKAGE_ID[phen], value, language });
+  const compassOf = (deg) => c.compass[["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8]];
+  function layerLine(layer) {
+    if (layer.value === null) return fill(p.valueLine, { phen: c.phenTitle[layer.phen], value: "—", unit: "" });
+    const main = layer.fromValue !== undefined && layer.fromValue !== null ? fill(p.changeLine, { from: short(layer.phen, layer.fromValue), value: valueText(layer.phen, layer.value) }) : valueText(layer.phen, layer.value);
+    const dir = layer.direction !== undefined ? fill(c.result.direction, { dir: compassOf(layer.direction) }) : "";
+    return [fill(p.valueLine, { phen: c.phenTitle[layer.phen], value: main, unit: "" }), phrase(layer.phen, layer.value), dir].filter(Boolean).join(" · ");
+  }
+  const revealWords = (rc) => [p.outcome[rc.outcome], rc.withheld ? p.withheldCell : (rc.layers ?? []).map(layerLine).join("; ")].filter(Boolean).join(", ");
+  function feedbackLine(fb, earned, before) {
+    const f = p.feedback;
+    const lead = fb.correct ? f.lead.correct : f.lead.wrong;
+    const idOfIndex = (i) => cellId(Math.floor(i / cols), i % cols);
+    const phenName = c.phen[fb.phen];
+    let line = "";
+    if (fb.kind === "pick") {
+      const values = fb.values ? fill(f.pickValues, { hi: short(fb.phen, fb.values[0]), lo: short(fb.phen, fb.values[1]), unit: unitOf(fb.phen) }) : "";
+      line = fill(f.pick, { lead, cell: idOfIndex(fb.higher), more: f.more[fb.phen], values });
+    } else if (fb.kind === "max") {
+      const value = fb.value !== null && fb.value !== undefined ? fill(f.maxValue, { value: valueText(fb.phen, fb.value) }) : "";
+      if (fb.correct) line = fill(f.max, { lead, cell: idOfIndex(fb.cell), phen: phenName, value });
+      else { const best = st.reveal.cells.find((x) => x.outcome === "missed"); const bv = best && !best.withheld ? fill(f.maxValue, { value: valueText(fb.phen, best.layers[0].value) }) : ""; line = fill(f.maxWrong, { lead, cell: idOfIndex(fb.cell), phen: phenName, best: best ? idOfIndex(best.index) : "", value: bv }); }
+    } else if (fb.kind === "marks") {
+      line = fb.hits === fb.total && fb.extra === 0 ? fill(f.marksAll, { lead, total: fb.total }) : fill(f.marks, { lead, hits: fb.hits, total: fb.total, extra: fb.extra, missing: fb.missing });
+    } else {
+      const base = { lead, cell: idOfIndex(fb.cell), from: compassOf(["N", "NE", "E", "SE", "S", "SW", "W", "NW"].indexOf(fb.from) * 45), deg: fb.degrees };
+      line = fb.correct ? fill(f.direction, base) : fill(f.directionWrong, { ...base, chosen: compassOf(["N", "NE", "E", "SE", "S", "SW", "W", "NW"].indexOf(fb.chosen) * 45) });
+    }
+    const notes = [];
+    if (before.together) notes.push(f.both);
+    if (before.change) notes.push(f.change);
+    if (fb.anyWithheld) notes.push(p.withheldNote);
+    return [line, fill(f.points, { points: earned }), ...notes].join(" ");
+  }
+  function afterAnswer(result, before) {
+    st.reveal = { cells: result.reveal.cells, objective: before, feedback: result.reveal.feedback };
     st.awaiting = true;
     st.marks.clear();
     store.saveCurrent(profile.id, run.snapshot());
-    const lines = [kind === "shown" ? fill(p.feedback.shown, { cells: cellsText(result.truth) }) : fill(p.feedback.correct, { points: result.earned }), kind === "shown" ? "" : fill(p.feedback.truth, { cells: cellsText(result.truth) })];
-    const cur = result.objective;
-    if (cur?.together) lines.push(p.feedback.both);
-    if (cur?.change) lines.push(p.feedback.change);
-    st.feedback = lines.filter(Boolean).join(" ");
+    st.feedback = feedbackLine(result.reveal.feedback, result.earned, before);
     paint(); renderSide();
-    el.live.textContent = st.feedback;
+    const spoken = result.reveal.cells.map((rc) => cellId(rc.row, rc.col) + ": " + revealWords(rc)).join(". ");
+    el.live.textContent = st.feedback + " " + spoken;
   }
   function submit(answer) {
     const before = run.view().current;
-    const result = run.submit(answer);
-    if (result.ok) { afterCompletion({ ...result, id: before.id, objective: before }, "ok"); return; }
-    let text = p.feedback.pickWrong;
-    if (before.type === "mark-set") text = fill(p.feedback.marks, { hits: result.hits, extra: result.extra, missing: result.missing });
-    else if (before.type === "find-max") text = p.feedback.maxWrong;
-    else if (before.type === "direction") text = p.feedback.dirWrong;
-    st.feedback = text;
-    renderSide();
-    el.live.textContent = text;
+    afterAnswer(run.submit(answer), before);
   }
   function next() {
-    st.awaiting = null; st.hit.clear(); st.sel = null; st.marks.clear(); st.feedback = ""; st.hints = []; st.listenPhen = null;
+    st.awaiting = null; st.reveal = null; st.sel = null; st.marks.clear(); st.feedback = ""; st.hints = []; st.listenPhen = null;
     const v = run.view();
     if (v.finished) return finishLevel();
     paint(); renderSide();
@@ -289,7 +326,7 @@ function mountPlay(app, level, run) {
     const outcome = store.completeLevel(profile.id, result);
     if (result.levelId === 1) markDecodeCompleted();
     if (outcome?.allDone) markDecodeFinished();
-    showResult(app, level, run, result, outcome);
+    showLevelReveal(app, level, run, result, outcome);
   }
 
   // ---- side panel
@@ -342,7 +379,10 @@ function mountPlay(app, level, run) {
       h(document, "ol", { class: "dg-steps", "aria-hidden": "true" }, ...v.objectives.map((o) => h(document, "li", { "data-done": o.done ? "1" : "", "data-now": cur && cur.id === o.id ? "1" : "" })))));
     parts.push(h(document, "p", { class: "dg-score ltr", text: fill(p.score, { score: v.score }) }));
     if (st.awaiting) {
-      parts.push(h(document, "p", { class: "callout dg-feedback", text: st.feedback }));
+      parts.push(h(document, "p", { class: "callout dg-feedback", "data-correct": st.reveal?.feedback.correct ? "1" : "", text: st.feedback }));
+      if (st.reveal?.cells.length) parts.push(h(document, "h3", { class: "dg-reveal-title", text: p.revealTitle }), h(document, "ul", { class: "dg-reveal" }, ...st.reveal.cells.map((rc) => h(document, "li", { "data-outcome": rc.outcome },
+        p.sym[rc.outcome] ? h(document, "span", { class: "dg-sym", "aria-hidden": "true", "data-outcome": rc.outcome, text: p.sym[rc.outcome] }) : h(document, "span", { class: "dg-sym none", "aria-hidden": "true" }),
+        h(document, "strong", { class: "ltr", text: cellId(rc.row, rc.col) }), h(document, "span", { text: " " + revealWords(rc) })))));
       parts.push(actionButton(v.finished ? p.finish : p.next, next));
     } else if (cur) {
       parts.push(h(document, "p", { class: "eyebrow", text: fill(p.objective, { k: cur.index + 1, n: cur.total }) + (showStage ? " · " + fill(p.stage, { s: cur.stage }) : "") }));
@@ -381,11 +421,9 @@ function mountPlay(app, level, run) {
         parts.push(radios, go);
       }
       if (cur.change) parts.push(actionButton(p.hearBoth, () => { if (st.sel !== null) hearBoth(st.sel); }, "button ghost", st.sel === null));
-      if (st.feedback) parts.push(h(document, "p", { class: "callout dg-feedback", text: st.feedback }));
       // hints and fair play
       const hint = actionButton(cur.hintsLeft ? p.hint : p.noHints, () => { const hn = run.hint(); if (hn) { st.hints.push(hintText(hn)); store.saveCurrent(profile.id, run.snapshot()); renderSide(); } }, "button ghost small-button", cur.hintsLeft === 0);
       parts.push(h(document, "div", { class: "dg-hints" }, hint, h(document, "p", { class: "small", text: cur.hintsLeft ? fill(p.hintCost, { n: cur.hintsLeft }) : "" }), ...st.hints.map((t) => h(document, "p", { class: "dg-hint", text: "💡 " + t }))));
-      if (cur.canShowAnswer) parts.push(actionButton(p.showAnswer, () => { const shown = run.showAnswer(); if (shown) afterCompletion({ ...shown, id: cur.id, objective: cur }, "shown"); }, "button ghost small-button"), h(document, "p", { class: "small", text: p.showNote }));
     }
     // sound
     const soundToggle = actionButton(app.sound ? p.soundOn : p.soundOff, () => { app.sound = !app.sound; if (!app.sound) app.rec.stop(); renderSide(); }, "button ghost small-button");
@@ -423,16 +461,14 @@ function mountPlay(app, level, run) {
   renderSide();
 }
 
-// ---------------------------------------------------------------------------------------------------------- result
-function showResult(app, level, run, result, outcome) {
-  const { document, c, language, store } = app;
+// ---------------------------------------------------------------------------------------------------------- level-end reveal
+function showLevelReveal(app, level, run, result, outcome) {
+  const { document, c, language } = app;
   const r = c.result;
-  const profile = store.active();
+  const rv = c.result.reveal;
   const info = c.levels.info[level.id];
   const view = run.view();
   const { rows, cols } = level.grid;
-  const nextLevel = level.id < LEVEL_COUNT ? LEVELS[level.id] : null;
-  const rows2 = result.objectives.map((o) => h(document, "li", {}, h(document, "span", { text: r.types[o.type] + ": " }), h(document, "span", { class: "ltr", text: fill(r.points, { earned: o.earned, points: o.points }) }), " ", o.wrong ? h(document, "span", { class: "small", text: fill(r.wrong, { n: o.wrong }) }) : null, " ", o.hints ? h(document, "span", { class: "small", text: fill(r.hints, { n: o.hints }) }) : null, o.shown ? h(document, "span", { class: "small", text: " " + r.shown }) : null));
   // ---- review map with the real values (the final reveal)
   const stage = h(document, "div", { class: "xp-stage dg-stage dg-review", dir: "ltr", "data-renderer": "svg" });
   const grid = h(document, "div", { class: "xp-grid" });
@@ -440,7 +476,7 @@ function showResult(app, level, run, result, outcome) {
   const crop = textureCrop(SOURCE_BOUNDS);
   stage.style.setProperty("--dg-rows", String(level.grid.rows));
   Object.assign(stage.style, { aspectRatio: String(crop.aspect), backgroundImage: `url("${TEXTURE}")`, backgroundSize: `${crop.sizeX}% ${crop.sizeY}%`, backgroundPosition: `${crop.posX}% ${crop.posY}%` });
-  const readout = h(document, "p", { class: "dg-cue", role: "status", "aria-live": "polite", text: r.reviewNote });
+  const readout = h(document, "p", { class: "dg-cue", role: "status", "aria-live": "polite", text: rv.pickCell });
   const state = { phen: level.phenomena[0], which: "main" };
   const spec = () => PHENOMENA[PACKAGE_ID[state.phen]];
   const valueOf = (i) => view.revealed[state.phen]?.[state.which]?.[i] ?? null;
@@ -457,7 +493,9 @@ function showResult(app, level, run, result, outcome) {
   function paintReview() {
     api.buttons.forEach((line, row) => line.forEach((b, col) => {
       const value = valueOf(row * cols + col);
-      b.style.background = value === null ? "rgb(0 0 0 / .45)" : `rgb(${colorAt(spec(), value).join(",")} / .72)`;
+      b.style.background = value === null ? "rgb(0 0 0 / .45)" : `rgb(${colorAt(spec(), value).join(" ")} / .72)`;
+      b.querySelector(".dg-cellval")?.remove();
+      if (value !== null) b.append(h(document, "span", { class: "dg-cellval ltr", "aria-hidden": "true", text: formatValue(spec(), value) }));
       b.setAttribute("aria-label", describeCell(row * cols + col));
     }));
     const s = spec();
@@ -466,11 +504,36 @@ function showResult(app, level, run, result, outcome) {
   const layers = h(document, "div", { class: "seg", role: "group", "aria-label": r.layer });
   const redrawLayers = () => {
     layers.replaceChildren();
-    for (const id of level.phenomena) { const b = h(document, "button", { type: "button", "aria-pressed": state.phen === id, text: c.phenTitle[id] }); b.addEventListener("click", () => { state.phen = id; redrawLayers(); paintReview(); }); layers.append(b); }
-    if (level.dates.from) for (const which of ["from", "main"]) { const b = h(document, "button", { type: "button", "aria-pressed": state.which === which, text: level.dates[which] }); b.addEventListener("click", () => { state.which = which; redrawLayers(); paintReview(); }); layers.append(b); }
+    for (const id of level.phenomena) { const b = h(document, "button", { type: "button", "aria-pressed": state.phen === id, text: c.phenTitle[id] }); b.addEventListener("click", () => { state.phen = id; redrawLayers(); paintReview(); startEffect(); }); layers.append(b); }
+    if (level.dates.from) for (const which of ["from", "main"]) { const b = h(document, "button", { type: "button", "aria-pressed": state.which === which, text: level.dates[which] }); b.addEventListener("click", () => { state.which = which; redrawLayers(); paintReview(); startEffect(); }); layers.append(b); }
   };
   redrawLayers();
   paintReview();
+  // the effect: dust particles, rain shimmer or wind streaks, drawn from the real values (static colours with reduced motion)
+  const fx = h(document, "canvas", { class: "dg-fx", "aria-hidden": "true" });
+  stage.append(fx);
+  const effect = createEffect(fx, { grid: level.grid, reduced: reducedMotion });
+  const effectCells = () => (view.revealed[state.phen]?.[state.which] ?? []).map((value, i) => ({ row: Math.floor(i / cols), col: i % cols, value, direction: state.phen === "wind" ? (state.which === "from" ? view.revealed.wind.fromDirection : view.revealed.wind.direction)?.[i] ?? null : undefined }));
+  const startEffect = () => effect.set(state.phen, effectCells());
+  startEffect();
+  new ResizeObserver(() => effect.resize()).observe(stage);
+  const next = h(document, "button", { type: "button", class: "button", text: rv.continue });
+  next.addEventListener("click", () => { effect.stop(); showResult(app, level, run, result, outcome); });
+  const note = h(document, "p", { class: "small dg-effect-note", text: reducedMotion() ? rv.effectNote + " " + rv.effectStatic : rv.effectNote });
+  setScreen(app, "reveal", h(document, "section", { class: "dg-section dg-result dg-reveal-screen", "aria-labelledby": "dg-reveal-title" },
+    h(document, "p", { class: "eyebrow", text: fill(c.play.levelOf, { n: level.id, name: info.name }) }), h(document, "h1", { id: "dg-reveal-title", text: fill(rv.title, { n: level.id }) }), h(document, "p", { class: "lede", text: rv.lede }),
+    layers, h(document, "div", { class: "dg-review-box" }, stage), note, legend, readout, h(document, "div", { class: "actions" }, next)));
+  globalThis.__dgEffect = app.debug ? effect : undefined;
+}
+
+// ---------------------------------------------------------------------------------------------------------- result
+function showResult(app, level, run, result, outcome) {
+  const { document, c, language, store } = app;
+  const r = c.result;
+  const profile = store.active();
+  const info = c.levels.info[level.id];
+  const nextLevel = level.id < LEVEL_COUNT ? LEVELS[level.id] : null;
+  const rows2 = result.objectives.map((o) => h(document, "li", {}, h(document, "span", { text: r.types[o.type] + ": " }), h(document, "span", { class: "ltr", text: fill(r.points, { earned: o.earned, points: o.points }) }), " ", o.wrong ? h(document, "span", { class: "small", text: r.wrong }) : null, " ", o.hints ? h(document, "span", { class: "small", text: fill(r.hints, { n: o.hints }) }) : null));
   const nextButton = nextLevel ? h(document, "button", { type: "button", class: "button", text: r.next }) : h(document, "button", { type: "button", class: "button", text: r.finish });
   nextButton.addEventListener("click", () => (nextLevel ? playLevel(app, nextLevel.id) : showAward(app)));
   const replay = h(document, "button", { type: "button", class: "button ghost", text: r.replay });
@@ -483,8 +546,7 @@ function showResult(app, level, run, result, outcome) {
     result.perfect ? h(document, "p", { class: "callout", text: r.perfect }) : null, outcome?.improved && !outcome.first ? h(document, "p", { class: "callout", text: r.improved }) : null,
     nextLevel ? h(document, "p", { class: "small", text: fill(r.unlocked, { n: nextLevel.id }) }) : null,
     h(document, "h2", { class: "dg-h2", text: r.objectives }), h(document, "ol", { class: "dg-breakdown" }, ...rows2),
-    h(document, "div", { class: "actions" }, nextButton, replay, all),
-    h(document, "h2", { class: "dg-h2", text: r.review }), h(document, "p", { class: "small", text: r.reviewNote }), layers, h(document, "div", { class: "dg-review-box" }, stage), legend, readout));
+    h(document, "div", { class: "actions" }, nextButton, replay, all)));
 }
 
 // ---------------------------------------------------------------------------------------------------------- final award
