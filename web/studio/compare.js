@@ -39,11 +39,11 @@ export function placeSummary(place, values, grid) {
 export function fingerprintPlan(place, values, kind, grid, tonesFor = null) {
   if (place.type === "cell") {
     const step = { row: place.cell.row, col: place.cell.col, index: place.cell.index, value: values[place.cell.index] ?? null };
-    return sequencePlan(kind, [step, step, step], grid, { slotS: 0.24, tag: "fingerprint", compact: false, tonesFor });
+    return sequencePlan(kind, [step, step, step], grid, { slotS: 0.5, tag: "fingerprint", compact: false, tonesFor });
   }
   const cells = rectCells(grid, place.rect);
   const steps = scanSteps(cells, values, strideFor(cells.length, FINGERPRINT_CELLS));
-  return sequencePlan(kind, steps, grid, { slotS: 0.1, tag: "fingerprint", tonesFor });
+  return sequencePlan(kind, steps, grid, { slotS: 0.25, tag: "fingerprint", tonesFor });
 }
 
 export function mountCompare(api) {

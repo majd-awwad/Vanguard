@@ -26,7 +26,7 @@ Colour ramps use the same normalised value (`PHENOMENA[...].stops`). Changes bet
 phenomenon (display bands, not scientific thresholds): near-zero band / saturation: dust 0.02 / 1.5, rainfall 0.05 / 3 mm,
 temperature 0.5 / 20 degC, wind 0.3 / 12 m s-1.
 
-## Mapping per phenomenon
+## Mapping per phenomenon (legacy synthesized tones, no longer played; see "Studio sound" below)
 
 | Phenomenon | Sound | Parameters (n = normalized, 0 to 1) | What changes with the value |
 |---|---|---|---|
@@ -76,13 +76,15 @@ whenever the context changes, and ducks the data sound to 35% while speaking, th
 and data volume are separate sliders. Pure Sonification never speaks automatically.
 
 
-## Optional ambience layer (illustrative recordings)
+## Studio sound = the user's recordings, chosen by the real value (current)
 
-An optional layer under the data sonification. **Illustrative recording, not data. The level (low/mid/high) follows the real value.** It is OFF by default, remembered in settings, and starts only after the user has enabled sound. Temperature has no recording.
+**This replaces the synthesized tones described in the sections above for the Sound Studio, Explore Earth, the Science "How it sounds" examples and the Hunter/Echo listening.** The tone mapping above (`earthmap-v1`, `studio-v1`) is legacy: its code (`sonify.js`, `mapping.js` tones) stays in the repository with its unit tests, but nothing in those pages plays it. The Decode challenge is unchanged (its game relies on pitch = north).
 
-- Which recording: `{dust|rain|wind}-{low|mid|high}.mp3` from `web/assets/ambient/` (`manifest.json` lists each file with its SHA-256, original source and licence status).
-- Which level: from the REAL value of the snapshot under the cursor, the selected cell, or the scan position. At or below the low breakpoint is low, at or below the high breakpoint is mid, above it is high. A missing value gives silence. Rain below 0.1 mm/h counts as no measurable rain and gives silence. Wind uses speed.
-- Fixed breakpoints, computed once per phenomenon: the 33rd and 66th percentiles (linear interpolation) of every valid value across all 13 sampled dates (13,000 values each). For rain, only values at or above 0.1 mm/h are used (below that is "no measurable rain"). They are tested against the catalog in `tests/ambience.test.mjs`.
+**Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative.** (Arabic: «الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية.»)
+
+- It is a categorical mapping to three levels, not a continuous one. Files: `{dust|rain|wind}-{low|mid|high}.mp3` in `web/assets/ambient/` (`manifest.json` lists every file with its SHA-256, original source and licence status, **all "TO VERIFY"**).
+- Which level: from the REAL value of the snapshot under the cursor, the selected cell, or the scan position. At or below the low breakpoint is low, at or below the high breakpoint is mid, above it is high. A missing value gives silence and the text explanation. Rain below 0.1 mm/h counts as no measurable rain: silence, with the text "no measurable rain (< 0.1 mm/h)". Wind uses speed. **Temperature has no recording**: no sound, the value readout stays and the Studio says "No recording for temperature".
+- Fixed breakpoints, computed once per phenomenon: the 33rd and 66th percentiles (linear interpolation) of every valid value across all 13 sampled dates (13,000 values each). For rain, only values at or above 0.1 mm/h are used. They are tested against the catalog in `tests/ambience.test.mjs` and kept as constants in `web/studio/ambience-core.js` for pages that do not load the whole package.
 
 | Phenomenon | Unit | Low breakpoint (p33) | High breakpoint (p66) |
 |---|---|---|---|
@@ -90,7 +92,10 @@ An optional layer under the data sonification. **Illustrative recording, not dat
 | Rainfall (values >= 0.1 mm/h) | mm per hour | 0.1637 | 0.3115 |
 | Wind | m/s | 2.477 | 4.068 |
 
-Rainfall note: only 1,074 of the 13,000 values are at or above 0.1 mm/h; the other 11,926 give silence. The breakpoints come from those 1,074 values. (The first version used all values and its 33rd percentile was practically zero; the 0.1 mm/h floor replaced it.)
+Rainfall note: only 1,074 of the 13,000 values are at or above 0.1 mm/h; the other 11,926 give silence. The breakpoints come from those 1,074 values.
 
-- Mix: about 12 dB below the data sonification (gain 0.251 times the data volume), with its own volume slider; ducked further to 15% while Guided Voice speaks; mute and sound-off stop it.
-- Looping: two overlapping sources with a 0.5 s crossfade; 400 ms crossfade when the level changes (60 ms with reduced motion); at most two recordings are alive and never two levels at full volume.
+- Hover (a cell under the cursor or the selection): the level loops (two overlapping sources, 0.5 s loop crossfade); a level change crossfades over 400 ms (60 ms with reduced motion); at most two recordings are alive and never two levels at full volume.
+- Area scan, path, Region A/B fingerprints and Echo series: one slice per step, about 0.7 s with 80 ms fades, from the recording of that step's level, in order. The shared transport only keeps the clock (play, pause, stop, speed, active step); its plans carry markers without tones, and the active step triggers the slice, so the playhead and the sound stay in sync. A scan reads at most 130 cells (stride from the grid), at 0.3 s per step.
+- Stereo pan follows longitude: west left, east right, never mirrored in Arabic.
+- One volume (the settings volume) and one sound on/off button. The audio context is created and resumed inside the button's click; nothing plays before it. Guided Voice speech ducks the recordings to 35% and restores them smoothly; mute and sound-off fade everything out.
+- Old stored sound settings are reset once (`earthpulse.sound.v2`).

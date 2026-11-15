@@ -79,3 +79,9 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 
 ## Dry dates
 - A date with almost no signal (rain: fewer than 10% of cells at or above 0.1 mm/h; the same pattern is ready for wind below 0.3 m/s) shows a notice on the map with the three wettest real dates, counted from the data (rain: 15 Aug 15%, 15 Jul 11%, 15 Nov 11% of cells). On phones the notice sits in the Data card so it does not cover the small map. Hovering a dry cell says "no measurable rain (< 0.1 mm/h)" and the selected-place card says it too. English and Arabic. Tests: `tests/dry-dates.test.mjs`.
+
+## Sound is the user's recordings only (3 levels by real value)
+- The Sound Studio, Explore Earth listening, the Science "How it sounds" examples and the Hunter/Echo listening play only the nine recordings (dust, rain, wind × low/mid/high), chosen from the real value with the documented breakpoints. The synthesized data tones are no longer played anywhere outside Decode. Temperature has no recording ("No recording for temperature").
+- One sound button and one volume. The sound-style selector and the separate ambience toggle are gone (spoken guidance follows the "Spoken instructions" setting). Old stored sound settings are reset once.
+- Scans, paths, Region A/B and Echo play one slice (about 0.7 s, 80 ms fades) of the matching recording per step, in order, with the clock and playhead in sync. Pan follows longitude.
+- Credits: every recording is listed with its source in the manifest, the Science page credits and the table above; all licences are "to verify".

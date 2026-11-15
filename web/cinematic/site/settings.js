@@ -6,7 +6,7 @@ export const SPEEDS = Object.freeze([0.5, 0.75, 1, 1.25, 1.5]);
 export const TEXT_SIZES = Object.freeze(["sm", "md", "lg", "xl"]);
 
 export const defaults = Object.freeze({
-  language: "en", volume: 0.72, speechVolume: 1, speed: 1, contrast: false, textSize: "md", captions: false, guidance: false, ambience: false, ambienceVolume: 0.8,
+  language: "en", volume: 0.72, speechVolume: 1, speed: 1, contrast: false, textSize: "md", captions: false, guidance: false,
 });
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
@@ -23,8 +23,6 @@ export function sanitize(input) {
     textSize: TEXT_SIZES.includes(source.textSize) ? source.textSize : defaults.textSize,
     captions: source.captions === true,
     guidance: source.guidance === true,
-    ambience: source.ambience === true,
-    ambienceVolume: Number.isFinite(source.ambienceVolume) ? clamp01(source.ambienceVolume) : defaults.ambienceVolume,
   };
 }
 
