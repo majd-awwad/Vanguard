@@ -665,8 +665,8 @@
           "lon": 0.3125
         }
       },
-      "bytes": 25037,
-      "sha256": "2960c31f5bec79f266f53a77b99995ef3382fcea856b1b0580d79c48b57a8420"
+      "bytes": 22426,
+      "sha256": "abb3f0111187dd8a47d9ca122afd413824afb5c017c0a4d4fb794cfde4f6bbb8"
     },
     {
       "id": "geos-fp-dust-20250115-1930",
@@ -735,8 +735,8 @@
           "lon": 0.3125
         }
       },
-      "bytes": 25082,
-      "sha256": "ca7efc487670a6632cb36c456216fca85be348fe31b1dd4eaa95786d401e43f4"
+      "bytes": 25083,
+      "sha256": "3dd6c72a102ed390efd495afc978abe7929ca738614ccff5668e05b4bd9492b4"
     },
     {
       "id": "geos-fp-dust-20250215-1930",
@@ -2936,13 +2936,8 @@
       "sourceProvenance": {
         "context": "Shared geometry or catalog supporting verified GEOS-FP DFPT1NXSLV snapshots; not a separate NASA observation."
       },
-<<<<<<< JSON_Files
       "bytes": 12601,
       "sha256": "c7f7ce366afc1d5d0ef009b3ad4b6117d139c8d383f1c9a560969b29828b8615"
-=======
-      "bytes": 10895,
-      "sha256": "d349aea3fc5ee28cd6fee8b4f23699d5a5bf77038f61b6462676a1dd4d9b5730"
->>>>>>> main
     },
     {
       "id": "north-africa-med-25x40-v1-temperature",
