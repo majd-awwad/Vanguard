@@ -65,5 +65,5 @@ export function renderAbout(document, root, language, hrefs) {
 export function startAbout(document = globalThis.document) {
   const language = mountNav(document, document.getElementById("site-nav"), { active: "about", from: "pages" });
   document.title = aboutCopy[language].title + " · EARTHPULSE";
-  renderAbout(document, document.getElementById("about-root"), language, { decode: "../decode-3d.html", explore: "./explore.html", science: "./science.html" });
+  renderAbout(document, document.getElementById("about-root"), language, { decode: "../", explore: "./explore.html", science: "./science.html" });
 }

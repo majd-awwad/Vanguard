@@ -45,7 +45,7 @@ export function startExplore(document = globalThis.document) {
     h(document, "p", { class: "eyebrow", text: c.eyebrow }), h(document, "h1", { id: "lock-title", text: c.lock.title }),
     h(document, "p", { class: "lede", text: c.lock.text }),
     h(document, "div", { class: "actions" },
-      h(document, "a", { class: "button", href: "../decode-3d.html" + (language === "ar" ? "?lang=ar" : ""), text: c.lock.decode }),
+      h(document, "a", { class: "button", href: "../" + (language === "ar" ? "?lang=ar" : ""), text: c.lock.decode }),
       (() => { const show = h(document, "button", { type: "button", class: "button ghost", text: c.lock.show }); show.addEventListener("click", () => { allowSpoilersThisVisit(); mountExplore(document, root, language); }); return show; })())));
   return Promise.resolve();
 }

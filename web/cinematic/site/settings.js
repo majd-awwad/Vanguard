@@ -6,7 +6,7 @@ export const SPEEDS = Object.freeze([0.5, 0.75, 1, 1.25, 1.5]);
 export const TEXT_SIZES = Object.freeze(["sm", "md", "lg", "xl"]);
 
 export const defaults = Object.freeze({
-  language: "en", volume: 0.72, speed: 1, contrast: false, textSize: "md", captions: false, guidance: false,
+  language: "en", volume: 0.72, speechVolume: 1, speed: 1, contrast: false, textSize: "md", captions: false, guidance: false,
 });
 
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
@@ -17,6 +17,7 @@ export function sanitize(input) {
   return {
     language: source.language === "ar" ? "ar" : "en",
     volume: Number.isFinite(source.volume) ? clamp01(source.volume) : defaults.volume,
+    speechVolume: Number.isFinite(source.speechVolume) ? clamp01(source.speechVolume) : defaults.speechVolume,
     speed: SPEEDS.includes(source.speed) ? source.speed : defaults.speed,
     contrast: source.contrast === true,
     textSize: TEXT_SIZES.includes(source.textSize) ? source.textSize : defaults.textSize,

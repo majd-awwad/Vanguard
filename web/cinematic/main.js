@@ -8,9 +8,9 @@ import { copy } from "./copy.js";
 import { createGlobeMount } from "./globe.js";
 import { createHero } from "./hero.js";
 import { createScene } from "./scene.js";
-import { NAV_ITEMS, SETTINGS_PATH, hrefFor, navText } from "./site/nav.js";
+import { mountNav } from "./site/nav.js";
 import { markDecodeCompleted } from "./site/progress.js";
-import { applySettings, loadSettings, resolveLanguage, saveSettings } from "./site/settings.js";
+import { loadSettings } from "./site/settings.js";
 
 // Mirrors startDecode() in web/decode.js (read-only): the same session, transport, spatial plan and accessible
 // grid run underneath, with a cinematic scene, hero and dock around them. The only interactive grid is still the
@@ -18,41 +18,23 @@ import { applySettings, loadSettings, resolveLanguage, saveSettings } from "./si
 
 export async function startCinematic(root) {
   const document = root.ownerDocument;
-  // Shared settings (language, contrast, text size, volume, speed) are read here, the same way as on every site page.
+  // One shell for every page: the shared header, settings drawer and footer. It also applies the stored settings.
   const settings = loadSettings();
-  const language = resolveLanguage(document.URL, settings);
-  if (new URL(document.URL).searchParams.has("lang") && language !== settings.language) saveSettings({ language });
+  const language = mountNav(document, document.getElementById("site-nav"), { active: "decode", from: "root", variant: "overlay", skipTo: "#decode-page" });
   const text = copy[language];
   const body = document.body;
-  applySettings(document, settings, language);
   document.title = text.pageTitle + " · EARTHPULSE";
   body.classList.add("cine");
   body.dataset.view = "hero";
-
-  // Navigation: the same six pages and settings link as every site page.
-  const nav = navText[language];
-  const navHost = document.querySelector(".cine-links");
-  navHost.setAttribute("aria-label", nav.label);
-  navHost.replaceChildren(...NAV_ITEMS.map((item) => {
-    const link = document.createElement("a");
-    link.href = hrefFor(item.path, "root");
-    link.textContent = nav[item.id];
-    if (item.id === "decode") link.setAttribute("aria-current", "page");
-    return link;
-  }));
-  const gear = document.createElement("a");
-  gear.className = "cine-icon-button";
-  gear.href = hrefFor(SETTINGS_PATH, "root");
-  gear.setAttribute("aria-label", nav.settings);
-  gear.title = nav.settings;
-  gear.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="2.2" fill="currentColor"/><path d="M5 9.5h14M12 9.5V14m0 0-3.5 6M12 14l3.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  document.querySelector(".cine-tools").prepend(gear);
-  document.querySelector("#decode-home").href = language === "ar" ? "./?lang=ar" : "./";
-  document.querySelector(".cine-lang").setAttribute("aria-label", text.language);
-  for (const code of ["en", "ar"]) {
-    const link = document.querySelector("#cine-lang-" + code);
-    if (code === language) link.setAttribute("aria-current", "true"); else link.removeAttribute("aria-current");
-  }
+  // The hero's guide-sound mute toggle lives in the shared header tools.
+  const soundButton = document.createElement("button");
+  soundButton.type = "button";
+  soundButton.id = "cine-sound";
+  soundButton.className = "icon-btn cine-icon-button";
+  soundButton.setAttribute("aria-pressed", "false");
+  soundButton.setAttribute("aria-label", "Sound");
+  soundButton.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 14v-2a8 8 0 0 1 16 0v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3" y="13" width="4" height="7" rx="1.6" fill="currentColor"/><rect x="17" y="13" width="4" height="7" rx="1.6" fill="currentColor"/></svg>';
+  document.querySelector("#site-nav .site-tools").prepend(soundButton);
 
   // The scene is one fixed canvas behind the page, so the hero Earth shows while the case is still loading.
   let scene = null;

@@ -59,7 +59,7 @@ test("settings validate, persist and never throw", () => {
 
 test("navigation targets are consistent and every page text exists in both languages", () => {
   assert.equal(hrefFor("pages/science.html", "pages"), "./science.html");
-  assert.equal(hrefFor("decode-3d.html", "pages"), "../decode-3d.html");
+  assert.equal(hrefFor("index.html", "root"), "./");
   assert.equal(hrefFor("index.html", "pages"), "../");
   assert.equal(hrefFor("pages/science.html", "root"), "./pages/science.html");
   for (const language of ["en", "ar"]) for (const item of NAV_ITEMS) assert.ok(navText[language][item.id]);
@@ -211,12 +211,12 @@ test("settings page: only real controls, real shortcuts, voice gating", () => {
 });
 
 test("every site page and the Decode 3D page link to the shared settings and nav", () => {
-  for (const file of ["web/pages/science.html", "web/pages/about.html", "web/pages/sound-lab.html", "web/pages/settings.html"]) {
+  for (const file of ["web/pages/science.html", "web/pages/about.html", "web/pages/settings.html", "web/pages/explore.html", "web/pages/studio.html"]) {
     const html = read(file);
     assert.ok(html.includes('id="site-nav"'), file);
     assert.ok(html.includes("site/site.css"), file);
   }
-  assert.ok(read("web/cinematic/main.js").includes("NAV_ITEMS"));
+  assert.ok(read("web/cinematic/main.js").includes("mountNav"));
 });
 
 import { compareValues, levelMax, cellOf, ZOOM_MAX, ZOOM_MIN } from "../web/cinematic/site/explore.js";

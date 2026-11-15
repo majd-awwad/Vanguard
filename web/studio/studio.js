@@ -541,7 +541,7 @@ async function mountApp(document, root, language, initialMode) {
     if (isLocked(phen.id, entry.date, unlocked())) {
       el.lock.hidden = false;
       el.lock.replaceChildren(h(document, "span", { text: T(m.lock.text, { date: entry.date }) + " " }), (() => { const show = h(document, "button", { type: "button", class: "button ghost small-button", text: m.lock.show }); show.addEventListener("click", () => { allowSpoilersThisVisit(); el.lock.hidden = true; fillDates(); renderTimeline(); requestDate(id); }); return show; })(),
-        h(document, "a", { class: "button ghost small-button", href: "../decode-3d.html" + (language === "ar" ? "?lang=ar" : ""), text: m.lock.decode }));
+        h(document, "a", { class: "button ghost small-button", href: "../" + (language === "ar" ? "?lang=ar" : ""), text: m.lock.decode }));
       el.date.value = state.snapshot.id;
       return;
     }

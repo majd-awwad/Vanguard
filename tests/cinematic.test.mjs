@@ -451,12 +451,12 @@ test("the page keeps every element the shared Decode wiring queries and uses the
   const html = read("web/index.html");
   const source = read("web/decode.js");
   const ids = new Set([...source.matchAll(/byId\("([\w-]+)"\)/g)].map((match) => `decode-${match[1]}`));
-  for (const id of ["decode-title", "decode-home", "decode-state", "decode-retry", "decode-page"]) ids.add(id);
+  for (const id of ["decode-title", "decode-state", "decode-retry", "decode-page", "site-nav"]) ids.add(id);
   assert.ok(ids.size > 25);
   for (const id of ids) assert.match(html, new RegExp(`id="${id}"`), `index.html needs #${id}`);
   for (const id of ["cine-eyebrow", "cine-title-lead", "cine-title-accent", "cine-lede", "cine-lede2", "cine-play-guide", "cine-play-label", "cine-wave",
     "cine-guide-caption", "cine-steps", "cine-start", "cine-start-label", "cine-source", "cine-challenge", "cine-zoom-in", "cine-zoom-out", "cine-compass",
-    "cine-sound", "cine-dock-label", "cine-nav-decode", "cine-nav-about", "cine-nav-science", "cine-nav-dataset", "cine-lang-en", "cine-lang-ar"]) {
+    "cine-dock-label"]) {
     assert.match(html, new RegExp(`id="${id}"`), `the hero needs #${id}`);
   }
   // The region and date live in the case bar, inside the root that mountDecode queries.
