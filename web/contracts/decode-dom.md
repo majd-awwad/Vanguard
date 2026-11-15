@@ -6,8 +6,8 @@
 |---|---|---|
 | `#decode-stage` | Majd | Shared extent for the two layers. |
 | `#decode-visual` | Roaa | Inert, aria-hidden and pointer-transparent SVG. Use the same bounds and row/column geometry as the interactive grid. |
-| `#decode-grid` | Israa | The only named `role=grid`. Render rows and accessible cells with native buttons using `.dg-cell[data-row][data-col]`. Use one roving Tab stop. Each guess exposes its pressed state. |
-| `#decode-status` | Israa | Polite live region for actions, playback completion and revealed results. Skip per-tone announcements. |
+| `#decode-grid` | Israa | The only named `role=grid`. Render rows and accessible cells with native buttons using `.dg-cell[data-row][data-col]`. Use one roving Tab stop. Expose each guess as `aria-selected="true|false"` on its `gridcell` and mark the grid `aria-multiselectable="true"`. Keep the existing `aria-pressed` attribute while the visuals use it. |
+| `#decode-status` | Israa | Polite live region for actions, playback completion and Reveal. |
 
 The signatures are in `decode.d.ts`. Majd provides `validateDecodeCase`. Mohammad supplies `loadDecodeCase` from `web/sources/decode/index.js`. Andreh supplies `makeSpatialPlan` and `heardClass` from `web/audio/spatial-plan.js`. Yaman supplies `createDecodeSession` and `scoreGuesses` from `web/experiences/decode/session.js` and `score.js`. Roaa supplies `mountDecodeVisual` from `web/visual/decode-visual.js`. Israa supplies `mountDecodeGrid` and `decodeMessage` from `web/accessibility/decode-grid.js` and `web/i18n/decode-messages.js`.
 
@@ -21,14 +21,39 @@ Render the coastline only when geography is present and its `caseId` matches `sn
 
 Project longitude linearly to x and latitude inversely to y in the grid's drawing rectangle. West is left and north is up in both LTR and RTL. Quick and Advanced use the same geographic extent. The coastline is the Decode basemap. Any SVS frame is separate evidence and requires independently verified registration before it can be treated as geographically aligned.
 
-Row 0 is north; column 0 is west in Arabic and English. The only shared focus is `snapshot.focus`. Arrows move it. Pointer activation and Space use the same toggle. Enter probes, P sweeps, L plays calibration, R reads and S submits. Scope character shortcuts to the grid. Keep Tab exits and visible controls. An active playback event does not move keyboard focus. Both layers use the current plan revision and transport event identity for the playhead. Do not start a renderer clock or expose private spatial-plan evidence to resolve the active cell.
+Row 0 is north; column 0 is west in Arabic and English. The only shared focus is `snapshot.focus`. Arrows move it. Pointer activation and Space use the same toggle. Enter probes, P sweeps, L plays calibration, R reads and S submits. Scope character shortcuts to the grid. Keep Tab exits and visible controls. An active playback event does not move keyboard focus. Both layers read the active cell from the integrated renderer snapshot and share the transport clock.
 
 In Discovery before Reveal, cells contain only `row`, `col`, `lat` and `lon`. Keep values, statuses, event counts, source imagery, truth and scores out of the visual and accessibility trees. The v2 `expectedCount` hint must be the same in every compared condition when used. Only relay `lastProbe.heard` after a permitted probe; it is a qualitative cue. In a text-only trial it cannot relay an unplayed audio probe. Learning may expose readings and does not submit or score. After Reveal, keep guesses locked. Fixtures must have a visible test-data label when exercised by later integration.
 
-This milestone freezes the excerpt and leaves production wiring for F1. The shared excerpt lacks an explicit session field for event-ID-to-cell resolution, localized source metadata/units and per-cell grading outcomes. It shows only a summary score, although the visual brief calls for cell-level reveal markers. The session brief additionally injects `heardClass`. Before wiring the affected feature, Majd and its owners must confirm the missing payloads and alignment without sending raw case data to renderers or extending the wire format informally. Non-interactive drawing stays aria-hidden; meaningful evidence and controls must be available to assistive technology through the interactive/evidence layer.
+### Playback highlight
+
+Each `SpatialPlan` contains events with an opaque `id`, `row` and `col`. The ID is unique within its plan and can recur in another plan. On load, `web/decode.js` indexes each event's stored coordinates by ID and associates the index with the transport's new `planRevision`. It looks up `transport.activeEventId` as a whole key when the transport and session revisions, case and level match the loaded plan. The integration publishes the result as `snapshot.activeCell`, a zero-based `[row, col]` or `null`. Treat absence in older session snapshots as `null`. A silent slot has the same timing rules as a sounding slot. Clear the highlight while idle, starting, paused, seeking, in pre-roll, at the end, during Legend, or when revision or cell identity does not match. Resume from the next published playing snapshot. Neither renderer receives the plan or changes grid focus to follow playback.
+
+### Playback completion
+
+The session publishes `snapshot.playMode` for the loaded `planRevision`. Its values are `legend`, `sweep`, `row`, `cell`, `contrast`, or `null` until a plan loads. It remains set when the transport ends. Older session producers may omit it. The integration can use the mode of its tracked plan as a fallback.
+
+The grid announces the transition from `playing` to `ended` once per run, using a localized message for the plan mode. This works when a shortcut plays a mode other than the on-screen phase. On the combined page the grid owns this announcement.
+
+### Reveal handoff
+
+Keep `DecodeCase.visualLink.note` as the source provenance. The grid announces the localized relation before the note. The dust case's approved Arabic translation lives in `web/i18n/decode-messages.js` under `note.<case-id>`, shared by the integrated evidence panel and grid. Mark untranslated English notes with `lang="en"`. For synthetic fixtures, the combined page supplies a localized test-data note and omits the imagery relation label.
+
+After the session publishes a locked Discovery Reveal snapshot, integration derives the cell markers from that snapshot's guesses and evidence cells. In v2 a `measured` status is at or above the case threshold. An exact match is correct, an unmatched guess is incorrect, and an unguessed threshold cell is missed. This follows the session's default zero-tolerance score. A missing value is still labelled missing in the evidence table.
+
+Integration calls `prepareReveal()` once for the new Reveal and immediately applies the returned callback using that snapshot's outcomes. `#decode-outcome-labels` is inside the accessible evidence section, outside the inert SVG. Setup may return `null`. The visual mount invalidates older callbacks when the phase, case or level changes. On Reset or explicit case selection integration calls `clearReveal()` before dispatch. Older visual mounts can omit these methods. The numeric evidence table and separate links for the GEOS-FP data and SVS context frame are available after Reveal.
 
 ## Validation and sources
+
+DecodeCase v2 provides two precomputed levels: Quick 3 × 4 and Advanced 6 × 8. They cover the same bounds. The loader reads both levels from the case JSON. The session can select either level. The combined dust page starts in Quick.
 
 The validator accepts the truth rule literal `value >= threshold`. Quick uses either `mean of 2x2 advanced cells` for continuous data or `sum of 2x2 advanced cells` for intermittent counts. Each Quick cell is missing if any child is missing. Use one threshold across levels and recompute the truth for each level. Grids are rectangular, equally subdivided in WGS84 and ordered north-to-south, west-to-east. Source granule IDs stay strings; record authenticated download links, checksums, QA and native-to-advanced aggregation in the science provenance. Propose any additional rule explicitly before using it in a case.
 
 Validation checks structure and internal consistency. `SAME_DATA` requires independent evidence of the frame's source run, time, field, domain and registration. [SVS 5669](https://svs.gsfc.nasa.gov/5669/) credits GEOS-FP 2 km Replay. MERRA-2 uses `RELATED_CONTEXT` with an explicit note and independent attribution.
+
+### Packaged context frame
+
+The integrated page loads `web/assets/decode/svs-5669-context.webp` locally at Reveal for the production dust case. The 1920 × 1080 WebP is lossless. Its decoded RGB pixels were compared to the [NASA SVS source PNG](https://svs.gsfc.nasa.gov/vis/a000000/a005600/a005669/Aerosols_2025-08-19T20_00_00_1920x1080.png). Credit NASA GMAO and NASA SVS, Joseph V. Ardizzone and Helen-Nicole Kostis. The external links provide attribution and access to the original.
+
+- Bundled WebP SHA-256 `abece93664d0966265da5819b6844a7b9dd9aac17aded9c84a0076f80d72b30a`
+- Source PNG SHA-256 `0c6a8f6c46fb52a2f9a636bbd804fc6e5e23454dcb2f0d3fe04c653c772e8a7a`
