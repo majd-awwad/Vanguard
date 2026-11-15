@@ -48,8 +48,8 @@ export function mountOrchestra(api, app) {
     counts, h(document, "div", { class: "orchestra-transport" }, location, h(document, "label", { class: "orchestra-window-label" }, c.window, windowSelect), h(document, "div", { class: "orchestra-actions", role: "group", "aria-label": c.title }, play, pause, stop, replay)),
     mapContext, windowNotice, jumps, scroll);
   const opener = button(c.open, () => setOpen(!open), { id: "orchestra-toggle", "aria-expanded": "false", "aria-controls": "orchestra-workspace" });
-  api.el.bottom.append(opener);
-  app.append(workspace);
+  (api.el.orchestraSlot ?? api.el.bottom).append(opener);
+  (api.el.orchestraHost ?? app).append(workspace);
 
   for (const id of ORCHESTRA_IDS) {
     const name = c.names[id];

@@ -4,19 +4,19 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { openPackage, fetchVerified, validateCatalogEntry } from "../web/studio/datasets.js";
 import { channelCompatibility } from "../web/studio/orchestra-data.js";
-import { verifyDirectory, SOURCE, TARGET } from "../scripts/earth-map/copy-package.mjs";
+import { verifyDirectory, SOURCE, TARGET, EXCLUDED_PHENOMENA } from "../scripts/earth-map/copy-package.mjs";
 
 const base = new URL("../web/assets/earthpulse-json/", import.meta.url);
 const fetchImpl = async url => { const b = await readFile(url); return { ok: true, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; };
 const digest = async b => createHash("sha256").update(b).digest("hex");
 const pkg = await openPackage({ baseUrl: base, fetchImpl, digest });
-const ids = ["dust", "rainfall", "temperature", "wind"];
+const ids = ["dust", "rainfall", "wind"];
 const phens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await pkg.openPhenomenon(id)])));
 
-test("main integration: all 63 exact-byte assets verify; browser and delivery copies are byte-identical", async () => {
+test("main integration: every exact-byte asset verifies; browser and delivery copies of the used phenomena are byte-identical", async () => {
   for (const dir of [SOURCE, TARGET]) assert.deepEqual((await verifyDirectory(dir)).failures, []);
   assert.equal(pkg.integrity.bytePolicy, "exact");
-  for (const path of ["catalog.json", ...pkg.master.assets.map(a => a.path)]) {
+  for (const path of ["catalog.json", ...pkg.master.assets.map(a => a.path).filter(p => !EXCLUDED_PHENOMENA.some(id => p.startsWith(id + "/")))]) {
     assert.deepEqual(await readFile(`${SOURCE}/${path}`), await readFile(new URL(path, base)), path);
   }
 });
@@ -44,7 +44,7 @@ test("main integration: conflicting dust publications are identified and exclude
   }
   // A bad dust publication does not suppress a valid hourly listening frame on the same date.
   const date = "2025-01-15", primary = phens.dust.byDate(date), anchor = phens.wind.byDate(date);
-  for (const id of ["rainfall", "temperature", "wind"]) assert.equal(channelCompatibility({ primary, anchor, candidate: phens[id].byDate(date), grid: phens[id].grid, referenceGrid: phens.dust.grid, index: 520 }).ok, true);
+  for (const id of ["rainfall", "wind"]) assert.equal(channelCompatibility({ primary, anchor, candidate: phens[id].byDate(date), grid: phens[id].grid, referenceGrid: phens.dust.grid, index: 520 }).ok, true);
 });
 
 test("main integration: conflicting group/time/source/quality declarations fail validation (mutated test metadata)", () => {

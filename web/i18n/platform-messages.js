@@ -17,7 +17,7 @@ const copy = {
   timbre: ["Tone color", "خامة النغمة"], pure: ["Pure sine", "موجة جيبية"], soft: ["Soft triangle", "موجة مثلثية ناعمة"],
   volume: ["Volume", "مستوى الصوت"], mute: ["Mute", "كتم"], silent: ["Visual playback", "تشغيل مرئي"],
   aboutBody: ["Listen to derived signals from traceable NASA science. Each experience identifies its source, scientific time, units and sound mapping. Map legends and structured evidence also support silent exploration.", "استمع إلى إشارات مشتقّة من بيانات ناسا القابلة للتتبّع. تعرض كل تجربة مصدرها وزمنها العلمي ووحداتها وطريقة التحويل إلى صوت. تدعم الخرائط والأدلة المقروءة الاستكشاف الصامت."],
-  credits: ["Visual context: NASA Scientific Visualization Studio. Forest landscape: AI-generated illustration. Implementation assisted by Codex.", "التصوّرات المرجعية من استوديو التصوّر العلمي في ناسا. مشهد الغابة توضيحي مولّد بالذكاء الاصطناعي. نُفّذ المشروع بمساعدة Codex."],
+  credits: ["Visual context: NASA Scientific Visualization Studio. Forest landscape: AI-generated illustration.", "التصوّرات المرجعية من استوديو التصوّر العلمي في ناسا. مشهد الغابة توضيحي مولّد بالذكاء الاصطناعي."],
   gallery: ["NASA Earth Information Center gallery ↗", "معرض مركز معلومات الأرض في ناسا ↗"], close: ["Close", "إغلاق"],
   ocean: ["Ocean heat", "حرارة المحيط"], rain: ["Rainfall", "الأمطار"], fires: ["Active fires", "الحرائق النشطة"], forest: ["Forest structure", "بنية الغابات"],
   oceanDesc: ["Follow daily surface analyses across seven weekly dates in the Northwest Atlantic.", "تتبّع تحليلات حرارة السطح في سبعة تواريخ أسبوعية في شمال غرب الأطلسي."],

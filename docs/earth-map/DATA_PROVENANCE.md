@@ -52,31 +52,6 @@ Generated from the verified package `deliverables/EarthPulse-JSON-ONLY` (every f
 | sourceProduct | NASA GMAO GEOS-FP DFPT1NXFLX (GEOS FP 2d time-averaged surface flux diagnostics) (release 5.29.5) |
 | buildLabels | `GEOSadas-5_29_5-p6 experiment_id: f5295_fp`; `GEOSadas-5_29_5-p6-SLES15 experiment_id: f5295_fp` |
 
-## temperature (`geos-fp-temperature-sampled-2025`)
-
-| Field | Value |
-|---|---|
-| datasetId | geos-fp-temperature-sampled-2025 |
-| phenomenon | temperature |
-| eicVisualizationUrl | https://svs.gsfc.nasa.gov/5147/ |
-| sourceDatasetUrl | https://portal.nccs.nasa.gov/datashare/gmao/geos-fp/das/ |
-| sourceType | model |
-| variable | T2M (2 m air temperature) in K and derived degC |
-| unit | K; derived degC |
-| timeCoverage | `{"start":"2024-12-15","end":"2025-11-15","kind":"one-hour mean","note":"13 selected snapshots (the 15th of each month 2024-12 to 2025-11, plus 2025-08-19); each is one snapshot, not a daily, monthly or seasonal average and not a climatology."}` |
-| geoCoverage | `{"type":"bbox","west":-20,"east":50,"south":15,"north":45}` |
-| resolution | `{"native":{"lat":0.25,"lon":0.3125},"grid":"25 x 40 cells of 1.2 x 1.75 degrees"}` |
-| sampleCount | `{"snapshots":13,"cellsPerSnapshot":1000}` |
-| lastVerified | 2026-11-15 |
-| processingSteps | `["Read the GEOS-FP NetCDF granule (SHA-256 recorded)","Spherical area-weighted mean of the native footprints inside each 1.2 x 1.75 degree cell","Serialise as JSON with provenance; every file verified against the master catalog sha256","Derive degC = T2M - 273.15"]` |
-| missingPolicy | null means missing; any invalid native overlap makes the target cell missing; missing is never replaced by zero or shown as no change (0 missing cells in this release). |
-| qualityFlags | `["model output, not a direct observation","different literal model build labels are not comparable (differences and Echo blocked across them)","native footprints inferred from regular coordinate centres; no explicit datum declaration"]` |
-| licenseAndCredit | Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA. |
-| assetHash | master catalog sha256 per file; 15 files; catalog c7f7ce366afc1d5d0ef009b3ad4b6117d139c8d383f1c9a560969b29828b8615; each snapshot hash is in `provenance.json` |
-| eicRelation | RELATED_CONTEXT: the EIC visualization of GEOS-FP near-surface temperature; the relation is stated, nothing is drawn from it. |
-| sourceProduct | NASA GMAO GEOS-FP DFPT1NXSLV (GEOS FP 2d time-averaged single level diagnostics) (release 5.29.5) |
-| buildLabels | `GEOSadas-5_29_5-p6 experiment_id: f5295_fp`; `GEOSadas-5_29_5-p6-SLES15 experiment_id: f5295_fp` |
-
 ## wind (`geos-fp-wind-sampled-2025`)
 
 | Field | Value |

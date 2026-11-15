@@ -26,7 +26,7 @@
 .orchestra-window-label select { min-width: 0; max-width: 100%; font-size: .72rem; }
 .orchestra-actions { display: flex; gap: .3rem; flex-wrap: wrap; }
 .orchestra-actions .button:first-child { background: rgb(104 224 208 / .14); border-color: var(--teal); }
-.orchestra-channels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; }
+.orchestra-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .7rem; }
 .orchestra-channel { min-width: 0; border-inline-start: 2px solid var(--line); padding: .3rem .7rem; font-size: .75rem; }
 .orchestra-channel[data-audible="true"] { border-color: var(--teal); }
 .orchestra-channel[data-available="false"] { border-color: var(--amber); }
@@ -66,7 +66,7 @@
   .orchestra-heading .eyebrow { display: none; }
   .orchestra-status { font-size: .68rem; }
   .orchestra-scroll { max-height: 28dvh; min-height: 14rem; }
-  .orchestra-jumps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .25rem; margin-block: .5rem; }
+  .orchestra-jumps { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .25rem; margin-block: .5rem; }
   .orchestra-jumps .button { min-width: 0; min-height: 2.75rem; padding-inline: .25rem; font-size: .7rem; }
   .orchestra-jumps [data-available="true"] { border-color: var(--teal); }
   .orchestra-counts { font-size: .65rem; }

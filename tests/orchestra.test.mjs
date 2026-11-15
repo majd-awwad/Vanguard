@@ -13,13 +13,14 @@ const pkg = await openPackage({ baseUrl: new URL("../web/assets/earthpulse-json/
 } });
 const phens = Object.fromEntries(await Promise.all(ORCHESTRA_IDS.map(async id => [id, await pkg.openPhenomenon(id)])));
 const date = "2025-04-15";
-const args = (id, index = 520, anchorId = "temperature", day = date) => ({ primary: phens.dust.byDate(day), anchor: phens[anchorId].byDate(day), candidate: phens[id].byDate(day), grid: phens[id].grid, referenceGrid: phens.dust.grid, index });
-const observations = () => Object.fromEntries(ORCHESTRA_IDS.map(id => [id, { ...channelCompatibility(args(id)), snapshot: args(id).candidate, index: 520 } ]));
+const args = (id, index = 520, anchorId = "wind", day = date) => ({ primary: phens.dust.byDate(day), anchor: phens[anchorId].byDate(day), candidate: phens[id].byDate(day), grid: phens[id].grid, referenceGrid: phens.dust.grid, index });
+const observations = (index = 520) => Object.fromEntries(ORCHESTRA_IDS.map(id => [id, { ...channelCompatibility(args(id, index)), snapshot: args(id, index).candidate, index } ]));
+const wetIndex = phens.rainfall.byDate(date).values.findIndex(v => v > 0.5);
 
-test("Orchestra: all 13 real dates and 1000 cells support the hourly trio; the dust mean is rejected", () => {
-  for (const snap of phens.temperature.list) for (let i = 0; i < 1000; i++) {
+test("Orchestra: all 13 real dates and 1000 cells support the hourly pair; the dust mean is rejected", () => {
+  for (const snap of phens.wind.list) for (let i = 0; i < 1000; i++) {
     for (const id of ORCHESTRA_IDS) {
-      const result = channelCompatibility(args(id, i, "temperature", snap.date));
+      const result = channelCompatibility(args(id, i, "wind", snap.date));
       assert.equal(result.ok, id !== "dust", `${snap.date}/${i}/${id}: ${result.reason}`);
     }
   }
@@ -30,7 +31,7 @@ test("Orchestra: the real three-hour dust frame plays only dust, never fabricate
 });
 
 test("Orchestra rejects geographic, temporal, build, unit, quality, missing and integrity mismatches (mutated test data only)", () => {
-  const bad = (mutate, reason) => { const a = structuredClone(args("temperature")); a.candidate = structuredClone(a.candidate); mutate(a); assert.deepEqual(channelCompatibility(a), { ok: false, reason }); };
+  const bad = (mutate, reason) => { const a = structuredClone(args("wind")); a.candidate = structuredClone(a.candidate); mutate(a); assert.deepEqual(channelCompatibility(a), { ok: false, reason }); };
   bad(a => a.grid.cells[a.index].lat += 0.01, "geography");
   bad(a => a.grid.cells[a.index].bounds.west += 0.01, "geography");
   bad(a => a.index = -1, "geography");
@@ -40,8 +41,8 @@ test("Orchestra rejects geographic, temporal, build, unit, quality, missing and 
   bad(a => a.candidate.source.modelSource += "other", "source");
   bad(a => a.candidate.source.version = "unknown", "source");
   bad(a => a.candidate.source.sha256 = null, "source");
-  bad(a => a.candidate.variables.celsius.unit = "K", "variable");
-  bad(a => a.candidate.measures.kelvin[a.index] += 1, "variable");
+  bad(a => a.candidate.variables.u.unit = "km h-1", "variable");
+  bad(a => a.candidate.measures.vMps[a.index] += 1, "variable");
   bad(a => a.candidate.metadata.fixture = true, "quality");
   bad(a => a.candidate.metadata.method = "unverified", "quality");
   bad(a => a.candidate.values[a.index] = null, "missing");
@@ -58,18 +59,17 @@ test("Orchestra uses deterministic existing scientific voices; controls never ch
   const obs = observations(), settings = defaultChannels();
   const before = structuredClone(obs);
   const plan = orchestraPlan(obs, settings);
-  assert.ok(plan.events.some(e => e.channelId === "temperature"));
   assert.ok(plan.events.some(e => e.channelId === "wind"));
   assert.ok(plan.events.every(e => !e.tone.sample && e.channelId !== "dust"));
   assert.deepEqual(plan, orchestraPlan(obs, settings));
-  settings.wind.gain = 0; settings.temperature.solo = true; settings.rainfall.muted = true;
+  settings.wind.gain = 0; settings.rainfall.solo = true; settings.dust.muted = true;
   assert.deepEqual(plan.events, orchestraPlan(obs, settings).events);
   assert.deepEqual(obs, before);
   const pulses = plan.events.find(e => e.channelId === "wind").tone.pulses;
   const rate = soundParams("wind", obs.wind.info).rate;
   assert.ok(pulses.every((at, i) => Math.abs(at - i / rate) < 1e-9), "fractional rates never reset at second boundaries");
-  const changed = structuredClone(obs); changed.temperature.info.value += 4;
-  assert.notEqual(orchestraPlan(changed, settings).events.find(e => e.channelId === "temperature").tone.frequencyHz, plan.events.find(e => e.channelId === "temperature").tone.frequencyHz);
+  const changed = structuredClone(obs); changed.wind.info.value += 4;
+  assert.notDeepEqual(orchestraPlan(changed, settings).events.find(e => e.channelId === "wind").tone.pulses, plan.events.find(e => e.channelId === "wind").tone.pulses);
   // A real wet cell makes audible rainfall, not a fabricated nonzero minimum.
   const wet = phens.rainfall.byDate(date).values.findIndex(v => v > 0.5);
   const a = args("rainfall", wet); obs.rainfall = { ...channelCompatibility(a), snapshot: a.candidate, index: wet };
@@ -89,20 +89,20 @@ function harness() {
 }
 
 test("Orchestra transport shares a clock, independently ramps buses, preserves pause, and releases nodes", async () => {
-  const h = harness(), settings = defaultChannels(), obs = observations();
+  const h = harness(), settings = defaultChannels(), obs = observations(wetIndex);
   h.transport.load(orchestraPlan(obs, settings)); await h.transport.play();
   const osc = h.nodes.filter(n => n.type !== "gain" && n.frequency);
   assert.ok(osc.length > 2);
   assert.ok(osc.filter(n => n.startAt === 0.035).length >= 2, "channels start at one common origin");
-  const first = osc.find(n => n.frequency.value > 220);
+  const first = osc.find(n => n.frequency.value === 180);
   const bus = first.connections[0].connections[0].connections[0];
   assert.equal(bus.gain.value, 0.7 / 4);
   const busCount = h.nodes.filter(n => n.type === "gain").length;
-  settings.temperature.muted = true; h.transport.setChannels(settings);
+  settings.wind.muted = true; h.transport.setChannels(settings);
   assert.deepEqual(bus.gain.calls.at(-1), ["target", 0, 0, 0.012]);
-  settings.temperature.muted = false; settings.wind.solo = true; h.transport.setChannels(settings);
+  settings.wind.muted = false; settings.rainfall.solo = true; h.transport.setChannels(settings);
   assert.equal(bus.gain.calls.at(-1)[1], 0);
-  settings.wind.solo = false; settings.temperature.gain = 0.4; h.transport.setChannels(settings);
+  settings.rainfall.solo = false; settings.wind.gain = 0.4; h.transport.setChannels(settings);
   assert.equal(bus.gain.calls.at(-1)[1], 0.1);
   assert.equal(h.nodes.filter(n => n.type === "gain").length, busCount, "gain changes create no nodes or clocks");
   h.advance(2); h.transport.pause();
@@ -111,7 +111,7 @@ test("Orchestra transport shares a clock, independently ramps buses, preserves p
   const count = h.nodes.length;
   await h.transport.play();
   assert.equal(h.created, 1);
-  assert.ok(h.nodes.slice(count).some(n => n.frequency?.value > 220), "sustained temperature resumes mid-tone");
+  assert.ok(h.nodes.slice(count).some(n => n.frequency?.value === 180), "wind pulses resume after pause");
   h.transport.stop(); assert.equal(h.transport.snapshot().positionS, 0);
   for (const n of h.nodes) n.onended?.();
   assert.ok(h.nodes.filter(n => n.frequency).every(n => n.disconnected));
