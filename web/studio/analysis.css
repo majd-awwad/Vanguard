@@ -1,0 +1,28 @@
+/* Find signals (Hunter) and Find similar (Echo) */
+.em-radios { display: grid; gap: .3rem; margin: .6rem 0; }
+.em-radio { display: flex; gap: .6rem; align-items: flex-start; min-height: 2.75rem; padding: .4rem .6rem; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; color: var(--ink); font-size: .9rem; }
+.em-radio input { margin-top: .25rem; accent-color: var(--teal); width: 1.1rem; height: 1.1rem; }
+.em-radio:has(input:checked) { border-color: var(--teal); background: rgb(104 224 208 / .1); }
+.em-radio:has(input:disabled) { opacity: .6; }
+.em-threshold { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .4rem 0; }
+.em-tabpanel input[type="number"] { min-height: 2.75rem; width: 7rem; background: rgb(255 255 255 / .06); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 .6rem; font: inherit; }
+.em-tabpanel .st-pick select { min-height: 2.75rem; background: rgb(255 255 255 / .06); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 .5rem; font: inherit; flex: 1; }
+.em-tabpanel .st-pick select option { background: #0a141f; color: #f0f4fa; }
+.em-results { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.em-result { width: 100%; text-align: start; min-height: 2.75rem; display: grid; grid-template-columns: 2rem 1fr; gap: .2rem .6rem; align-items: center; padding: .4rem .6rem; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: .88rem var(--sans); cursor: pointer; }
+.em-result .small { grid-column: 2; color: var(--muted); }
+.em-result[aria-pressed="true"] { border-color: var(--amber); background: rgb(255 203 134 / .12); }
+.em-rank { display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: rgb(255 255 255 / .1); font: 700 .8rem var(--mono); }
+.em-how { margin-top: .6rem; font-size: .85rem; }
+.em-how summary { cursor: pointer; min-height: 2.75rem; display: flex; align-items: center; color: var(--teal); }
+.em-chart { width: 100%; height: auto; background: rgb(5 11 18 / .6); border: 1px solid var(--line); border-radius: 8px; direction: ltr; }
+.em-chart .line { fill: none; stroke-width: 2; }
+.em-chart .line.src { stroke: #68e0d0; }
+.em-chart .line.match { stroke: #8fb8ff; }
+.em-chart .dot.src { fill: #68e0d0; }
+.em-chart .dot.match { fill: #8fb8ff; }
+.em-chart .axis { fill: #a8b8c8; font: 9px var(--mono); }
+.em-curves { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin: .5rem 0; }
+.em-curves figure { margin: 0; }
+.em-chartbox h3 { color: var(--muted); font-weight: 500; margin: .6rem 0 .3rem; }
+@media (max-width: 520px) { .em-curves { grid-template-columns: 1fr; } }

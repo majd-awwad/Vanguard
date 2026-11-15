@@ -2936,8 +2936,13 @@
       "sourceProvenance": {
         "context": "Shared geometry or catalog supporting verified GEOS-FP DFPT1NXSLV snapshots; not a separate NASA observation."
       },
+<<<<<<< JSON_Files
       "bytes": 12601,
       "sha256": "c7f7ce366afc1d5d0ef009b3ad4b6117d139c8d383f1c9a560969b29828b8615"
+=======
+      "bytes": 10895,
+      "sha256": "d349aea3fc5ee28cd6fee8b4f23699d5a5bf77038f61b6462676a1dd4d9b5730"
+>>>>>>> main
     },
     {
       "id": "north-africa-med-25x40-v1-temperature",

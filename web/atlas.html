@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101715">
+  <meta name="description" content="Explore NASA Earth observations through sound, from ocean temperature to forests.">
+  <title>EARTHPULSE · The Sound Atlas</title>
+  <link rel="icon" href="./assets/atlas/pulse.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./visual/platform.css">
+</head>
+<body>
+  <a class="skip" href="#main" data-copy="skip">Skip to main content</a>
+  <header class="shell wrap">
+    <a class="brand" href="./" aria-label="EARTHPULSE"><svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="14.4" stroke="currentColor" stroke-width="1.4"/><path d="M5 17h6l2.1-5 3.2 10 3.5-13 2.8 8H27" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>EARTH<span>PULSE</span></a>
+    <nav aria-label="EARTHPULSE"><a href="#atlas" data-copy="atlas">Sound Atlas</a><a href="#lens" data-copy="lens">Sonic Lens</a><a href="#about" data-copy="about">Science & credits</a></nav>
+    <button id="language" lang="ar" class="outline">العربية</button>
+  </header>
+  <main id="main">
+    <section class="arrival wrap" aria-labelledby="hero-title">
+      <div class="arrival-copy">
+        <p class="eyebrow" data-copy="eyebrow">An Earth observation jukebox</p>
+        <h1 id="hero-title" data-copy="title">One Earth.<br>Many signals.</h1>
+        <p data-copy="intro">What if you could hear what Earth is telling us? Explore the science behind the sounds of ocean heat, rainfall, active fires and forests.</p>
+        <div class="actions">
+          <a class="solid" href="#atlas" data-copy="explore">Explore Earth</a>
+          <label class="sr-only" for="preview-source" data-copy="previewChoice">Preview signal</label>
+          <select id="preview-source"></select>
+          <button id="preview" class="outline" type="button" disabled data-copy="preview">Listen</button>
+        </div>
+        <p class="preview-note" id="preview-note" role="status"></p>
+      </div>
+      <figure class="earth-frame">
+        <img id="preview-image" src="./assets/atlas/svs-5101.jpg" width="1024" height="512" fetchpriority="high" alt="Global NASA visualization of sea-surface temperature">
+        <figcaption><span id="preview-caption">Ocean surface temperature · related NASA visualization</span><a id="preview-credit" href="https://svs.gsfc.nasa.gov/5101/">NASA SVS 5101 ↗</a></figcaption>
+      </figure>
+    </section>
+    <section class="atlas wrap" id="atlas" aria-labelledby="atlas-title">
+      <header class="section-head"><div><p class="eyebrow" data-copy="worlds">Explore Earth</p><h2 id="atlas-title" data-copy="atlas">Sound Atlas</h2></div></header>
+      <div id="atlas-worlds" class="atlas-worlds"></div>
+    </section>
+    <section class="lens wrap" id="lens" aria-labelledby="lens-title">
+      <header class="section-head">
+        <div><p class="eyebrow" data-copy="lens">Sonic Lens</p><h2 id="lens-title" tabindex="-1"></h2></div>
+        <label class="field"><span data-copy="signal">Signal</span><select id="signal"></select></label>
+      </header>
+      <p id="load-message" role="status" data-copy="loading">Loading measurements…</p>
+      <button id="retry-lens" class="outline" type="button" data-copy="retry" hidden>Retry</button>
+      <div id="instrument" hidden>
+        <div class="observatory">
+          <div class="scientific-stage">
+            <div class="stage-top"><span id="map-title"></span><span id="map-date"></span></div>
+            <div id="data-map" class="data-map"></div>
+            <div id="map-legend" class="map-legend"></div>
+            <p id="map-note" class="map-note"></p>
+          </div>
+          <aside class="reading-summary" aria-labelledby="reading-label">
+            <p class="eyebrow" id="reading-label"></p>
+            <p id="reading-value"></p>
+            <p id="reading-location"></p>
+            <p id="reading-detail"></p>
+          </aside>
+          <div class="listening-dock">
+            <div class="dock-row">
+              <div class="actions">
+                <button id="play" class="solid" type="button" data-copy="play">Play</button>
+                <button id="pause" class="outline" type="button" data-copy="pause">Pause</button>
+                <button id="replay" class="outline" type="button" data-copy="replay">Replay</button>
+              </div>
+              <span id="playback"></span>
+              <label class="field speed"><span data-copy="speed">Speed</span><select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+            </div>
+            <label class="sr-only" for="date-scrub" data-copy="scrub">Scientific date</label>
+            <div id="date-trend" class="date-trend" aria-hidden="true"></div>
+            <input id="date-scrub" type="range" min="0" max="6" value="0">
+            <div id="date-labels" class="date-labels"></div>
+          </div>
+          <div class="reading-controls">
+            <label class="field"><span data-copy="location">Location</span><select id="site"></select></label>
+            <label class="field"><span data-copy="compare">Compare with</span><select id="compare-site"></select></label>
+            <p id="compare-reading"></p>
+            <button id="hear-comparison" class="outline" type="button" data-copy="hearCompare" hidden>Hear both locations</button>
+            <button id="read-measurement" class="text-action" type="button" data-copy="read">Read measurement</button>
+            <button id="open-evidence" class="text-action" type="button" aria-controls="evidence" data-copy="evidence">Inspect evidence</button>
+          </div>
+        </div>
+        <details class="context-strip">
+          <summary data-copy="context">Related NASA visualization</summary>
+          <figure><img id="context-image" width="1024" height="512" loading="lazy" alt=""><figcaption><a id="context-link" href="https://svs.gsfc.nasa.gov/5101/"></a> · <span data-copy="contextNote">NASA Scientific Visualization Studio · frame independent of the selected date</span></figcaption></figure>
+        </details>
+        <section id="detective" class="method" aria-labelledby="detective-title">
+          <div><p class="eyebrow" data-copy="detective">Earth Detective</p><h3 id="detective-title"></h3><p id="mission"></p></div>
+          <div><button id="reveal-mission" class="outline" type="button" aria-expanded="false" aria-controls="mission-result" data-copy="check">Check the pattern</button><p id="mission-result" tabindex="-1" hidden></p></div>
+        </section>
+        <details class="fold" id="studio">
+          <summary data-copy="studio">Sound Studio</summary>
+          <div class="studio-body">
+            <div class="studio-controls">
+              <label class="field"><span data-copy="timbre">Tone color</span><select id="timbre"><option value="sine" data-copy="pure">Pure sine</option><option value="triangle" data-copy="soft">Soft triangle</option></select></label>
+              <label class="field"><span data-copy="volume">Volume</span><input id="volume" type="range" min="0" max="100" value="54"></label>
+              <label class="check"><input id="mute" type="checkbox"><span data-copy="mute">Mute</span></label>
+              <label class="check"><input id="visual-only" type="checkbox"><span data-copy="silent">Visual playback</span></label>
+            </div>
+            <p id="mapping"></p>
+          </div>
+        </details>
+      </div>
+      <p id="announcer" class="sr-only" role="status" aria-live="polite"></p>
+    </section>
+    <section class="about wrap" id="about" aria-labelledby="about-title">
+      <p class="eyebrow">EARTHPULSE · Team Vanguard</p>
+      <h2 id="about-title" data-copy="about">Science & credits</h2>
+      <p data-copy="aboutBody">Listen to derived signals from traceable NASA science. Each experience identifies its source, scientific time, units and sound mapping. Map legends and structured evidence also support silent exploration.</p>
+      <p data-copy="credits">Visual context: NASA Scientific Visualization Studio. Forest landscape: AI-generated illustration. Implementation assisted by Codex.</p>
+      <a href="https://svs.gsfc.nasa.gov/gallery/daily-visualizations/" data-copy="gallery">NASA Earth Information Center gallery ↗</a>
+    </section>
+  </main>
+  <dialog id="evidence" aria-labelledby="evidence-title">
+    <div class="evidence-head"><h2 id="evidence-title" data-copy="evidence">Inspect evidence</h2><form method="dialog"><button class="outline" data-copy="close">Close</button></form></div>
+    <div id="evidence-body"></div>
+  </dialog>
+  <noscript>JavaScript is required to explore the scientific data.</noscript>
+  <script type="module" src="./platform.js"></script>
+</body>
+</html>

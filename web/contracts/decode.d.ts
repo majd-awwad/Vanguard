@@ -99,7 +99,11 @@ type EvidenceCell = Pick<DecodeCell, "row" | "col" | "lat" | "lon" | "value" | "
 type SessionGrid<T> = { rows: number; cols: number; cells: T[] };
 type SessionBase = { caseId: string; behavior: DecodeCase["behavior"]; level: Level; condition: Condition;
   focus: CellPosition; guesses: CellPosition[]; expectedCount: number;
-  lastProbe: null | { row: number; col: number; heard: Heard }; planRevision: number; transport: TransportSnapshot };
+  lastProbe: null | { row: number; col: number; heard: Heard }; planRevision: number; transport: TransportSnapshot;
+  /** Mode of the plan for planRevision; null before a case's plan loads. Older sessions may omit it. */
+  playMode?: SpatialPlan["mode"] | null;
+  /** Always present in the integrated renderer view. Older session views may omit it. */
+  activeCell?: readonly [row: number, col: number] | null };
 
 export type SessionSnapshot = SessionBase & (
   | { mode: "discovery"; phase: Exclude<Phase, "reveal">; grid: SessionGrid<PublicCell>; visualLink: null; score: null }
@@ -116,6 +120,7 @@ export type DecodeIntent =
   | { type: "pause" | "replay" | "submit" | "next" | "reset" };
 
 export interface DecodeSession {
+  readonly ready?: Promise<void>;
   dispatch(intent: DecodeIntent): void | Promise<void>;
   subscribe(listener: (snapshot: SessionSnapshot) => void): () => void;
   getState(): SessionSnapshot;
@@ -146,6 +151,16 @@ export type VisualMountOptions = {
   t: Translate;
   geography?: DecodeGeography;
 };
-export type MountDecodeVisual = (root: HTMLElement, session: DecodeSession, options: VisualMountOptions) =>
-  { dispose(): void }; // Roaa
+export type DecodeRevealOutcome = {
+  row: number;
+  col: number;
+  outcome: "correct" | "incorrect" | "missed";
+};
+export type ApplyDecodeReveal = (outcomes: DecodeRevealOutcome[], evidenceRoot: HTMLElement,
+  formatLabel: (outcome: DecodeRevealOutcome["outcome"], row: number, col: number) => string) => boolean;
+export type MountDecodeVisual = (root: HTMLElement, session: DecodeSession, options: VisualMountOptions) => {
+  dispose(): void;
+  prepareReveal?(): ApplyDecodeReveal | null;
+  clearReveal?(): void;
+}; // Roaa
 export type DecodeMessage = (lang: "ar" | "en", ...args: Parameters<Translate>) => string; // Israa
