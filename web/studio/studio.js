@@ -71,7 +71,7 @@ export function openModeDialog(document, language, { current = null, dismissable
 }
 
 export function startStudio(document = globalThis.document) {
-  const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages", footer: false });
+  const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages" });
   const m = copyFor(language);
   document.title = m.title + " · EARTHPULSE";
   const root = document.getElementById("studio-root");
@@ -162,25 +162,7 @@ async function mountApp(document, root, language, initialMode) {
   }
   const vw = () => Math.max(40, state.width - state.ins.l - state.ins.r);
   const vh = () => Math.max(40, state.height - state.ins.t - state.ins.b);
-  function computeInsets() {
-    const f = el.frame.getBoundingClientRect();
-    const shown = (node) => node && !node.hidden && win.getComputedStyle(node).display !== "none" && node.getBoundingClientRect().width > 0;
-    const gap = 10;
-    const ins = { l: 8, t: 8, r: 8, b: 8 };
-    const small = win.matchMedia?.("(max-width: 767px)").matches;
-    for (const node of [el.tbLeft, el.soundPill]) if (shown(node)) ins.t = Math.max(ins.t, node.getBoundingClientRect().bottom - f.top + gap);
-    if (small) {
-      if (shown(el.rail)) ins.b = Math.max(ins.b, f.bottom - el.rail.getBoundingClientRect().top + gap);
-      if (shown(el.bottom)) ins.b = Math.max(ins.b, f.bottom - el.bottom.getBoundingClientRect().top + gap);
-    } else {
-      if (shown(el.rail)) ins.l = Math.max(ins.l, el.rail.getBoundingClientRect().right - f.left + gap);
-      if (shown(el.flyout)) ins.l = Math.max(ins.l, el.flyout.getBoundingClientRect().right - f.left + gap);
-      if (shown(el.bottom) && el.bottom.closest(".st-app").dataset.timeline === "bar") ins.b = Math.max(ins.b, f.bottom - el.bottom.getBoundingClientRect().top + gap);
-      if (shown(el.inspector) && el.inspector.dataset.collapsed !== "true") ins.r = Math.max(ins.r, f.right - el.inspector.getBoundingClientRect().left + gap);
-      if (shown(el.cluster)) ins.r = Math.max(ins.r, f.right - el.cluster.getBoundingClientRect().left + gap);
-    }
-    state.ins = ins;
-  }
+  function computeInsets() { state.ins = { l: 8, t: 8, r: 8, b: 8 }; } // the map box holds only the map; zoom and legend sit in the empty bands
   function layoutChanged(animate = true) {
     if (!renderer || !state.width) return;
     computeInsets();
@@ -452,6 +434,7 @@ async function mountApp(document, root, language, initialMode) {
     el.soundButton.setAttribute("aria-pressed", String(on));
     const soundLabel = on ? m.sound.disable : m.sound.enable;
     el.soundButton.setAttribute("aria-label", soundLabel);
+    el.soundLabel.textContent = soundLabel;
     el.soundButton.setAttribute("data-tip", soundLabel);
     if (on) { await audio.enable(); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : m.sound.on; } else { audio.disable(); el.soundState.textContent = m.sound.off; }
     store.dispatch("SET_AUDIO", { audio: on ? AUDIO.IDLE : AUDIO.MUTED });
@@ -568,6 +551,8 @@ async function mountApp(document, root, language, initialMode) {
   // ---- Sound pill (top right over the map): on/off, Guided Voice | Pure Sonification, data volume
   el.soundButton = h(document, "button", { type: "button", class: "icon-btn st-sound-toggle", "aria-pressed": "false", "aria-label": m.sound.enable, "data-tip": m.sound.enable, "data-tip-pos": "below" });
   el.soundButton.innerHTML = ICON.sound;
+  el.soundLabel = h(document, "span", { text: m.sound.enable });
+  el.soundButton.append(el.soundLabel);
   el.soundState = h(document, "p", { class: "visually-hidden", role: "status", "aria-live": "polite", text: m.sound.off });
   el.volume = h(document, "input", { type: "range", id: "st-volume", min: 0, max: 100, step: 1, value: Math.round(settings.volume * 100), "aria-label": m.voice.dataVolume });
   el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); saveSettings({ volume: v }); });
@@ -700,16 +685,17 @@ async function mountApp(document, root, language, initialMode) {
     el.sourceStatus.textContent = m.status.source + " · " + verified + (pkg.integrity.failed.length ? " · ⚠ " + pkg.integrity.failed.length : "");
   }
   const openComputed = () => openSheet(m.info.how, [el.sourceStatus, info]);
-  const openHelp = () => {
+  const helpNodes = () => {
     const mapping = h(document, "ul", { class: "st-help-list" }, ...PHENOMENON_IDS.map((id) => h(document, "li", {}, h(document, "strong", { text: m.phen[id] + ": " }), m.phen.soundMeaning[id])));
     const keys = h(document, "ul", { class: "st-help-list" }, ...m.help.shortcuts.map(([key, text]) => h(document, "li", {}, h(document, "span", { class: "kbd", text: key }), " " + text)));
     const notes = h(document, "ul", { class: "st-help-list" }, ...m.help.notes.map((line) => h(document, "li", { text: T(line, { cellLat: trimNumber(size.lat), cellLon: trimNumber(size.lon) }) })));
     const actions = h(document, "div", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.explain }); b.addEventListener("click", explain); return b; })(), (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.help }); b.addEventListener("click", () => speech.say(m.voice.helpText[store.state.tool])); return b; })());
-    return openSheet(m.help.title, [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, h(document, "p", { class: "small" }, m.credit), h(document, "p", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy }); b.addEventListener("click", () => api.copyLink?.()); return b; })()), h(document, "p", { class: "small" }, h(document, "a", { href: "../atlas.html", text: language === "ar" ? "الأرشيف: أطلس الصوت v1" : "Archive: Sound Atlas v1" })), actions]);
+    return [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, h(document, "p", { class: "small" }, m.credit), h(document, "p", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy }); b.addEventListener("click", () => api.copyLink?.()); return b; })()), h(document, "p", { class: "small" }, h(document, "a", { href: "../atlas.html", text: language === "ar" ? "الأرشيف: أطلس الصوت v1" : "Archive: Sound Atlas v1" })), actions];
   };
+  const openHelp = () => openSheet(m.help.title, helpNodes());
 
   // ---- Inspector (right): value big, unit, location, time, model badge, one-line sound meaning
-  el.insId = h(document, "h2", { class: "st-ins-id", id: "st-ins-title" });
+  el.insId = h(document, "h3", { class: "st-ins-id", id: "st-ins-title" });
   el.insValue = h(document, "strong", { class: "st-ins-number" });
   el.insUnit = h(document, "span", { class: "st-ins-unit" });
   el.insSub = h(document, "p", { class: "small st-ins-sub" });
@@ -728,8 +714,11 @@ async function mountApp(document, root, language, initialMode) {
   el.insClose.addEventListener("click", () => { state.selected = null; renderInspector(); invalidate(); });
   el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow));
   el.handle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand, "data-snap-control": "inspector" });
-  el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", hidden: true, "data-collapsed": String(win.innerHeight < 700) },
+  el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", "data-collapsed": "false" },
     h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insPill, el.insCollapse, el.insClose), el.insBody);
+  el.insEmpty = h(document, "p", { class: "st-ins-empty", text: m.info.none });
+  el.inspector.prepend(h(document, "h2", { class: "st-card-title", text: m.cards.place }));
+  el.inspector.append(el.insEmpty);
   el.insCollapse.addEventListener("click", () => setInspectorCollapsed(el.inspector.dataset.collapsed !== "true"));
   function setInspectorCollapsed(collapsed) {
     el.inspector.dataset.collapsed = String(collapsed);
@@ -742,9 +731,10 @@ async function mountApp(document, root, language, initialMode) {
   function renderInspector() {
     const cell = state.selected;
     const d = cell ? describeCell(cell) : null;
-    const wasHidden = el.inspector.hidden;
-    el.inspector.hidden = !d;
-    if (wasHidden !== !d) layoutChanged(false);
+    el.inspector.hidden = false;
+    el.insEmpty.hidden = Boolean(d);
+    el.insBody.hidden = !d;
+    el.inspector.querySelector(".st-ins-head").hidden = !d;
     if (!d) return;
     el.insId.textContent = d.id;
     el.insValue.textContent = d.value === null ? "—" : d.kind === "change" ? fmtChange(d.value) : fmt(d.value);
@@ -769,6 +759,7 @@ async function mountApp(document, root, language, initialMode) {
   for (const [id] of toolDefs) {
     const b = h(document, "button", { type: "button", class: "icon-btn st-rail-button", "aria-pressed": String(id === "explore"), "aria-label": m.tools[id], "data-tip": m.tools[id], "data-tip-pos": "below", "data-id": id });
     b.innerHTML = ICON[id];
+    b.append(h(document, "span", { class: "st-rail-label", text: m.tools[id] }));
     b.addEventListener("click", () => openTool(id, { focus: true }));
     railButtons[id] = b;
     el.rail.append(b);
@@ -776,7 +767,6 @@ async function mountApp(document, root, language, initialMode) {
   const helpButton = h(document, "button", { type: "button", class: "icon-btn st-rail-button st-rail-help", "aria-label": m.help.title, "data-tip": m.help.title, "data-tip-pos": "below" });
   helpButton.innerHTML = ICON.help;
   helpButton.addEventListener("click", openHelp);
-  el.rail.append(helpButton);
   const hunterBox = h(document, "div", { id: "em-panel-hunter", class: "st-flyout-body" });
   const echoBox = h(document, "div", { id: "em-panel-echo", class: "st-flyout-body" });
   state.left = h(document, "div", { hidden: true }, h(document, "div"), h(document, "div"));
@@ -954,20 +944,21 @@ async function mountApp(document, root, language, initialMode) {
   // ---- Assemble: the map is the page; everything else floats over it
   el.hint = h(document, "p", { class: "visually-hidden", id: "st-map-hint", text: m.help.mapHint });
   el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
-  el.tbLeft = topLeft;
-  el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline, el.timePlay);
-  el.bottom = h(document, "div", { class: "st-bottom" }, el.legend, el.timewrap);
-  const app = h(document, "div", { class: "st-app", "data-flyout": "closed", "data-tool": "explore", "data-timeline": "bar" }, el.frame, el.hint,
-    h(document, "div", { class: "st-top" }, topLeft, soundPill), el.lock, el.rail, el.flyout, el.inspector, el.hoverTip, el.cluster, el.bottom, el.timePop, el.note);
-  function setFlyout(open) { app.dataset.flyout = open ? "open" : "closed"; invalidate(); }
-  const compactTimeline = win.matchMedia?.("(max-height: 699px), (max-width: 767px)");
-  const placeTimeline = () => {
-    const pop = compactTimeline?.matches === true;
-    app.dataset.timeline = pop ? "popover" : "bar";
-    if (pop) el.timePop.prepend(el.timewrap); else { el.bottom.append(el.timewrap); closeTimePop(false); }
-    layoutChanged(false);
-  };
-  compactTimeline?.addEventListener?.("change", placeTimeline);
+  el.exploreHint = h(document, "p", { class: "st-hint", text: c.tools.help.explore });
+  el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline);
+  el.soundMore.replaceChildren(el.modeSeg, h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.voice.dataVolume }), el.volume));
+  const title = (text) => h(document, "h2", { text });
+  const head = h(document, "header", { class: "st-head" }, h(document, "p", { class: "eyebrow", text: m.cards.eyebrow }), h(document, "h1", {}, m.cards.title[0] + " ", h(document, "em", { text: m.cards.title[1] })), h(document, "p", { class: "lede", text: m.cards.lede }));
+  const dataCard = h(document, "section", { class: "st-card", "aria-label": m.cards.data }, title(m.cards.data), el.phenGroup,
+    h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.timewrap, h(document, "div", { class: "st-inline" }, el.layerChip, el.timePlay), el.lock, el.lockFoot);
+  const soundCard = h(document, "section", { class: "st-card st-sound", role: "group", "aria-label": c.sound.title }, title(m.cards.sound), el.soundButton, el.soundState, el.soundMore, el.wave);
+  const toolsCard = h(document, "section", { class: "st-card", "aria-label": m.cards.tools }, title(m.cards.tools), el.rail, el.exploreHint, el.flyout);
+  const how = h(document, "details", { class: "st-card st-how" }, h(document, "summary", { text: m.cards.how }), ...helpNodes());
+  const app = h(document, "div", { class: "st-page", "data-flyout": "closed", "data-tool": "explore", "data-timeline": "bar" },
+    h(document, "div", { class: "st-mapcol" }, h(document, "div", { class: "st-mapbox" }, el.frame, el.hint, el.legend, el.cluster, el.hoverTip, el.note)),
+    h(document, "div", { class: "st-col" }, head, dataCard, soundCard, el.inspector, toolsCard, how));
+  function setFlyout(open) { app.dataset.flyout = open ? "open" : "closed"; el.exploreHint.hidden = open; invalidate(); }
+  function placeTimeline() { app.dataset.timeline = "bar"; layoutChanged(false); }
   setFlyout(false);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);

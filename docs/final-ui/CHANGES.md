@@ -44,3 +44,8 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - The whole coverage fits the free area (rail, top pills, bottom bar, open flyout, expanded inspector are excluded) on load, resize, compass and layout changes; contain, never cover.
 - Layer cross-fade on date, phenomenon and change-layer switches (skipped under reduced motion).
 - One path through the site: a "next step" band ends Decode (Explore the data), Explore Earth and Science (Open the Sound Studio), About and Settings (Decode). Explore Earth has one selected-cell card and Compare in a drawer. Science and About sections carry icons; About has a data to rules to sound diagram.
+
+## Studio in the first-Studio look (fourth pass)
+- Reference: the first Studio (b932dc9) was served from a temporary worktree and screenshotted at 1366x768 and 1440x900; the worktree was deleted afterwards.
+- Layout: desktop = a sticky map on the left (the whole coverage fitted, contain) and a scrolling column of cards on the right: Data (phenomenon, date, season timeline, layer chip), Sound, Selected place, Tools (one tab bar, only the active tool's question and results), How it works (collapsed). Phones = one column with a 55 vh sticky map on top. Footer at the end.
+- Same rhythm on every page: 96 px between sections on desktop, 56 px on phones, and a next-step button at the end.

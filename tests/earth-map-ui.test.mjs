@@ -88,14 +88,14 @@ test("ACCESS-A: every main tool is a real control with a role and a name", async
   assert.match(await text("web/studio/studio-ui-kit.js"), /aria-live/);
 });
 
-test("RESPONSIVE: 44px targets, one bottom sheet with three snap points, icon bar on phones, geography never mirrors", async () => {
+test("RESPONSIVE: sticky map + scrolling cards on desktop, one column with a 55vh sticky map on phones, 44px targets, geography never mirrors", async () => {
   const css = await text("web/studio/earthmap.css");
-  assert.match(css, /@media \(max-width: 767px\)/);
-  assert.match(css, /\.st-flyout\[data-snap="peek"\]/);
-  assert.match(css, /\.st-flyout\[data-snap="full"\]/);
-  assert.match(css, /.st-timepop .st-date {[^}]*min-height: 2.75rem/);
+  assert.ok(css.includes("@media (max-width: 1023px)"));
+  assert.ok(css.includes(".st-mapcol { position: sticky"));
+  assert.ok(css.includes("height: 55dvh"));
+  assert.ok(css.includes("min-height: var(--target); border-radius: 10px"));
   const studio = await text("web/studio/studio.js");
-  assert.match(studio, /st-handle/);
+  assert.ok(studio.includes("st-mapcol") && studio.includes("st-col"));
   assert.match(studio, /dir: "ltr", tabindex: "0", role: "application"/, "geography never mirrors");
 });
 
