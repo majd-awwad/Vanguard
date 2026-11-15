@@ -99,3 +99,27 @@ Rainfall note: only 1,074 of the 13,000 values are at or above 0.1 mm/h; the oth
 - Stereo pan follows longitude: west left, east right, never mirrored in Arabic.
 - One volume (the settings volume) and one sound on/off button. The audio context is created and resumed inside the button's click; nothing plays before it. Guided Voice speech ducks the recordings to 35% and restores them smoothly; mute and sound-off fade everything out.
 - Old stored sound settings are reset once (`earthpulse.sound.v2`).
+
+## Meaning phrase (spoken in Guided Voice, shown as a badge in every mode)
+
+A short **relative** phrase for the value under the cursor or selection. It uses the SAME level that chooses the recording (low / mid / high from the breakpoints above), so what is said matches what is heard. It is never a weather claim: "high" means high compared with this dataset (for rain, "high" starts at 0.31 mm/h, which is light rain meteorologically).
+
+Temperature has no recording, but gets the same three levels from the 33rd and 66th percentiles (linear interpolation) of all 13,000 valid values across the 13 sampled dates, kept as constants in `web/studio/meaning.js` and tested against the catalog:
+
+| Phenomenon | Unit | Low breakpoint (p33) | High breakpoint (p66) |
+|---|---|---|---|
+| Temperature | degrees C | 18.52 | 26.74 |
+
+At or below the low breakpoint is the first word, at or below the high breakpoint the middle word, above it the last word.
+
+| | low | mid | high |
+|---|---|---|---|
+| Dust (EN) | Dust: low compared with this dataset | Dust: moderate compared with this dataset | Dust: high compared with this dataset |
+| Rain (EN) | Rain: light compared with this dataset | Rain: moderate compared with this dataset | Rain: high compared with this dataset |
+| Wind (EN) | Wind: low compared with this dataset | Wind: moderate compared with this dataset | Wind: high compared with this dataset |
+| Temperature (EN) | Temperature: cooler compared with this dataset | Temperature: middle compared with this dataset | Temperature: warmer compared with this dataset |
+
+- Rain below 0.1 mm/h: "Rain: no measurable rain". A missing value: "no data here".
+- Arabic: «غبار منخفض / متوسط / مرتفع مقارنة ببقية البيانات» · «لا يوجد مطر يُقاس» / «مطر قليل / متوسط / مرتفع مقارنة ببقية البيانات» · «رياح ضعيفة / متوسطة / قوية مقارنة ببقية البيانات» · «حرارة أبرد / متوسطة / أدفأ مقارنة ببقية البيانات» · «لا توجد بيانات هنا».
+- Spoken order (after the movement settles, stale speech cancelled): the phrase, the value with its unit (dust and rain 2 decimals, wind 1, temperature whole degrees), the place (latitude and longitude to 1 decimal), and the date only when it changed since the last spoken one.
+- The badge appears in the selected-place card and in the hover tooltip in both modes. Pure Sonification never speaks it. The comparison (change) layer has no phrase.

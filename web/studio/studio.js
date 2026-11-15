@@ -15,6 +15,7 @@ import { mountEcho } from "./echo-ui.js";
 import { mountHunter } from "./hunter-ui.js";
 import { lonPan } from "./mapping.js";
 import { cellInfo } from "./sonify.js";
+import { MEANING_PHENOMENA, meaningLevel, meaningPhrase, spokenNumber } from "./meaning.js";
 import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { decodeShare, mountShare } from "./share.js";
@@ -245,7 +246,9 @@ async function mountApp(document, root, language, initialMode) {
     if (!tip) return;
     if (!cell || (state.selected && cell.index === state.selected.index)) { tip.hidden = true; return; }
     const d = describeCell(cell);
-    tip.textContent = d.value === null ? m.info.missing : d.kind !== "change" && isDryValue(phen.id, d.value) ? m.dry[phen.id].cell : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
+    const line = d.value === null ? m.info.missing : d.kind !== "change" && isDryValue(phen.id, d.value) ? m.dry[phen.id].cell : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
+    const mean = meaningFor(cell.index);
+    tip.replaceChildren(h(document, "span", { class: "st-tip-value", text: line }), ...(mean ? [makeBadge(mean)] : []));
     tip.hidden = false;
     const x = Math.min(state.width - tip.offsetWidth - 6, p.x + 14);
     tip.style.transform = `translate(${Math.max(6, Math.round(x))}px, ${Math.max(6, Math.round(p.y - 34))}px)`;
@@ -374,6 +377,37 @@ async function mountApp(document, root, language, initialMode) {
     return phen.id === "wind" && d.value !== null ? base + " " + windText(d.index) + "." : base;
   };
 
+  // ---- Meaning of a value: a relative phrase from the same level that chooses the recording (temperature: its own percentiles)
+  function meaningFor(index) {
+    if (layerKind() === "change" || !MEANING_PHENOMENA.includes(phen.id) || index === undefined || index < 0) return null;
+    const value = state.snapshot.values[index];
+    const args = { phenomenon: phen.id, value, breakpoints: bpFor() };
+    return { level: meaningLevel(args), text: meaningPhrase({ ...args, language }) };
+  }
+  function fillBadge(node, mean) {
+    node.hidden = !mean;
+    if (!mean) return;
+    node.textContent = mean.text;
+    node.dataset.level = mean.level;
+    node.dataset.kind = phen.id;
+  }
+  const makeBadge = (mean) => { const node = h(document, "span", { class: "st-badge", dir: "auto" }); fillBadge(node, mean); return node; };
+  // Spoken order: meaning phrase, value with unit, short place, the date only when it changed. Resolved when it is actually said.
+  let lastSpokenDate = null;
+  function spokenNow(cell) {
+    const d = describeCell(cell);
+    const mean = meaningFor(cell.index);
+    if (!mean) return readText(cell);
+    const parts = [mean.text];
+    if (d.value !== null && mean.level !== "missing") parts.push(spokenNumber(phen.id, d.value) + " " + unitText());
+    const centre = cellCenter(grid, cell.row, cell.col);
+    parts.push(formatLat(Math.round(centre.lat * 10) / 10) + ", " + formatLon(Math.round(centre.lon * 10) / 10));
+    const date = dateOf(state.snapshot);
+    if (date !== lastSpokenDate) { parts.push(date); lastSpokenDate = date; }
+    return parts.join(". ") + ".";
+  }
+  const spoken = (cell, prefix = "") => () => (prefix ? prefix + " " : "") + spokenNow(cell);
+
   // ---- Legend (compact: title, gradient bar, ticks)
   el.legend = h(document, "div", { class: "st-legend" });
   function renderLegend() {
@@ -398,7 +432,7 @@ async function mountApp(document, root, language, initialMode) {
     state.cursor = cell;
     state.outside = outside;
     if (changed) { renderInfo(); invalidate(); if (cell) store.dispatch("MOVE_FOCUS", { sampleId: cell.index }); state.onCursor?.(cell); }
-    if (announce && cell) speech.say(readText(cell));
+    if (announce && cell) speech.say(spoken(cell));
   }
   const cursorAt = (x, y) => { const g = toGeo(x, y); return cellAt(grid, g.lon, g.lat); };
   function selectCell(cell, { play = true, say = true, user = true } = {}) {
@@ -412,9 +446,9 @@ async function mountApp(document, root, language, initialMode) {
     for (const hook of state.selectHooks ?? []) hook(cell, { user });
     if (user && typeof app !== "undefined" && app.dataset.flyout !== "open" && win.innerHeight >= 700) setInspectorCollapsed(false);
     if (play) soundForCursor(true);
-    if (say) guided(readText(cell));
+    if (say) guided(spoken(cell));
   }
-  const explain = () => { if (state.cursor) speech.say(readText(state.cursor)); else speech.say(m.info.none); };
+  const explain = () => { if (state.cursor) speech.say(spoken(state.cursor)); else speech.say(m.info.none); };
 
   // ---- Sound: the user's recordings, chosen by the REAL value (low / mid / high). No synthesized tones.
   const SOUND_PHENOMENA = AMBIENCE_PHENOMENA;
@@ -458,7 +492,7 @@ async function mountApp(document, root, language, initialMode) {
   state.onCursor = (cell) => {
     updateSoundStatus();
     if (state.tool === "explore") soundForCursor();
-    if (cell && state.tool === "explore" && store.state.tool === TOOLS.EXPLORE) guided(readText(cell));
+    if (cell && state.tool === "explore" && store.state.tool === TOOLS.EXPLORE) guided(spoken(cell));
   };
 
   const setSound = async (on) => {
@@ -561,7 +595,7 @@ async function mountApp(document, root, language, initialMode) {
     return false;
   });
   state.onKey = (event) => {
-    if (event.key === " " && state.cursor) { event.preventDefault(); if (audio.enabled) soundForCursor(true); else speech.say(m.sound.off + " " + readText(state.cursor)); return; }
+    if (event.key === " " && state.cursor) { event.preventDefault(); if (audio.enabled) soundForCursor(true); else speech.say(spoken(state.cursor, m.sound.off)); return; }
     for (const handler of state.onKeyExtra) if (handler(event)) return;
   };
   el.frame.addEventListener("keydown", (event) => {
@@ -616,7 +650,7 @@ async function mountApp(document, root, language, initialMode) {
     renderModeButton();
     el.live.textContent = m.mode.switched[mode];
     if (persist) { const next = saveSettings({ guidance: mode === GUIDED }); win.dispatchEvent(new win.CustomEvent("earthpulse:settings", { detail: next })); }
-    if (mode === GUIDED && state.cursor) speak(m.mode.switched[mode] + " " + readText(state.cursor));
+    if (mode === GUIDED && state.cursor) speak(spoken(state.cursor, m.mode.switched[mode]));
   }
 
   // ---- Dry dates: explain a date with almost no signal and suggest the wettest real dates
@@ -758,6 +792,7 @@ async function mountApp(document, root, language, initialMode) {
   el.insWhere = h(document, "p", { class: "small ltr st-ins-where" });
   el.insWhen = h(document, "p", { class: "small st-ins-when", dir: "auto" });
   el.insSound = h(document, "p", { class: "small st-ins-sound" });
+  el.insBadge = h(document, "p", { class: "st-badge", dir: "auto", hidden: true });
   const insListen = h(document, "button", { type: "button", class: "button small-button", text: m.sound.replay });
   const insHow = h(document, "button", { type: "button", class: "button ghost small-button", text: m.info.how });
   insListen.addEventListener("click", async () => { if (!state.selected) return; state.cursor = state.selected; if (!audio.enabled) await setSound(true); soundForCursor(true); });
@@ -768,7 +803,7 @@ async function mountApp(document, root, language, initialMode) {
   el.insClose = h(document, "button", { type: "button", class: "icon-btn st-collapse st-ins-close", "aria-label": m.mode.close });
   el.insClose.innerHTML = ICON.close;
   el.insClose.addEventListener("click", () => { state.selected = null; renderInspector(); invalidate(); });
-  el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow));
+  el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insBadge, el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow));
   el.handle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand, "data-snap-control": "inspector" });
   el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", "data-collapsed": "false" },
     h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insPill, el.insCollapse, el.insClose), el.insBody);
@@ -795,6 +830,7 @@ async function mountApp(document, root, language, initialMode) {
     el.insId.textContent = d.id;
     el.insValue.textContent = d.value === null ? "—" : d.kind === "change" ? fmtChange(d.value) : fmt(d.value);
     el.insUnit.textContent = d.value === null ? m.info.missing : unitText();
+    fillBadge(el.insBadge, d.kind === "change" ? null : meaningFor(d.index));
     el.insPill.textContent = d.value === null ? "—" : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
     const where = T("{lat}, {lon}", { lat: d.lat, lon: d.lon });
     const s = state.snapshot;
