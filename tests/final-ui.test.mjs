@@ -38,7 +38,7 @@ test("Studio opens on a real value: default centre cell, sound off, inspector", 
 
 test("Studio shows one flyout at a time and closes it with Escape returning focus", () => {
   const studio = text("web/studio/studio.js");
-  assert.equal((studio.match(/class: "st-flyout st-panel floating"/g) ?? []).length, 1);
+  assert.equal((studio.match(/class: "st-flyout"/g) ?? []).length, 1);
   assert.match(studio, /el\.flyoutBody\.replaceChildren\(\.\.\.nodes\)/);
   assert.match(studio, /const closeFlyout = \(\) => \{ const opener = railButtons\[currentTool\]; openTool\("explore"\); opener\?\.focus\(\); \}/);
 });

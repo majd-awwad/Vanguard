@@ -71,7 +71,7 @@ export function openModeDialog(document, language, { current = null, dismissable
 }
 
 export function startStudio(document = globalThis.document) {
-  const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages" });
+  const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages", footer: false });
   const m = copyFor(language);
   document.title = m.title + " · EARTHPULSE";
   const root = document.getElementById("studio-root");
@@ -333,6 +333,7 @@ async function mountApp(document, root, language, initialMode) {
       parts.push(h(document, "p", { class: "st-legend-title", text: c.legend.changeTitle + " · " + unitText() }), h(document, "div", { class: "st-bar st-bar-diff", "aria-hidden": "true" }),
         h(document, "div", { class: "st-ticks ltr", "aria-hidden": "true" }, h(document, "span", { class: "tick", style: "left:0%", text: "−" + s.change.max }), h(document, "span", { class: "tick", style: "left:50%", text: "0" }), h(document, "span", { class: "tick", style: "left:100%", text: "+" + s.change.max })));
     }
+    parts.push(h(document, "span", { class: "st-legend-range ltr", "aria-hidden": "true", text: state.comparison ? "−" + s.change.max + " … +" + s.change.max : s.min + " … " + s.max }));
     el.legend.replaceChildren(...parts);
   }
 
@@ -445,7 +446,15 @@ async function mountApp(document, root, language, initialMode) {
   };
   el.frame.addEventListener("pointerup", endPointer);
   el.frame.addEventListener("pointercancel", endPointer);
-  el.frame.addEventListener("wheel", (event) => { event.preventDefault(); const p = local(event); zoomBy(Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.0016)), p.x, p.y, false); }, { passive: false });
+  let trackpadUntil = 0;
+  el.frame.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    const p = local(event);
+    const now = event.timeStamp;
+    const scroll = !event.ctrlKey && event.deltaMode === 0 && (event.deltaX !== 0 || Math.abs(event.deltaY) < 40 || (Math.abs(event.deltaY) < 100 && now < trackpadUntil));
+    if (scroll) { trackpadUntil = now + 120; setView(panBy(state.view, bounds, state.width, state.height, -event.deltaX, -event.deltaY), false); return; }
+    zoomBy(Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : event.ctrlKey ? 0.01 : 0.0016)), p.x, p.y, false);
+  }, { passive: false });
   el.frame.style.touchAction = "none";
   state.onPointer = (type, event, p, ptrs) => {
     for (const handler of state.pointerHandlers) { handler(type, event, p, ptrs); if (event.defaultPrevented) return; }
@@ -505,7 +514,8 @@ async function mountApp(document, root, language, initialMode) {
     el.modeSeg.append(b);
   }
   function renderModeButton() { for (const [mode, b] of Object.entries(modeButtons)) b.setAttribute("aria-pressed", String(mode === store.state.soundMode)); }
-  const soundPill = h(document, "div", { class: "st-pill st-sound floating", role: "group", "aria-label": c.sound.title }, el.soundButton, el.modeSeg, el.volume, el.wave, el.soundState);
+  el.soundMore = h(document, "div", { class: "st-sound-more" }, el.modeSeg, el.volume);
+  const soundPill = h(document, "div", { class: "st-tb-group st-sound", role: "group", "aria-label": c.sound.title }, el.soundButton, el.soundMore, el.soundState);
   el.voiceNote = h(document, "p", { class: "small", hidden: true, text: m.voice.unavailable });
   function setSoundMode(mode) {
     store.dispatch("SET_SOUND_MODE", { mode });
@@ -566,7 +576,9 @@ async function mountApp(document, root, language, initialMode) {
   const stepDate = (delta) => { const i = phen.list.findIndex((s) => s.id === state.snapshot.id); const next = phen.list[Math.min(phen.list.length - 1, Math.max(0, i + delta))]; if (next) requestDate(next.id); };
   el.prev.addEventListener("click", () => stepDate(-1));
   el.next.addEventListener("click", () => stepDate(1));
-  const topLeft = h(document, "div", { class: "st-pill st-top-left floating" }, el.phenGroup, h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next), el.dateInfo);
+  el.timeButton = h(document, "button", { type: "button", class: "icon-btn st-time-open", "aria-expanded": "false", "aria-haspopup": "dialog", "aria-label": m.date.timeline, "data-tip": m.date.timeline, "data-tip-pos": "below" });
+  el.timeButton.innerHTML = ICON.calendar;
+  const topLeft = h(document, "div", { class: "st-tb-group st-tb-left" }, el.phenGroup, h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.dateInfo);
 
   // ---- Toasts and sheets
   let toastTimer = 0;
@@ -606,7 +618,7 @@ async function mountApp(document, root, language, initialMode) {
     const keys = h(document, "ul", { class: "st-help-list" }, ...m.help.shortcuts.map(([key, text]) => h(document, "li", {}, h(document, "span", { class: "kbd", text: key }), " " + text)));
     const notes = h(document, "ul", { class: "st-help-list" }, ...m.help.notes.map((line) => h(document, "li", { text: T(line, { cellLat: trimNumber(size.lat), cellLon: trimNumber(size.lon) }) })));
     const actions = h(document, "div", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.explain }); b.addEventListener("click", explain); return b; })(), (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.help }); b.addEventListener("click", () => speech.say(m.voice.helpText[store.state.tool])); return b; })());
-    return openSheet(m.help.title, [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, actions]);
+    return openSheet(m.help.title, [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, h(document, "p", { class: "small" }, m.credit), h(document, "p", { class: "small" }, h(document, "a", { href: "../atlas.html", text: language === "ar" ? "الأرشيف: أطلس الصوت v1" : "Archive: Sound Atlas v1" })), actions]);
   };
 
   // ---- Inspector (right): value big, unit, location, time, model badge, one-line sound meaning
@@ -627,12 +639,11 @@ async function mountApp(document, root, language, initialMode) {
   el.insCollapse.innerHTML = ICON.chevron;
   el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow, insShare));
   el.handle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand, "data-snap-control": "inspector" });
-  el.inspector = h(document, "aside", { class: "st-inspector st-panel floating", "aria-labelledby": "st-ins-title", hidden: true, "data-snap": "peek" },
-    el.handle, h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insCollapse), el.insBody);
+  el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", hidden: true, "data-snap": "peek" },
+    h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insCollapse), el.insBody);
   el.insCollapse.addEventListener("click", () => { const open = el.insBody.hidden; el.insBody.hidden = !open; el.insCollapse.setAttribute("aria-expanded", String(open)); });
   const snaps = ["peek", "half", "full"];
   const cycleSnap = (panel) => { panel.dataset.snap = snaps[(snaps.indexOf(panel.dataset.snap) + 1) % snaps.length]; };
-  el.handle.addEventListener("click", () => cycleSnap(el.inspector));
   function renderInspector() {
     const cell = state.cursor ?? state.selected;
     const d = cell ? describeCell(cell) : null;
@@ -654,18 +665,17 @@ async function mountApp(document, root, language, initialMode) {
   // ---- Tool rail and flyouts
   const toolDefs = [["explore", "tool"], ["area", "tool"], ["path", "tool"], ["compare", "flyout"], ["hunter", "flyout"], ["echo", "flyout"]];
   const railButtons = {};
-  el.rail = h(document, "nav", { class: "st-rail st-pill floating", "aria-label": m.tabs.label });
+  el.rail = h(document, "nav", { class: "st-tools-group", "aria-label": m.tabs.label });
   for (const [id] of toolDefs) {
-    const b = h(document, "button", { type: "button", class: "icon-btn st-rail-button", "aria-pressed": String(id === "explore"), "aria-label": m.tools[id], "data-tip": m.tools[id], "data-id": id });
+    const b = h(document, "button", { type: "button", class: "icon-btn st-rail-button", "aria-pressed": String(id === "explore"), "aria-label": m.tools[id], "data-tip": m.tools[id], "data-tip-pos": "below", "data-id": id });
     b.innerHTML = ICON[id];
     b.addEventListener("click", () => openTool(id, { focus: true }));
     railButtons[id] = b;
     el.rail.append(b);
   }
-  const helpButton = h(document, "button", { type: "button", class: "icon-btn st-rail-button st-rail-help", "aria-label": m.help.title, "data-tip": m.help.title });
+  const helpButton = h(document, "button", { type: "button", class: "icon-btn st-rail-button st-rail-help", "aria-label": m.help.title, "data-tip": m.help.title, "data-tip-pos": "below" });
   helpButton.innerHTML = ICON.help;
   helpButton.addEventListener("click", openHelp);
-  el.rail.append(helpButton);
   const hunterBox = h(document, "div", { id: "em-panel-hunter", class: "st-flyout-body" });
   const echoBox = h(document, "div", { id: "em-panel-echo", class: "st-flyout-body" });
   state.left = h(document, "div", { hidden: true }, h(document, "div"), h(document, "div"));
@@ -675,8 +685,7 @@ async function mountApp(document, root, language, initialMode) {
   el.flyoutTitle = h(document, "h2", { id: "st-flyout-title", tabindex: "-1" });
   el.flyoutBody = h(document, "div", { class: "st-flyout-content" });
   el.flyoutHandle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand });
-  el.flyout = h(document, "section", { class: "st-flyout st-panel floating", "aria-labelledby": "st-flyout-title", hidden: true, "data-snap": "half" }, el.flyoutHandle, h(document, "div", { class: "st-flyout-head" }, el.flyoutTitle, flyoutClose), el.flyoutBody);
-  el.flyoutHandle.addEventListener("click", () => cycleSnap(el.flyout));
+  el.flyout = h(document, "section", { class: "st-flyout", "aria-labelledby": "st-flyout-title", hidden: true, "data-snap": "half" }, h(document, "div", { class: "st-flyout-head" }, el.flyoutTitle, flyoutClose), el.flyoutBody);
   const introduced = new Set();
   let currentTool = "explore";
   function flyoutNodes(id) {
@@ -705,7 +714,8 @@ async function mountApp(document, root, language, initialMode) {
       el.flyout.dataset.snap = "half";
       if (focus) el.flyoutTitle.focus();
     } else if (focus) railButtons.explore.focus();
-    el.inspector.dataset.hideOnMobile = nodes.length ? "true" : "false";
+    el.rail.dataset.open = "false";
+    if (nodes.length) setSide(true);
     if (storeTool !== TOOLS.EXPLORE && !introduced.has(storeTool) && store.state.soundMode === GUIDED) { introduced.add(storeTool); speak(m.voice.toolIntro[storeTool]); }
     state.tabHooks?.[storeTool]?.();
     invalidate();
@@ -719,7 +729,7 @@ async function mountApp(document, root, language, initialMode) {
   const clusterButton = (label, html, handler) => { const b = h(document, "button", { type: "button", class: "icon-btn", "aria-label": label, "data-tip": label }); b.innerHTML = html; b.addEventListener("click", handler); return b; };
   el.compass.remove();
   el.compassButton = clusterButton(m.compass, ICON.compass, () => setView(initialView()));
-  el.cluster = h(document, "div", { class: "st-cluster st-pill floating", role: "group", "aria-label": c.zoom.label }, clusterButton(c.zoom.in, "+", () => zoomBy(1.5)), clusterButton(c.zoom.out, "−", () => zoomBy(1 / 1.5)), el.compassButton);
+  el.cluster = h(document, "div", { class: "st-cluster", role: "group", "aria-label": c.zoom.label }, clusterButton(c.zoom.in, "+", () => zoomBy(1.5)), clusterButton(c.zoom.out, "−", () => zoomBy(1 / 1.5)), el.compassButton);
   el.timeline = h(document, "div", { class: "st-ticks-row", role: "group", "aria-label": m.date.timeline });
   function renderTimeline() {
     el.timeline.replaceChildren(...phen.seasons.map((season) => h(document, "div", { class: "st-season" }, h(document, "span", { class: "st-season-label", text: m.date.seasons[season.name] }),
@@ -748,7 +758,11 @@ async function mountApp(document, root, language, initialMode) {
     timeTimer = win.setInterval(advance, 1500);
   }
   el.timePlay.addEventListener("click", () => (timeTimer ? stopTime() : startTime()));
-  el.bottom = h(document, "div", { class: "st-bottom floating" }, el.legend, el.timeline, el.timePlay);
+  el.timePop = h(document, "div", { class: "st-timepop", role: "dialog", "aria-label": m.date.timeline, hidden: true }, el.timeline, el.timePlay);
+  function closeTimePop(focus) { if (el.timePop.hidden) return; el.timePop.hidden = true; el.timeButton.setAttribute("aria-expanded", "false"); if (focus) el.timeButton.focus(); }
+  el.timeButton.addEventListener("click", () => { const open = el.timePop.hidden; el.timePop.hidden = !open; el.timeButton.setAttribute("aria-expanded", String(open)); if (open) el.timePop.querySelector('[aria-pressed="true"]')?.focus?.(); });
+  el.timePop.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); closeTimePop(true); } });
+  document.addEventListener("pointerdown", (event) => { if (!el.timePop.hidden && !el.timePop.contains(event.target) && !el.timeButton.contains(event.target)) closeTimePop(false); });
   let waveFrame = win.requestAnimationFrame(function loop() { if (audio.enabled) drawWaveform(el.wave, audio.tap.analyser, { color: "#68e0d0" }); waveFrame = win.requestAnimationFrame(loop); });
   audio.transport.subscribe((snap) => { store.dispatch("SET_AUDIO", { audio: !audio.enabled ? AUDIO.MUTED : snap.status === "playing" ? AUDIO.PLAYING : snap.status === "paused" ? AUDIO.PAUSED : AUDIO.IDLE }); });
 
@@ -759,14 +773,8 @@ async function mountApp(document, root, language, initialMode) {
     for (const hook of state.dataHooks) hook();
     if (state.audio) state.onCursor?.(state.cursor);
   }
-  const initialView = () => {
-    const base = createView(bounds);
-    if (state.width < state.height) return clampView({ ...base, zoom: 3, lon: 12, lat: 30 }, bounds, state.width, state.height);
-    // Edge to edge: the coverage fills the screen (cropped on the long axis, pan to see the rest) instead of leaving empty bands.
-    const lonPpd = state.width / (bounds.east - bounds.west);
-    const latPpd = state.height / (bounds.north - bounds.south);
-    return clampView({ ...base, zoom: Math.max(lonPpd, latPpd) / Math.min(lonPpd, latPpd) }, bounds, state.width, state.height);
-  };
+  const initialView = () => clampView(createView(bounds), bounds, state.width, state.height); // the whole coverage fits (contain)
+
 
   // ---- Phenomenon switch (the dataset changes; position, tool, mode and sound settings stay)
   async function switchPhenomenon(id) {
@@ -808,10 +816,37 @@ async function mountApp(document, root, language, initialMode) {
 
   // ---- Assemble: the map is the page; everything else floats over it
   el.hint = h(document, "p", { class: "visually-hidden", id: "st-map-hint", text: m.help.mapHint });
-  const app = h(document, "div", { class: "st-app" }, el.frame, el.hint, h(document, "div", { class: "st-top" }, topLeft, soundPill), el.lock, el.rail, el.flyout, el.inspector, el.cluster, el.bottom, el.note);
+  el.toolsMenuButton = h(document, "button", { type: "button", class: "button ghost small-button st-tools-open", "aria-expanded": "false", "aria-haspopup": "true", text: m.mobile.tools });
+  el.toolsMenuButton.addEventListener("click", () => { const open = el.rail.dataset.open !== "true"; el.rail.dataset.open = String(open); el.toolsMenuButton.setAttribute("aria-expanded", String(open)); });
+  el.rail.dataset.open = "false";
+  const toolsWrap = h(document, "div", { class: "st-tools-wrap" }, el.toolsMenuButton, el.rail);
+  const toolbar = h(document, "div", { class: "st-toolbar" }, topLeft, h(document, "div", { class: "st-tb-spacer" }), toolsWrap, soundPill, helpButton);
+  const small = win.matchMedia?.("(max-width: 767px)");
+  const placeMore = () => { if (small?.matches) el.rail.append(el.soundMore); else el.soundButton.after(el.soundMore); };
+  small?.addEventListener?.("change", placeMore);
+  placeMore();
+  el.sideToggle = h(document, "button", { type: "button", class: "icon-btn st-side-toggle", "aria-controls": "st-side" });
+  el.sideToggle.innerHTML = ICON.chevron;
+  el.sideHandle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand });
+  el.side = h(document, "aside", { class: "st-side", id: "st-side", "aria-label": m.info.title, "data-snap": "half" }, el.sideHandle, h(document, "div", { class: "st-side-scroll" }, el.inspector, el.flyout));
+  const app = h(document, "div", { class: "st-app" }, toolbar,
+    h(document, "div", { class: "st-body" }, h(document, "div", { class: "st-mapzone" }, el.frame, el.hint, el.legend, el.cluster, el.sideToggle, el.lock, el.note), el.side), el.timePop);
+  function setSide(open) {
+    app.dataset.side = open ? "open" : "closed";
+    el.side.dataset.open = String(open);
+    el.sideToggle.setAttribute("aria-expanded", String(open));
+    const label = open ? m.info.panelHide : m.info.panelShow;
+    el.sideToggle.setAttribute("aria-label", label);
+    el.sideToggle.setAttribute("data-tip", label);
+    app.dataset.snap = el.side.dataset.snap;
+    invalidate();
+  }
+  el.sideToggle.addEventListener("click", () => setSide(el.side.dataset.open !== "true"));
+  el.sideHandle.addEventListener("click", () => { cycleSnap(el.side); app.dataset.snap = el.side.dataset.snap; });
+  setSide(win.innerWidth >= 1280 && win.innerHeight >= 700);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") speech.cancel(); if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); else if (el.rail.dataset.open === "true") { el.rail.dataset.open = "false"; el.toolsMenuButton.focus(); } else if (el.side.dataset.open === "true" && el.side.contains(document.activeElement) && el.flyout.hidden) { setSide(false); el.sideToggle.focus(); } } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
   win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
 
 
