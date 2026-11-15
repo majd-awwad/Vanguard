@@ -135,7 +135,7 @@ export function mountTools(api) {
   speedSelect.addEventListener("change", () => audio.setSpeed(Number(speedSelect.value)));
 
   // ---- M3: area
-  const visibleRect = () => clipToRegion(visibleBounds(state.view, bounds, state.width, state.height), bounds);
+  const visibleRect = () => clipToRegion(visibleBounds(state.view, bounds, api.vw(), api.vh()), bounds);
   function playArea(rect) {
     if (!rect) { el.runState.textContent = c.scan.none; return; }
     const cells = rectCells(grid, rect);

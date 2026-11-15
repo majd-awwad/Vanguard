@@ -54,9 +54,9 @@ test("one layer, one tool: layer chip, tool memory, map card, clustered pins", (
   assert.match(studio, /function renderLayerChip\(\)/);
   assert.match(studio, /function leaveTool\(prev\)/);
   assert.match(studio, /function enterTool\(id\)/);
-  assert.match(studio, /function positionCard\(\)/);
+  assert.ok(studio.includes("function computeInsets()"), "the whole coverage fits the free area");
   assert.match(studio, /st-pin-cluster/);
-  assert.match(studio, /setSide\(nodes\.length > 0\)/, "the side panel exists only for the active tool");
+  assert.ok(studio.includes("setFlyout(nodes.length > 0)"), "the flyout exists only for the active tool");
 });
 
 test("spoiler lock is enforced in the timeline, Compare and Find signals", () => {

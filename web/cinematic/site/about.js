@@ -42,8 +42,10 @@ export function renderAbout(document, root, language, hrefs) {
       h(document, "div", { class: "about-globe", "aria-hidden": "true", style: `background-image:url("${TEXTURE}")` }), svg,
       h(document, "figcaption", {}, badge(document, "decor", c.decorLabel), h(document, "span", { text: c.decorWave }))));
 
+  const FLOW = language === "ar" ? ["بيانات ناسا", "قواعد التحويل", "الصوت"] : ["NASA data", "Mapping rules", "Sound"];
+  const flow = h(document, "ol", { class: "about-flow", "aria-label": FLOW.join(" → ") }, ...FLOW.map((word) => h(document, "li", { text: word })));
   const what = h(document, "section", { class: "panel about-what" }, h(document, "h2", { text: c.what.title }),
-    h(document, "p", { text: c.what.p1 }), h(document, "p", { text: c.what.p2 }),
+    h(document, "p", { text: c.what.p1 }), flow, h(document, "p", { text: c.what.p2 }),
     h(document, "p", {}, h(document, "a", { href: hrefs.science, text: c.what.link + (language === "ar" ? " ←" : " →") })));
   const why = h(document, "section", { class: "panel about-why" }, h(document, "h2", { text: c.why.title }),
     h(document, "p", { text: c.why.p1 }), h(document, "p", { text: c.why.p2 }),

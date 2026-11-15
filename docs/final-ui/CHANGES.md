@@ -38,3 +38,9 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - Find signals: one sentence ("Show the 10 highest Dust values on 2025-04-15"), kinds highest / above threshold / biggest rises / biggest drops (anomaly only explained in the info icon), human rows (rank, value with a bar, coordinates, code small), one header line with an info icon, clustered pins, designed empty / loading / unavailable / error states. Find similar, Area, Path and Compare follow the same pattern.
 - Spoiler lock: dust 2025-08-15 and 2025-08-19 are disabled (lock + tooltip) in the date select, the timeline, Compare and Find signals until Decode is finished or "Show anyway".
 - Fixed a latent bug: a published date comparison (for example dust 15 Apr to 15 Jul) failed to load because its file path was dropped.
+
+## Design restore (third pass)
+- Studio back to the first-pass look (full-bleed map, left icon rail with one flyout, floating compact inspector that collapses to a value pill, sound pill with a live waveform, one slim season row that becomes a date popover below 700 px height and on phones), with every functional fix kept: layer chip, one active tool with cleanup/restore, human result rows, clustered pins, spoiler lock everywhere, designed states.
+- The whole coverage fits the free area (rail, top pills, bottom bar, open flyout, expanded inspector are excluded) on load, resize, compass and layout changes; contain, never cover.
+- Layer cross-fade on date, phenomenon and change-layer switches (skipped under reduced motion).
+- One path through the site: a "next step" band ends Decode (Explore the data), Explore Earth and Science (Open the Sound Studio), About and Settings (Decode). Explore Earth has one selected-cell card and Compare in a drawer. Science and About sections carry icons; About has a data to rules to sound diagram.

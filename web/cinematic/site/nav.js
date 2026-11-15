@@ -12,6 +12,25 @@ export const NAV_ITEMS = Object.freeze([
   { id: "science", path: "pages/science.html" },
   { id: "about", path: "pages/about.html" },
 ]);
+/** The path through the site: Decode, then the data, then the Studio. The Studio itself is the end of the path. */
+export const NEXT_STEPS = Object.freeze({
+  decode: { path: "pages/explore.html", en: ["Explore the data", "You listened and decoded. Now look at the real data, cell by cell."], ar: ["استكشف البيانات", "استمعت وفككت الشيفرة. الآن انظر إلى البيانات الحقيقية خلية بخلية."] },
+  explore: { path: "pages/studio.html", en: ["Open the Sound Studio", "Compare dates, find signals and listen across the whole map."], ar: ["افتح استوديو الصوت", "قارن التواريخ وابحث عن الإشارات واستمع عبر الخريطة كلها."] },
+  science: { path: "pages/studio.html", en: ["Open the Sound Studio", "Now hear these numbers on the map, for dust, rain, temperature and wind."], ar: ["افتح استوديو الصوت", "والآن استمع إلى هذه الأرقام على الخريطة: غبار ومطر وحرارة ورياح."] },
+  about: { path: "index.html", en: ["Start with Decode", "The best way to understand EARTHPULSE is to listen to it."], ar: ["ابدأ بفك الشيفرة", "أفضل طريقة لفهم EARTHPULSE هي أن تستمع إليه."] },
+  settings: { path: "index.html", en: ["Back to Decode", "Your settings are saved on this device."], ar: ["العودة إلى فك الشيفرة", "إعداداتك محفوظة على هذا الجهاز."] },
+});
+
+export function mountNext(document, { language, from = "root", active, host = document.getElementById("site-footer") } = {}) {
+  const step = NEXT_STEPS[active];
+  if (!step) return null;
+  const [label, text] = step[language] ?? step.en;
+  const band = h(document, "section", { class: "next-step", "aria-label": label },
+    h(document, "p", { class: "next-text", text }), h(document, "a", { class: "button next-button", href: hrefFor(step.path, from), text: label + (language === "ar" ? " ←" : " →") }));
+  if (host) host.before(band); else document.body.append(band);
+  return band;
+}
+
 export const SETTINGS_PATH = "pages/settings.html";
 export const ARCHIVE_PATH = "atlas.html";
 
@@ -167,6 +186,6 @@ export function mountNav(document, host, { active, from = "pages", url = documen
   host.classList.add("site-nav");
   host.dataset.variant = variant;
   host.replaceChildren(skip, logo, links, h(document, "div", { class: "site-tools" }, lang, shortLang, gear, menuButton));
-  if (footer) mountFooter(document, { language, from });
+  if (footer) { mountNext(document, { language, from, active }); mountFooter(document, { language, from }); }
   return language;
 }

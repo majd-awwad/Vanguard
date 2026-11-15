@@ -122,7 +122,7 @@ async function mountApp(document, root, language, initialMode) {
   const startSnap = (decoded.snapshotId && !isLocked(phen.id, phen.snapshot(decoded.snapshotId).date, unlocked()) ? phen.snapshot(decoded.snapshotId) : null) ?? firstOpen();
 
   const store = createStore(createAppState({ datasetId: phen.id, variable: phen.spec.measure, soundMode: initialMode, uiLanguage: language, timeRange: { start: startSnap.date, end: startSnap.date } }));
-  const state = { snapshot: startSnap, comparison: null, view: createView(bounds), cursor: null, selected: null, pins: [], tool: "explore", width: 1, height: 1, outside: false, extraOverlay: [], understandExtras: [], onKeyExtra: [], pointerHandlers: [], dataHooks: [] };
+  const state = { snapshot: startSnap, comparison: null, view: createView(bounds), cursor: null, selected: null, pins: [], tool: "explore", width: 1, height: 1, ins: { l: 8, t: 8, r: 8, b: 8 }, outside: false, extraOverlay: [], understandExtras: [], onKeyExtra: [], pointerHandlers: [], dataHooks: [] };
   const el = {};
   const spec = () => phen.spec;
   const layerValues = () => (state.comparison ? state.comparison.values : state.snapshot.values);
@@ -160,12 +160,40 @@ async function mountApp(document, root, language, initialMode) {
     resize();
     applyLayer();
   }
+  const vw = () => Math.max(40, state.width - state.ins.l - state.ins.r);
+  const vh = () => Math.max(40, state.height - state.ins.t - state.ins.b);
+  function computeInsets() {
+    const f = el.frame.getBoundingClientRect();
+    const shown = (node) => node && !node.hidden && win.getComputedStyle(node).display !== "none" && node.getBoundingClientRect().width > 0;
+    const gap = 10;
+    const ins = { l: 8, t: 8, r: 8, b: 8 };
+    const small = win.matchMedia?.("(max-width: 767px)").matches;
+    for (const node of [el.tbLeft, el.soundPill]) if (shown(node)) ins.t = Math.max(ins.t, node.getBoundingClientRect().bottom - f.top + gap);
+    if (small) {
+      if (shown(el.rail)) ins.b = Math.max(ins.b, f.bottom - el.rail.getBoundingClientRect().top + gap);
+      if (shown(el.bottom)) ins.b = Math.max(ins.b, f.bottom - el.bottom.getBoundingClientRect().top + gap);
+    } else {
+      if (shown(el.rail)) ins.l = Math.max(ins.l, el.rail.getBoundingClientRect().right - f.left + gap);
+      if (shown(el.flyout)) ins.l = Math.max(ins.l, el.flyout.getBoundingClientRect().right - f.left + gap);
+      if (shown(el.bottom) && el.bottom.closest(".st-app").dataset.timeline === "bar") ins.b = Math.max(ins.b, f.bottom - el.bottom.getBoundingClientRect().top + gap);
+      if (shown(el.inspector) && el.inspector.dataset.collapsed !== "true") ins.r = Math.max(ins.r, f.right - el.inspector.getBoundingClientRect().left + gap);
+      if (shown(el.cluster)) ins.r = Math.max(ins.r, f.right - el.cluster.getBoundingClientRect().left + gap);
+    }
+    state.ins = ins;
+  }
+  function layoutChanged(animate = true) {
+    if (!renderer || !state.width) return;
+    computeInsets();
+    const fit = state.view.zoom < 1.001;
+    setView(fit ? initialView() : state.view, fit && animate);
+  }
   function resize() {
     const w = Math.max(1, el.frame.clientWidth);
     const hh = Math.max(1, el.frame.clientHeight);
     state.width = w; state.height = hh;
     renderer.resize(w, hh, Math.min(win.devicePixelRatio || 1, 2));
-    state.view = clampView(state.view, bounds, w, hh);
+    computeInsets();
+    state.view = state.view.zoom < 1.001 ? initialView() : clampView(state.view, bounds, vw(), vh());
     invalidate();
   }
   function layerDescription() {
@@ -176,34 +204,52 @@ async function mountApp(document, root, language, initialMode) {
     }
     return { mode: "value", values: layerValues(), normalize: normalizer(s), ramp: rampFromStops(s.stops) };
   }
-  function applyLayer() { renderer.setLayer(layerDescription(), grid); invalidate(); }
+  let layerShown = false;
+  function fadeFrom() {
+    if (!layerShown || reduced() || !state.width) { layerShown = true; return; }
+    const src = el.frame.querySelector("canvas.studio-canvas");
+    if (!src || !src.width) return;
+    try {
+      renderer.render();
+      const copy = document.createElement("canvas");
+      copy.className = "st-fade";
+      copy.width = src.width; copy.height = src.height;
+      copy.getContext("2d").drawImage(src, 0, 0);
+      copy.style.opacity = "1";
+      el.frame.insertBefore(copy, el.overlay);
+      win.requestAnimationFrame(() => win.requestAnimationFrame(() => { copy.style.opacity = "0"; }));
+      win.setTimeout(() => copy.remove(), 500);
+    } catch { /* the cross-fade is decoration only */ }
+  }
+  function applyLayer() { fadeFrom(); renderer.setLayer(layerDescription(), grid); invalidate(); }
   function invalidate() { if (!frameRequest) frameRequest = win.requestAnimationFrame(draw); }
   function draw() {
     frameRequest = 0;
-    renderer.setView(state.view, pixelsPerDegree(state.view, bounds, state.width, state.height), bounds);
+    const centre = toGeo(state.width / 2, state.height / 2);
+    renderer.setView({ ...state.view, lon: centre.lon, lat: centre.lat }, pixelsPerDegree(state.view, bounds, vw(), vh()), bounds);
     renderer.render();
     drawOverlay();
     if (el.inspector) positionCard();
   }
-  const toScreen = (lon, lat) => geoToScreen(state.view, bounds, state.width, state.height, lon, lat);
-  const toGeo = (x, y) => screenToGeo(state.view, bounds, state.width, state.height, x, y);
+  const toScreen = (lon, lat) => { const p = geoToScreen(state.view, bounds, vw(), vh(), lon, lat); return { x: p.x + state.ins.l, y: p.y + state.ins.t }; };
+  const toGeo = (x, y) => screenToGeo(state.view, bounds, vw(), vh(), x - state.ins.l, y - state.ins.t);
   let animation = 0;
   function setView(target, animate = true) {
-    const next = clampView(target, bounds, state.width, state.height);
+    const next = clampView(target, bounds, vw(), vh());
     win.cancelAnimationFrame(animation);
     if (!animate || reduced()) { state.view = next; invalidate(); store.dispatch("SET_CAMERA", { bounds: visibleWindow() }); return; }
     const from = state.view;
     const start = win.performance.now();
     const step = (now) => {
       const t = Math.min(1, (now - start) / 320);
-      state.view = clampView(lerpView(from, next, 1 - (1 - t) ** 3), bounds, state.width, state.height);
+      state.view = clampView(lerpView(from, next, 1 - (1 - t) ** 3), bounds, vw(), vh());
       invalidate();
       if (t < 1) animation = win.requestAnimationFrame(step); else store.dispatch("SET_CAMERA", { bounds: visibleWindow() });
     };
     animation = win.requestAnimationFrame(step);
   }
   const visibleWindow = () => { const a = toGeo(0, 0); const b = toGeo(state.width, state.height); return { west: a.lon, east: b.lon, north: a.lat, south: b.lat }; };
-  const zoomBy = (factor, x, y, animate = true) => setView(zoomAt(state.view, bounds, state.width, state.height, factor, x, y), animate);
+  const zoomBy = (factor, x, y, animate = true) => setView(zoomAt(state.view, bounds, vw(), vh(), factor, (x ?? state.ins.l + vw() / 2) - state.ins.l, (y ?? state.ins.t + vh() / 2) - state.ins.t), animate);
   const svg = (name, attrs) => { const node = document.createElementNS("http://www.w3.org/2000/svg", name); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v)); return node; };
   function hoverTip(p, cell) {
     const tip = el.hoverTip;
@@ -374,6 +420,7 @@ async function mountApp(document, root, language, initialMode) {
     renderInfo();
     invalidate();
     for (const hook of state.selectHooks ?? []) hook(cell, { user });
+    if (user && typeof app !== "undefined" && app.dataset.flyout !== "open" && win.innerHeight >= 700) setInspectorCollapsed(false);
     if (play) soundForCursor(true);
     if (say) guided(readText(cell));
   }
@@ -441,8 +488,8 @@ async function mountApp(document, root, language, initialMode) {
       const before = Math.hypot(pa.x - pb.x, pa.y - pb.y);
       const after = Math.hypot(a.x - b.x, a.y - b.y);
       const centre = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      let view = zoomAt(state.view, bounds, state.width, state.height, before > 0 ? after / before : 1, centre.x, centre.y);
-      view = panBy(view, bounds, state.width, state.height, centre.x - (pa.x + pb.x) / 2, centre.y - (pa.y + pb.y) / 2);
+      let view = zoomAt(state.view, bounds, vw(), vh(), before > 0 ? after / before : 1, centre.x - state.ins.l, centre.y - state.ins.t);
+      view = panBy(view, bounds, vw(), vh(), centre.x - (pa.x + pb.x) / 2, centre.y - (pa.y + pb.y) / 2);
       state.view = view; invalidate();
       return;
     }
@@ -450,7 +497,7 @@ async function mountApp(document, root, language, initialMode) {
     if (!dragging.moved && Math.hypot(p.x - dragging.start.x, p.y - dragging.start.y) < 4) return;
     dragging.moved = true;
     if (el.hoverTip) el.hoverTip.hidden = true;
-    state.view = panBy(state.view, bounds, state.width, state.height, p.x - dragging.last.x, p.y - dragging.last.y);
+    state.view = panBy(state.view, bounds, vw(), vh(), p.x - dragging.last.x, p.y - dragging.last.y);
     dragging.last = p;
     el.frame.dataset.dragging = "true";
     invalidate();
@@ -474,7 +521,7 @@ async function mountApp(document, root, language, initialMode) {
     const p = local(event);
     const now = event.timeStamp;
     const scroll = !event.ctrlKey && event.deltaMode === 0 && (event.deltaX !== 0 || Math.abs(event.deltaY) < 40 || (Math.abs(event.deltaY) < 100 && now < trackpadUntil));
-    if (scroll) { trackpadUntil = now + 120; setView(panBy(state.view, bounds, state.width, state.height, -event.deltaX, -event.deltaY), false); return; }
+    if (scroll) { trackpadUntil = now + 120; setView(panBy(state.view, bounds, vw(), vh(), -event.deltaX, -event.deltaY), false); return; }
     zoomBy(Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : event.ctrlKey ? 0.01 : 0.0016)), p.x, p.y, false);
   }, { passive: false });
   el.frame.style.touchAction = "none";
@@ -506,7 +553,7 @@ async function mountApp(document, root, language, initialMode) {
     const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     if (arrows[event.key]) {
       event.preventDefault();
-      if (event.shiftKey) { const [dr, dc] = arrows[event.key]; setView(panBy(state.view, bounds, state.width, state.height, -dc * 60, -dr * 60), false); return; }
+      if (event.shiftKey) { const [dr, dc] = arrows[event.key]; setView(panBy(state.view, bounds, vw(), vh(), -dc * 60, -dr * 60), false); return; }
       moveCursor(...arrows[event.key]);
       return;
     }
@@ -537,7 +584,8 @@ async function mountApp(document, root, language, initialMode) {
   }
   function renderModeButton() { for (const [mode, b] of Object.entries(modeButtons)) b.setAttribute("aria-pressed", String(mode === store.state.soundMode)); }
   el.soundMore = h(document, "div", { class: "st-sound-more" }, el.modeSeg, el.volume);
-  const soundPill = h(document, "div", { class: "st-tb-group st-sound", role: "group", "aria-label": c.sound.title }, el.soundButton, el.soundMore, el.soundState);
+  const soundPill = h(document, "div", { class: "st-tb-group st-sound", role: "group", "aria-label": c.sound.title }, el.soundButton, el.soundMore, el.wave, el.soundState);
+  el.soundPill = soundPill;
   el.voiceNote = h(document, "p", { class: "small", hidden: true, text: m.voice.unavailable });
   function setSoundMode(mode) {
     store.dispatch("SET_SOUND_MODE", { mode });
@@ -607,7 +655,9 @@ async function mountApp(document, root, language, initialMode) {
     const change = state.cmpSources;
     const sameYear = change && change.a.date.slice(0, 4) === change.b.date.slice(0, 4);
     const full = change ? m.phen.short[phen.id] + " " + m.layer.change + " · " + change.a.date + " → " + change.b.date : m.phen.short[phen.id] + " · " + state.snapshot.date;
-    el.layerText.textContent = change && sameYear ? m.phen.short[phen.id] + " " + m.layer.change + " · " + change.a.date.slice(5) + " → " + change.b.date.slice(5) : full;
+    const name = m.phen.short[phen.id] + (change ? " " + m.layer.change : "") + " · ";
+    const dates = change ? (sameYear ? change.a.date.slice(5) + " → " + change.b.date.slice(5) : change.a.date + " → " + change.b.date) : state.snapshot.date;
+    el.layerText.replaceChildren(name, h(document, "bdi", { dir: "ltr", text: dates }));
     el.layerChip.title = full;
     el.layerClear.hidden = !change;
     el.layerChip.dataset.kind = change ? "change" : "snapshot";
@@ -672,24 +722,34 @@ async function mountApp(document, root, language, initialMode) {
   insHow.addEventListener("click", openComputed);
   el.insCollapse = h(document, "button", { type: "button", class: "icon-btn st-collapse", "aria-expanded": "true", "aria-label": m.info.collapse });
   el.insCollapse.innerHTML = ICON.chevron;
+  el.insPill = h(document, "span", { class: "st-ins-pill" });
   el.insClose = h(document, "button", { type: "button", class: "icon-btn st-collapse st-ins-close", "aria-label": m.mode.close });
   el.insClose.innerHTML = ICON.close;
   el.insClose.addEventListener("click", () => { state.selected = null; renderInspector(); invalidate(); });
   el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow));
   el.handle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand, "data-snap-control": "inspector" });
-  el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", hidden: true, "data-snap": "peek" },
-    h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insCollapse, el.insClose), el.insBody);
-  el.insCollapse.addEventListener("click", () => { const open = el.insBody.hidden; el.insBody.hidden = !open; el.insCollapse.setAttribute("aria-expanded", String(open)); });
+  el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", hidden: true, "data-collapsed": String(win.innerHeight < 700) },
+    h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insPill, el.insCollapse, el.insClose), el.insBody);
+  el.insCollapse.addEventListener("click", () => setInspectorCollapsed(el.inspector.dataset.collapsed !== "true"));
+  function setInspectorCollapsed(collapsed) {
+    el.inspector.dataset.collapsed = String(collapsed);
+    el.insCollapse.setAttribute("aria-expanded", String(!collapsed));
+    el.insCollapse.setAttribute("aria-label", collapsed ? m.info.panelShow : m.info.collapse);
+    layoutChanged();
+  }
   const snaps = ["peek", "half", "full"];
   const cycleSnap = (panel) => { panel.dataset.snap = snaps[(snaps.indexOf(panel.dataset.snap) + 1) % snaps.length]; };
   function renderInspector() {
     const cell = state.selected;
     const d = cell ? describeCell(cell) : null;
+    const wasHidden = el.inspector.hidden;
     el.inspector.hidden = !d;
+    if (wasHidden !== !d) layoutChanged(false);
     if (!d) return;
     el.insId.textContent = d.id;
     el.insValue.textContent = d.value === null ? "—" : d.kind === "change" ? fmtChange(d.value) : fmt(d.value);
     el.insUnit.textContent = d.value === null ? m.info.missing : unitText();
+    el.insPill.textContent = d.value === null ? "—" : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
     const where = T("{lat}, {lon}", { lat: d.lat, lon: d.lon });
     const s = state.snapshot;
     el.insWhere.textContent = where;
@@ -700,26 +760,12 @@ async function mountApp(document, root, language, initialMode) {
     el.handle.setAttribute("aria-label", m.mobile.expand);
     positionCard();
   }
-  function positionCard() {
-    const card = el.inspector;
-    if (card.hidden || !state.selected) return;
-    const r = cellCenter(grid, state.selected.row, state.selected.col);
-    const p = toScreen(r.lon, r.lat);
-    const W = card.offsetWidth;
-    const Hh = card.offsetHeight;
-    const pad = 8;
-    card.style.visibility = p.x > -10 && p.x < state.width + 10 && p.y > -10 && p.y < state.height + 10 ? "visible" : "hidden";
-    let x = p.x + 18;
-    if (x + W > state.width - pad) x = p.x - W - 18;
-    if (x < pad) x = Math.max(pad, Math.min(state.width - W - pad, p.x - W / 2));
-    const y = Math.max(pad, Math.min(state.height - Hh - pad, p.y - 28));
-    card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-  }
+  function positionCard() {}
 
   // ---- Tool rail and flyouts
   const toolDefs = [["explore", "tool"], ["area", "tool"], ["path", "tool"], ["compare", "flyout"], ["hunter", "flyout"], ["echo", "flyout"]];
   const railButtons = {};
-  el.rail = h(document, "nav", { class: "st-tools-group", "aria-label": m.tabs.label });
+  el.rail = h(document, "nav", { class: "st-rail", "aria-label": m.tabs.label });
   for (const [id] of toolDefs) {
     const b = h(document, "button", { type: "button", class: "icon-btn st-rail-button", "aria-pressed": String(id === "explore"), "aria-label": m.tools[id], "data-tip": m.tools[id], "data-tip-pos": "below", "data-id": id });
     b.innerHTML = ICON[id];
@@ -730,6 +776,7 @@ async function mountApp(document, root, language, initialMode) {
   const helpButton = h(document, "button", { type: "button", class: "icon-btn st-rail-button st-rail-help", "aria-label": m.help.title, "data-tip": m.help.title, "data-tip-pos": "below" });
   helpButton.innerHTML = ICON.help;
   helpButton.addEventListener("click", openHelp);
+  el.rail.append(helpButton);
   const hunterBox = h(document, "div", { id: "em-panel-hunter", class: "st-flyout-body" });
   const echoBox = h(document, "div", { id: "em-panel-echo", class: "st-flyout-body" });
   state.left = h(document, "div", { hidden: true }, h(document, "div"), h(document, "div"));
@@ -739,7 +786,8 @@ async function mountApp(document, root, language, initialMode) {
   el.flyoutTitle = h(document, "h2", { id: "st-flyout-title", tabindex: "-1" });
   el.flyoutBody = h(document, "div", { class: "st-flyout-content" });
   el.flyoutHandle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand });
-  el.flyout = h(document, "section", { class: "st-flyout", "aria-labelledby": "st-flyout-title", hidden: true, "data-snap": "half" }, h(document, "div", { class: "st-flyout-head" }, el.flyoutTitle, flyoutClose), el.flyoutBody);
+  el.flyout = h(document, "section", { class: "st-flyout", "aria-labelledby": "st-flyout-title", hidden: true, "data-snap": "half" }, el.flyoutHandle, h(document, "div", { class: "st-flyout-head" }, el.flyoutTitle, flyoutClose), el.flyoutBody);
+  el.flyoutHandle.addEventListener("click", () => cycleSnap(el.flyout));
   const introduced = new Set();
   let currentTool = "explore";
   function flyoutNodes(id) {
@@ -775,7 +823,7 @@ async function mountApp(document, root, language, initialMode) {
     if (previous !== id) leaveTool(previous);
     currentTool = id;
     state.compareActive = id === "compare";
-    el.side.dataset.tool = id;
+    app.dataset.tool = id;
     speech.cancel();
     for (const [key, b] of Object.entries(railButtons)) b.setAttribute("aria-pressed", String(key === id));
     const mapTool = id === "area" || id === "path" ? id : "explore";
@@ -795,9 +843,10 @@ async function mountApp(document, root, language, initialMode) {
       if (focus) el.flyoutTitle.focus();
     } else if (focus) railButtons.explore.focus();
     el.rail.dataset.open = "false";
-    setSide(nodes.length > 0);
-    el.sideToggle.hidden = nodes.length === 0;
+    setFlyout(nodes.length > 0);
+    setInspectorCollapsed(nodes.length > 0 || win.innerHeight < 700);
     if (previous !== id) enterTool(id);
+    layoutChanged();
     if (storeTool !== TOOLS.EXPLORE && !introduced.has(storeTool) && store.state.soundMode === GUIDED) { introduced.add(storeTool); speak(m.voice.toolIntro[storeTool]); }
     state.tabHooks?.[storeTool]?.();
     invalidate();
@@ -820,7 +869,7 @@ async function mountApp(document, root, language, initialMode) {
         const s = phen.snapshot(id);
         const locked = isLocked(phen.id, s.date, unlocked());
         const b = h(document, "button", { type: "button", class: "st-date", "aria-pressed": String(s.id === state.snapshot.id), "aria-label": s.date + (locked ? " (" + m.date.locked + ")" : ""), "data-locked": String(locked), "aria-disabled": locked ? "true" : null, title: locked ? m.date.locked : null, "data-tip": locked ? m.date.locked : null, text: (locked ? "🔒 " : "") + s.date.slice(5) });
-        b.addEventListener("click", () => { if (locked) return; stopTime(); requestDate(s.id); });
+        b.addEventListener("click", () => { stopTime(); requestDate(s.id); });
         return b;
       })))));
   }
@@ -845,7 +894,7 @@ async function mountApp(document, root, language, initialMode) {
   const lockShow = h(document, "button", { type: "button", class: "button ghost small-button", text: m.lock.show });
   lockShow.addEventListener("click", () => { allowSpoilersThisVisit(); api.refreshLocks(); });
   el.lockFoot.append(lockShow, h(document, "a", { class: "button ghost small-button", href: "../" + (language === "ar" ? "?lang=ar" : ""), text: m.lock.decode }));
-  el.timePop = h(document, "div", { class: "st-timepop", role: "dialog", "aria-label": m.date.timeline, hidden: true }, h(document, "div", { class: "st-timepop-row" }, el.timeline, el.timePlay), el.lockFoot);
+  el.timePop = h(document, "div", { class: "st-timepop", role: "dialog", "aria-label": m.date.timeline, hidden: true }, el.lockFoot);
   function closeTimePop(focus) { if (el.timePop.hidden) return; el.timePop.hidden = true; el.timeButton.setAttribute("aria-expanded", "false"); if (focus) el.timeButton.focus(); }
   el.timeButton.addEventListener("click", () => { const open = el.timePop.hidden; el.timePop.hidden = !open; el.timeButton.setAttribute("aria-expanded", String(open)); if (open) el.timePop.querySelector('[aria-pressed="true"]')?.focus?.(); });
   el.timePop.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); closeTimePop(true); } });
@@ -861,7 +910,7 @@ async function mountApp(document, root, language, initialMode) {
     for (const hook of state.dataHooks) hook();
     if (state.audio) state.onCursor?.(state.cursor);
   }
-  const initialView = () => clampView(createView(bounds), bounds, state.width, state.height); // the whole coverage fits (contain)
+  const initialView = () => clampView(createView(bounds), bounds, vw(), vh()); // the whole coverage fits the free area (contain)
 
 
   // ---- Phenomenon switch (the dataset changes; position, tool, mode and sound settings stay)
@@ -905,37 +954,24 @@ async function mountApp(document, root, language, initialMode) {
   // ---- Assemble: the map is the page; everything else floats over it
   el.hint = h(document, "p", { class: "visually-hidden", id: "st-map-hint", text: m.help.mapHint });
   el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
-  el.toolsMenuButton = h(document, "button", { type: "button", class: "button ghost small-button st-tools-open", "aria-expanded": "false", "aria-haspopup": "true", text: m.mobile.tools });
-  el.toolsMenuButton.addEventListener("click", () => { const open = el.rail.dataset.open !== "true"; el.rail.dataset.open = String(open); el.toolsMenuButton.setAttribute("aria-expanded", String(open)); });
-  el.rail.dataset.open = "false";
-  const toolsWrap = h(document, "div", { class: "st-tools-wrap" }, el.toolsMenuButton, el.rail);
-  const toolbar = h(document, "div", { class: "st-toolbar" }, topLeft, h(document, "div", { class: "st-tb-spacer" }), toolsWrap, soundPill, helpButton);
-  const small = win.matchMedia?.("(max-width: 767px)");
-  const placeMore = () => { if (small?.matches) el.rail.append(el.soundMore); else el.soundButton.after(el.soundMore); };
-  small?.addEventListener?.("change", placeMore);
-  placeMore();
-  el.sideToggle = h(document, "button", { type: "button", class: "icon-btn st-side-toggle", "aria-controls": "st-side" });
-  el.sideToggle.innerHTML = ICON.chevron;
-  el.sideHandle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand });
-  el.side = h(document, "aside", { class: "st-side", id: "st-side", "aria-label": m.info.title, "data-snap": "half" }, el.sideHandle, h(document, "div", { class: "st-side-scroll" }, el.flyout));
-  const app = h(document, "div", { class: "st-app" }, toolbar,
-    h(document, "div", { class: "st-body" }, h(document, "div", { class: "st-mapzone" }, el.frame, el.hint, el.legend, el.cluster, el.sideToggle, el.inspector, el.hoverTip, el.lock, el.note), el.side), el.timePop);
-  function setSide(open) {
-    app.dataset.side = open ? "open" : "closed";
-    el.side.dataset.open = String(open);
-    el.sideToggle.setAttribute("aria-expanded", String(open));
-    const label = open ? m.info.panelHide : m.info.panelShow;
-    el.sideToggle.setAttribute("aria-label", label);
-    el.sideToggle.setAttribute("data-tip", label);
-    app.dataset.snap = el.side.dataset.snap;
-    invalidate();
-  }
-  el.sideToggle.addEventListener("click", () => setSide(el.side.dataset.open !== "true"));
-  el.sideHandle.addEventListener("click", () => { cycleSnap(el.side); app.dataset.snap = el.side.dataset.snap; });
-  setSide(false);
+  el.tbLeft = topLeft;
+  el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline, el.timePlay);
+  el.bottom = h(document, "div", { class: "st-bottom" }, el.legend, el.timewrap);
+  const app = h(document, "div", { class: "st-app", "data-flyout": "closed", "data-tool": "explore", "data-timeline": "bar" }, el.frame, el.hint,
+    h(document, "div", { class: "st-top" }, topLeft, soundPill), el.lock, el.rail, el.flyout, el.inspector, el.hoverTip, el.cluster, el.bottom, el.timePop, el.note);
+  function setFlyout(open) { app.dataset.flyout = open ? "open" : "closed"; invalidate(); }
+  const compactTimeline = win.matchMedia?.("(max-height: 699px), (max-width: 767px)");
+  const placeTimeline = () => {
+    const pop = compactTimeline?.matches === true;
+    app.dataset.timeline = pop ? "popover" : "bar";
+    if (pop) el.timePop.prepend(el.timewrap); else { el.bottom.append(el.timewrap); closeTimePop(false); }
+    layoutChanged(false);
+  };
+  compactTimeline?.addEventListener?.("change", placeTimeline);
+  setFlyout(false);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); else if (el.rail.dataset.open === "true") { el.rail.dataset.open = "false"; el.toolsMenuButton.focus(); } else if (el.side.dataset.open === "true" && el.side.contains(document.activeElement) && el.flyout.hidden) { setSide(false); el.sideToggle.focus(); } } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
   win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
 
 
@@ -958,7 +994,7 @@ async function mountApp(document, root, language, initialMode) {
   }
 
   const api = {
-    panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
+    vw, vh, panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
     layerValues, layerKind, applyLayer, onDataChanged, renderInfo, readText, tonesFor, slotFor, setTab, requestDate, switchPhenomenon, sampleName, explain, speak, guided,
     get phen() { return phen; }, get catalog() { return catalog(); }, get list() { return phen.list; }, get renderer() { return renderer; }, phenomenonId: () => phen.id,
     getSnapshot: async (id) => phen.snapshot(id),
@@ -1004,9 +1040,11 @@ async function mountApp(document, root, language, initialMode) {
   mountShare(api);
   mountHunter(api, hunterBox);
   mountEcho(api, echoBox);
+  placeTimeline();
   setView(initialView(), false);
   openTool("explore");
   selectDefaultCell();
+  setInspectorCollapsed(true);
   if (params.has("debug")) win.__studio = api;
   if (initialMode === GUIDED) speak(m.voice.welcome.GUIDED_VOICE);
   return api;

@@ -170,7 +170,17 @@ async function mountExplore(document, root, language) {
   el.selected = h(document, "section", { class: "panel", "aria-labelledby": "xp-sel-title" });
   el.listen = h(document, "section", { class: "panel", "aria-labelledby": "xp-listen-title" });
   el.compare = h(document, "section", { class: "panel", "aria-labelledby": "xp-compare-title" });
-  const right = h(document, "div", { class: "xp-right" }, el.selected, el.listen, el.compare);
+  el.selected.className = "xp-part";
+  el.listen.className = "xp-part";
+  el.compare.className = "xp-compare-body";
+  const drawerClose = h(document, "button", { type: "button", class: "icon-btn", "aria-label": c.compare.title + " ×", text: "×" });
+  const drawer = h(document, "aside", { class: "xp-drawer", id: "xp-compare-drawer", hidden: true, "aria-label": c.compare.title }, h(document, "div", { class: "xp-drawer-head" }, drawerClose), el.compare);
+  const openCompare = h(document, "button", { type: "button", class: "button ghost", "aria-expanded": "false", "aria-controls": "xp-compare-drawer", text: c.compare.title });
+  const setDrawer = (open, focus = false) => { drawer.hidden = !open; openCompare.setAttribute("aria-expanded", String(open)); if (open) drawerClose.focus(); else if (focus) openCompare.focus(); };
+  openCompare.addEventListener("click", () => setDrawer(drawer.hidden));
+  drawerClose.addEventListener("click", () => setDrawer(false, true));
+  drawer.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); setDrawer(false, true); } });
+  const right = h(document, "div", { class: "xp-right" }, h(document, "section", { class: "panel xp-card" }, el.selected, el.listen, openCompare), drawer);
 
   root.replaceChildren(h(document, "div", { class: "xp-layout" }, left, centre, right), h(document, "p", { class: "credit", text: c.credit }));
   if (!scene) stageFallback(); else { scene.setStage(el.stage); scene.setGeography({ caseId: caseData.id, bounds: { ...bounds }, projection: "plate-carree" }); }
