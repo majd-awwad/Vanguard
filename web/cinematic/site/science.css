@@ -81,3 +81,11 @@
   .glance, .related, .references { grid-column: auto; }
   .glance-body { grid-template-columns: 1fr; }
 }
+
+/* How it sounds */
+.sound-how { margin-top: var(--s-4); }
+.sound-how .sound-row { display: grid; grid-template-columns: 9rem minmax(0, 1fr) auto; gap: var(--s-2) var(--s-4); align-items: center; padding: var(--s-3) 0; border-top: 1px solid var(--line); }
+.sound-how .sound-row h3 { font-size: var(--fs-body); }
+.sound-how .sound-row p { margin: 0; }
+.sound-row-actions { display: flex; gap: var(--s-1); flex-wrap: wrap; }
+@media (max-width: 700px) { .sound-how .sound-row { grid-template-columns: 1fr; } }

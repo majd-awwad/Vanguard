@@ -4,6 +4,7 @@ import {
   cellId, cellSize, fill, formatLat, formatLon, formatUtcDate, formatUtcTime, textureCrop, transmission, trimNumber, windowStats,
 } from "./cells.js";
 import { mountNav } from "./nav.js";
+import { howItSounds } from "./science-sound.js";
 import { NATIVE, RAW_SHA256, REFERENCES, scienceCopy } from "./science-copy.js";
 
 export const CASE_ID = "dust-geos-fp-20250819-1930-north-africa-med";
@@ -186,7 +187,7 @@ export function renderScience(document, root, data, language = "en") {
   references.append(list);
 
   const grid = h(document, "div", { class: "science-grid" }, dod, threshold, method, glance, provenance, related, references);
-  root.append(hero, kinds, facts, grid, h(document, "p", { class: "credit", text: c.credit }));
+  root.append(hero, kinds, facts, howItSounds(document, language), grid, h(document, "p", { class: "credit", text: c.credit }));
   return m;
 }
 
