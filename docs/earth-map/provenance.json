@@ -50,26 +50,44 @@
     "qualityFlags": [
       "model output, not a direct observation",
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
-      "native footprints inferred from regular coordinate centres; no explicit datum declaration"
+      "native footprints inferred from regular coordinate centres; no explicit datum declaration",
+      "Publication conflict; Orchestra excludes geos-fp-dust-20241215-1930: collection fingerprint differs from master asset fingerprint; collection byte count differs from master asset byte count",
+      "Publication conflict; Orchestra excludes geos-fp-dust-20250115-1930: collection fingerprint differs from master asset fingerprint; collection byte count differs from master asset byte count"
+    ],
+    "publicationConflicts": [
+      {
+        "id": "geos-fp-dust-20241215-1930",
+        "issues": [
+          "collection fingerprint differs from master asset fingerprint",
+          "collection byte count differs from master asset byte count"
+        ]
+      },
+      {
+        "id": "geos-fp-dust-20250115-1930",
+        "issues": [
+          "collection fingerprint differs from master asset fingerprint",
+          "collection byte count differs from master asset byte count"
+        ]
+      }
     ],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",
       "files": 18,
-      "catalog": "b36d435af33576a7102557820ad74fcd320a5e5d22bace7e8108e46e2c818dea",
+      "catalog": "3094068c7ef557f430e0f77c03ad3da5e9f88218d2a83b5160e012d5cdd32a8b",
       "snapshots": {
         "geos-fp-dust-20241215-1930": "abb3f0111187dd8a47d9ca122afd413824afb5c017c0a4d4fb794cfde4f6bbb8",
-        "geos-fp-dust-20250115-1930": "c229aca0cbe8a6ce15c149aa345a8e8efee3e32f168405bb44b702b245da8f01",
+        "geos-fp-dust-20250115-1930": "3dd6c72a102ed390efd495afc978abe7929ca738614ccff5668e05b4bd9492b4",
         "geos-fp-dust-20250215-1930": "dd734d0ee1f4c8d196c8c68c8b922265589551fa714f4077850909b9be910879",
         "geos-fp-dust-20250315-1930": "24ff07287a902b57f45a00259cc1af57d0e5ad12488cb89c488a51a6ff75bfe1",
         "geos-fp-dust-20250415-1930": "71df0dfd5b5053d57808dc5e855b9f97db7384baa8e565a129a1e77b69208252",
         "geos-fp-dust-20250515-1930": "f38231c5bce58553aae59aa8ea2246f33c4f411874d2c0a3502ce9e29747b19a",
-        "geos-fp-dust-20250615-1930": "f48b666a322b826d837bba07379b22dfa92d445981d7ec5bb2e41d4886a978fe",
-        "geos-fp-dust-20250715-1930": "fa77c71d5643d5d17fdac981b56e1c4da37924a194a25efd65e3961c4e6441cf",
-        "geos-fp-dust-20250815-1930": "b5b3834d19d91ffd313bdfe1c619fdd0334bc45e630fa787e85521ba53142824",
+        "geos-fp-dust-20250615-1930": "ff143d0f072607244b029a9f95ba53d6e04f7338fa6a139576f99d49efc75cf2",
+        "geos-fp-dust-20250715-1930": "fd23d7b29ddc72bb667eb6a311cd516f7ea83730a1855956d9e64bf015d58614",
+        "geos-fp-dust-20250815-1930": "feb3a8b6030bb3b4bd5747a054a3fc4b71f3101d34819d77695e5cbca367289d",
         "geos-fp-dust-20250819-1930": "77bc9aba35819f4aac1b3aab61e035a56ee415455be0610ef6ee583340aa56c1",
         "geos-fp-dust-20250915-1930": "649cdb51c4df1bf7901a919cce43d663b699e74832e1035e4c351abd8d01857f",
-        "geos-fp-dust-20251015-1930": "ac4bc0f3309c6e09eb5c4042a2be004966db3a62aa1c731fe4b63fb26e22db39",
+        "geos-fp-dust-20251015-1930": "3548645a317dfccfb9359159308c3176475fb87deed0f9a9ef73710c23b10786",
         "geos-fp-dust-20251115-1930": "c63890f00309ff58d7dd0ab7014d4296e83bfa63e1b128b3c3afd7255eff8141"
       }
     }
@@ -127,11 +145,12 @@
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
       "native footprints inferred from regular coordinate centres; no explicit datum declaration"
     ],
+    "publicationConflicts": [],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",
       "files": 15,
-      "catalog": "05713ddaab3b7a526faccd69950a2cc0b958fde7f8f40b7a1af2120d345f412b",
+      "catalog": "6561e07702e245e2c22b498eea4956111a5f1fd21e8a94c0331ba62dfe1cc359",
       "snapshots": {
         "geos-fp-rainfall-20241215-1930": "900deeb13d5b4f43345b5b402b79c705477ede249cd432fb997d057aa11b2ef3",
         "geos-fp-rainfall-20250115-1930": "7991cf66bece10af6f5035b0e34deaf94609ece3c5cb21bcbef0f378e822ee91",
@@ -202,11 +221,12 @@
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
       "native footprints inferred from regular coordinate centres; no explicit datum declaration"
     ],
+    "publicationConflicts": [],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",
       "files": 15,
-      "catalog": "d349aea3fc5ee28cd6fee8b4f23699d5a5bf77038f61b6462676a1dd4d9b5730",
+      "catalog": "c7f7ce366afc1d5d0ef009b3ad4b6117d139c8d383f1c9a560969b29828b8615",
       "snapshots": {
         "geos-fp-temperature-20241215-1930": "51f65b8c14332a04dd38a396919e8add7d7daee7ee585121d0f01d0185b63456",
         "geos-fp-temperature-20250115-1930": "3da540755ea12ad4c9f02edd468088b186fa38d3130337573f39aa4d738eaa41",
@@ -277,11 +297,12 @@
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
       "native footprints inferred from regular coordinate centres; no explicit datum declaration"
     ],
+    "publicationConflicts": [],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",
       "files": 15,
-      "catalog": "2fea1d515ae23694965df3da7b4cdcffeffe3cca916dd9f8fde4bf35ab0b48f5",
+      "catalog": "11236ab9b7d7a08ad05152834baa0ed6845e713e520cc2694f824222f0aca8a7",
       "snapshots": {
         "geos-fp-wind-20241215-1930": "f192f08f05f4f7bcdf88eaa0c7a9ad20c4ca931af77175da6756eb665ebcb855",
         "geos-fp-wind-20250115-1930": "0a275618fe370cf8f6d5a566552318f58ae001a7fa89c45a9bbf1d05dff16985",

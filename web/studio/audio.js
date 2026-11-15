@@ -40,7 +40,7 @@ export function createStudioAudio({ volume = 0.72, now = () => performance.now()
     get enabled() { return enabled; },
     get unavailable() { return transport.snapshot().audioUnavailable; },
     /** Must be called from a user gesture (click or key press). */
-    async enable() { enabled = true; lastKey = null; await start(confirmationPlan()); return enabled; },
+    async enable({ confirm = true } = {}) { if (enabled) return true; enabled = true; lastKey = null; if (confirm) await start(confirmationPlan()); return enabled; },
     disable() { enabled = false; clearTimer(timer); timer = null; pending = null; transport.pause(); },
     setVolume(value) { baseVolume = value; applyVolume(); },
     /** Lower the data sound while speech is speaking, then restore it smoothly (never silenced). */

@@ -24,6 +24,7 @@ import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
 import { studioCopy } from "./studio-copy.js";
 import { mountTools } from "./tools.js";
+import { mountOrchestra } from "./orchestra.js";
 import { clampView, createView, geoToScreen, lerpView, panBy, pixelsPerDegree, screenToGeo, zoomAt } from "./view.js";
 
 export const DEFAULT_DATE = "2025-04-15";
@@ -372,6 +373,7 @@ async function mountApp(document, root, language, initialMode) {
   }
   function soundForCursor(force = false) {
     if (!audio.enabled || !state.cursor || state.busy) return;
+    if (api.orchestra?.open) { if (force) api.orchestra.play(); return; }
     const cell = state.cursor;
     if (force) audio.play(planFor(cell)); else audio.hover(cursorKey(), () => planFor(cell));
   }
@@ -381,14 +383,15 @@ async function mountApp(document, root, language, initialMode) {
   };
 
   const setSound = async (on) => {
+    const confirm = !api.orchestra?.open;
     el.soundButton.setAttribute("aria-pressed", String(on));
     const soundLabel = on ? m.sound.disable : m.sound.enable;
     el.soundButton.setAttribute("aria-label", soundLabel);
     el.soundButton.setAttribute("data-tip", soundLabel);
-    if (on) { await audio.enable(); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : m.sound.on; } else { audio.disable(); el.soundState.textContent = m.sound.off; }
+    if (on) { await audio.enable({ confirm }); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : m.sound.on; } else { api.orchestra?.stop(); audio.disable(); el.soundState.textContent = m.sound.off; }
     store.dispatch("SET_AUDIO", { audio: on ? AUDIO.IDLE : AUDIO.MUTED });
     renderInfo();
-    if (on && state.cursor) soundForCursor();
+    if (on && state.cursor && confirm) soundForCursor();
   };
 
   // ---- Pointer, wheel, touch
@@ -688,6 +691,7 @@ async function mountApp(document, root, language, initialMode) {
     return [];
   }
   function openTool(id, { focus = false } = {}) {
+    if (id !== "explore" && api.orchestra?.open) api.orchestra.setOpen(false);
     currentTool = id;
     speech.cancel();
     for (const [key, b] of Object.entries(railButtons)) b.setAttribute("aria-pressed", String(key === id));
@@ -808,7 +812,8 @@ async function mountApp(document, root, language, initialMode) {
 
   // ---- Assemble: the map is the page; everything else floats over it
   el.hint = h(document, "p", { class: "visually-hidden", id: "st-map-hint", text: m.help.mapHint });
-  const app = h(document, "div", { class: "st-app" }, el.frame, el.hint, h(document, "div", { class: "st-top" }, topLeft, soundPill), el.lock, el.rail, el.flyout, el.inspector, el.cluster, el.bottom, el.note);
+  const stage = h(document, "div", { class: "st-stage" }, el.frame, el.hint, h(document, "div", { class: "st-top" }, topLeft, soundPill), el.lock, el.rail, el.flyout, el.inspector, el.cluster, el.bottom, el.note);
+  const app = h(document, "div", { class: "st-app" }, stage);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") speech.cancel(); if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
@@ -883,6 +888,7 @@ async function mountApp(document, root, language, initialMode) {
   setView(initialView(), false);
   openTool("explore");
   selectDefaultCell();
+  mountOrchestra(api, app);
   if (params.has("debug")) win.__studio = api;
   if (initialMode === GUIDED) speak(m.voice.welcome.GUIDED_VOICE);
   return api;

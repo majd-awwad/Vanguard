@@ -26,6 +26,25 @@ export function createTransport({
   let playback = "audio";
   let audioUnavailable = false;
 
+  // Optional buses used by Scientific Orchestra. Legacy plans retain their routing.
+  const channelBuses = new Map();
+  let channelSettings = {};
+  const channelLevel = (id) => {
+    const c = channelSettings[id];
+    const solo = Object.values(channelSettings).some(x => x.enabled && x.solo);
+    return !c || !c.enabled || c.muted || (solo && !c.solo) ? 0 : Math.max(0, Math.min(1, c.gain ?? 1)) / 4;
+  };
+  function channelOutput(id) {
+    if (!id) return master;
+    if (!channelBuses.has(id)) {
+      const bus = context.createGain();
+      bus.gain.value = channelLevel(id);
+      bus.connect(master);
+      channelBuses.set(id, bus);
+    }
+    return channelBuses.get(id);
+  }
+
   function snapshot() {
     const positionS = status === "playing"
       ? Math.min(limit, position + Math.max(0, clock() - origin) * speed) : position;
@@ -59,17 +78,18 @@ export function createTransport({
     for (const event of plan.events) {
       if (!event.tone || event.onsetS >= limit) continue;
       const voices = event.tone.pulses ?? [0];
-      for (const offset of voices) scheduleTone(event.tone, event.onsetS + offset);
+      for (const offset of voices) scheduleTone(event.tone, event.onsetS + offset, event.channelId);
     }
   }
 
-  function scheduleTone(tone, onset) {
+  function scheduleTone(tone, onset, channelId) {
     // Both spatial voice types use their supplied envelope; crackle durationS
     // is per pulse, just like legacy temporal rain plans.
     const { frequencyHz, attackS, releaseS, durationS, gain, waveform = "sine" } = tone;
-    if (onset < position - 1e-9 || onset >= limit) return;
-    const start = origin + (onset - position) / speed;
-    const end = start + Math.min(durationS, limit - onset) / speed;
+    if ((!channelId && onset < position - 1e-9) || onset + durationS <= position || onset >= limit) return;
+    const actualOnset = Math.max(onset, position);
+    const start = origin + (actualOnset - position) / speed;
+    const end = origin + (Math.min(onset + durationS, limit) - position) / speed;
     const span = (end - start) * speed;
     if (span < attackS + releaseS) return;
     const oscillator = context.createOscillator();
@@ -93,18 +113,25 @@ export function createTransport({
     }
     if (panner) {
       envelope.connect(panner);
-      panner.connect(master);
+      panner.connect(channelOutput(channelId));
     } else {
-      envelope.connect(master);
+      envelope.connect(channelOutput(channelId));
     }
+    const scheduled = channelId ? { stop() {
+      const time = context.currentTime;
+      if (envelope.gain.cancelAndHoldAtTime) envelope.gain.cancelAndHoldAtTime(time);
+      else { envelope.gain.cancelScheduledValues(time); envelope.gain.setValueAtTime(envelope.gain.value, time); }
+      envelope.gain.linearRampToValueAtTime(0, time + 0.02);
+      oscillator.stop(time + 0.02);
+    } } : oscillator;
     oscillator.onended = () => {
-      pending.delete(oscillator);
+      pending.delete(scheduled);
       oscillator.disconnect();
       envelope.disconnect();
       panner?.disconnect();
     };
     oscillator.start(start);
-    pending.add(oscillator);
+    pending.add(scheduled);
     oscillator.stop(end);
   }
 
@@ -186,6 +213,8 @@ export function createTransport({
       return () => listeners.delete(listener);
     },
     load(next, start = 0) {
+      channelSettings = next.channels ?? {};
+      for (const [id, bus] of channelBuses) bus.gain.setTargetAtTime(channelLevel(id), context.currentTime, 0.012);
       plan = next;
       revision++;
       seek(start);
@@ -193,6 +222,7 @@ export function createTransport({
     play,
     pause,
     seek,
+    stop() { seek(0); },
     replay(mode = playback) {
       seek(0);
       return play(mode);
@@ -219,6 +249,19 @@ export function createTransport({
       muted = next;
       updateVolume();
       emit();
+    },
+    setChannels(next) {
+      channelSettings = next;
+      if (context) for (const [id, bus] of channelBuses) bus.gain.setTargetAtTime(channelLevel(id), context.currentTime, 0.012);
+    },
+    dispose() {
+      clearSchedule();
+      for (const bus of channelBuses.values()) bus.disconnect();
+      channelBuses.clear();
+      master?.disconnect();
+      context?.close?.();
+      context = undefined; master = undefined; status = "idle";
+      listeners.clear();
     },
   };
 }

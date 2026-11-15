@@ -2,6 +2,7 @@ import { cp, mkdir, copyFile, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { copyPackage } from "./earth-map/copy-package.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const destination = resolve(root, "dist");
@@ -28,6 +29,8 @@ for (const [file, hash] of [
   atlasFiles.set(file, contents);
 }
 
+// Regenerate the browser copy from the audited delivery; never ship stale catalogs.
+await copyPackage();
 await cp(resolve(root, "web"), destination, { recursive: true });
 await mkdir(resolve(destination, "assets/gedi"), { recursive: true });
 await writeFile(resolve(destination, "assets/gedi/sample.json"), sample);

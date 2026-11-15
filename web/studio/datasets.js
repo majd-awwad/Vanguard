@@ -102,11 +102,12 @@ export function browserDigest(win = globalThis) {
   return subtle ? async (bytes) => toHex(await subtle.digest("SHA-256", bytes)) : null;
 }
 
-/** Fetch one package file, normalise CRLF, check sha256 and bytes against the master catalog asset, return parsed JSON. */
-export async function fetchVerified(url, asset, { fetchImpl = fetch, digest = browserDigest() } = {}) {
+/** Fetch and verify one asset. Current packages require exact bytes; legacy callers may normalize CRLF. */
+export async function fetchVerified(url, asset, { fetchImpl = fetch, digest = browserDigest(), exactBytes = false } = {}) {
   const response = await fetchImpl(url);
   if (!response.ok) throw new Error(`Could not load ${asset?.path ?? url} (${response.status})`);
-  const bytes = normalizeLF(new Uint8Array(await response.arrayBuffer()));
+  const raw = new Uint8Array(await response.arrayBuffer());
+  const bytes = exactBytes ? raw : normalizeLF(raw);
   let verified = false;
   if (asset && digest) {
     if (bytes.length !== asset.bytes || (await digest(bytes)) !== asset.sha256) throw new Error(`Integrity check failed for ${asset.path}`);
@@ -137,16 +138,41 @@ export function comparability(a, b) {
 
 export const isLocked = (phenomenon, date, unlocked) => phenomenon === "dust" && DECODE_LOCKED_DATES.includes(date) && !unlocked;
 
+/** Publication declarations are additional checks, never a substitute for real cell/time/unit checks.
+ * Keep a conflicting snapshot inspectable, but exclude it from scientific mixing.
+ * Do not repair publisher JSON or silently excuse a conflicting hash with whitespace normalization.
+ */
+export function validateCatalogEntry(entry, asset, snapshot, groups, { exactBytes = false } = {}) {
+  const issues = [];
+  if (entry.id !== snapshot.id || entry.id !== asset?.id) issues.push("snapshot identifier differs");
+  if (entry.date !== snapshot.time.date || ["start", "end", "center", "kind"].some(key => entry.time?.[key] !== snapshot.time[key])) issues.push("catalog time differs from source snapshot");
+  if (entry.modelSource !== undefined && entry.modelSource !== snapshot.source.modelSource) issues.push("catalog modelSource differs from source snapshot");
+  if (entry.sourceSha256 !== undefined && entry.sourceSha256 !== snapshot.source.sha256) issues.push("source granule fingerprint differs");
+  if (groups !== undefined) {
+    const matches = Array.isArray(groups) ? groups.filter(g => Array.isArray(g?.snapshotIds) && g.snapshotIds.includes(snapshot.id)) : [];
+    if (matches.length !== 1 || matches[0].modelSource !== snapshot.source.modelSource) issues.push("compatibility-group membership differs from source snapshot");
+  } else if (exactBytes) issues.push("compatibility groups are not declared");
+  if (exactBytes) {
+    if (entry.modelSource === undefined) issues.push("catalog modelSource is not declared");
+    if ((entry.sha256_lf ?? entry.sha256) !== asset?.sha256) issues.push("collection fingerprint differs from master asset fingerprint");
+    if (entry.bytes !== asset?.bytes) issues.push("collection byte count differs from master asset byte count");
+    if (entry.downloadStatus !== undefined && entry.downloadStatus !== "verified") issues.push("download status is not verified");
+    if (entry.extractionStatus !== undefined && entry.extractionStatus !== "verified") issues.push("extraction status is not verified");
+  }
+  return { ok: issues.length === 0, issues };
+}
+
 /** Opens the package: master catalog now, phenomena on demand. */
 export async function openPackage({ baseUrl = PACKAGE_URL(), fetchImpl = fetch, digest = browserDigest() } = {}) {
   const base = new URL(baseUrl);
   const master = await (async () => { const r = await fetchImpl(new URL("catalog.json", base)); if (!r.ok) throw new Error("Could not load the master catalog."); return JSON.parse(new TextDecoder().decode(normalizeLF(new Uint8Array(await r.arrayBuffer())))); })();
   if (master.schema !== "earthpulse.json-export/1") throw new TypeError("Unexpected master catalog schema.");
   const assets = new Map(master.assets.map((a) => [a.path, a]));
-  const integrity = { mode: digest ? "sha256" : "unavailable", verified: 0, failed: [] };
+  const exactBytes = master.integrityPolicy?.includes("No newline normalization") === true;
+  const integrity = { mode: digest ? "sha256" : "unavailable", bytePolicy: exactBytes ? "exact" : "legacy-lf-normalized", verified: 0, failed: [], catalogConflicts: [] };
   const opened = new Map();
   const loadJson = async (path) => {
-    try { const { json, verified } = await fetchVerified(new URL(path, base), assets.get(path), { fetchImpl, digest }); if (verified) integrity.verified++; return json; }
+    try { const { json, verified } = await fetchVerified(new URL(path, base), assets.get(path), { fetchImpl, digest, exactBytes }); if (verified) integrity.verified++; return json; }
     catch (error) { integrity.failed.push(path); throw error; }
   };
 
@@ -161,7 +187,11 @@ export async function openPackage({ baseUrl = PACKAGE_URL(), fetchImpl = fetch, 
       catalog.snapshots.forEach((entry, i) => {
         const s = raw[i];
         const measures = validateSnapshot(spec, s);
-        snapshots.set(entry.id, { id: entry.id, phenomenon: id, date: entry.date, time: s.time, source: s.source, warnings: s.warnings ?? [], statistics: s.statistics, visualLink: s.visualLink ?? null, measures, values: measures[spec.measure], variables: s.variables ?? null });
+        const { values: rawValues, ...metadata } = s;
+        const path = entry.path.startsWith(id + "/") ? entry.path : `${id}/${entry.path}`;
+        const catalogValidation = validateCatalogEntry(entry, assets.get(path), s, catalog.compatibilityGroups, { exactBytes });
+        if (!catalogValidation.ok) integrity.catalogConflicts.push({ id: s.id, path, issues: catalogValidation.issues });
+        snapshots.set(entry.id, { id: entry.id, phenomenon: id, date: entry.date, time: s.time, source: s.source, warnings: s.warnings ?? [], statistics: s.statistics, visualLink: s.visualLink ?? null, measures, values: measures[spec.measure], variables: s.variables ?? null, metadata, catalogValidation, integrityVerified: Boolean(digest && assets.has(`${id}/grid.json`) && assets.has(`${id}/catalog.json`) && assets.has(path)) });
       });
       const list = [...snapshots.values()].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
       const groups = new Map();

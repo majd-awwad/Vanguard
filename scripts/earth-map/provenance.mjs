@@ -3,7 +3,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TARGET, toLF, sha256, verifyDirectory } from "./copy-package.mjs";
+import { TARGET, toLF, sha256, verifyDirectory, exactBytePolicy } from "./copy-package.mjs";
+import { validateCatalogEntry } from "../../web/studio/datasets.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 export const REQUIRED_FIELDS = Object.freeze(["datasetId", "phenomenon", "eicVisualizationUrl", "sourceDatasetUrl", "sourceType", "variable", "unit", "timeCoverage", "geoCoverage", "resolution", "sampleCount", "lastVerified", "processingSteps", "missingPolicy", "qualityFlags", "licenseAndCredit", "assetHash"]);
@@ -28,6 +29,11 @@ export function buildManifest({ master, catalogs, snapshots, grids, verifiedAt }
     const catalogAsset = assets.find((a) => a.role === "sampled-seasonal-catalog");
     const dates = list.map((s) => s.time.date ?? s.date).sort();
     const builds = [...new Set(list.map((s) => s.source.modelSource))];
+    const publicationConflicts = catalogs[id].snapshots.flatMap(entry => {
+      const snapshot = list.find(s => s.id === entry.id);
+      const result = validateCatalogEntry(entry, assets.find(a => a.id === entry.id), snapshot, catalogs[id].compatibilityGroups, { exactBytes: exactBytePolicy(master) });
+      return result.ok ? [] : [{ id: entry.id, issues: result.issues }];
+    });
     return {
       datasetId: catalogs[id].id ?? catalogAsset.id,
       phenomenon: id,
@@ -42,7 +48,8 @@ export function buildManifest({ master, catalogs, snapshots, grids, verifiedAt }
       lastVerified: verifiedAt,
       processingSteps: ["Read the GEOS-FP NetCDF granule (SHA-256 recorded)", "Spherical area-weighted mean of the native footprints inside each 1.2 x 1.75 degree cell", "Serialise as JSON with provenance; every file verified against the master catalog sha256", id === "wind" ? "Derive speed and meteorological direction from the aggregated U and V (never averaged directions)" : id === "rainfall" ? "Derive one-hour accumulation = PRECTOT x 3600 s" : id === "temperature" ? "Derive degC = T2M - 273.15" : "No further derivation"],
       missingPolicy: "null means missing; any invalid native overlap makes the target cell missing; missing is never replaced by zero or shown as no change (0 missing cells in this release).",
-      qualityFlags: ["model output, not a direct observation", "different literal model build labels are not comparable (differences and Echo blocked across them)", "native footprints inferred from regular coordinate centres; no explicit datum declaration"],
+      qualityFlags: ["model output, not a direct observation", "different literal model build labels are not comparable (differences and Echo blocked across them)", "native footprints inferred from regular coordinate centres; no explicit datum declaration", ...publicationConflicts.map(c => `Publication conflict; Orchestra excludes ${c.id}: ${c.issues.join("; ")}`)],
+      publicationConflicts,
       licenseAndCredit: "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
       assetHash: { master: "catalog.json", files: assets.length, catalog: catalogAsset.sha256, snapshots: Object.fromEntries(assets.filter((a) => a.role === "snapshot").map((a) => [a.id, a.sha256])) },
     };

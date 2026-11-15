@@ -5,11 +5,9 @@
 //   node scripts/earth-map/copy-package.mjs          copy + verify
 //   node scripts/earth-map/copy-package.mjs --check  verify the existing copy only (writes nothing)
 //
-// Line endings: the master catalog hashes the exact LF bytes of the source files (integrityPolicy). Git on Windows
-// (core.autocrlf=true) checks the package out with CRLF, so the working-tree bytes differ from the published ones.
-// This script reads each file, normalises CRLF to LF (valid for JSON), checks the hash, and writes LF bytes. The copy
-// folder has a .gitattributes (`* -text`) so git never converts it again, and the browser verifier applies the same
-// normalisation.
+// Current publication policy requires exact UTF-8 LF bytes, with no normalization exemption.
+// Source and browser directories are protected from Git line-ending conversion. Older packages
+// with the previous integrityPolicy retain their documented CRLF-to-LF verification path.
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -22,6 +20,7 @@ export const TARGET = resolve(root, "web/assets/earthpulse-json");
 
 export const toLF = (bytes) => Buffer.from(bytes.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
 export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+export const exactBytePolicy = (master) => master.integrityPolicy?.includes("No newline normalization") === true;
 
 /** Verifies every master-catalog asset under `dir`; returns { ok, failures[] }. */
 export async function verifyDirectory(dir) {
@@ -30,7 +29,8 @@ export async function verifyDirectory(dir) {
   let ok = 0;
   for (const asset of master.assets) {
     try {
-      const bytes = toLF(await readFile(resolve(dir, asset.path)));
+      const raw = await readFile(resolve(dir, asset.path));
+      const bytes = exactBytePolicy(master) ? raw : toLF(raw);
       if (sha256(bytes) !== asset.sha256) failures.push(`${asset.path}: sha256 mismatch`);
       else if (bytes.length !== asset.bytes) failures.push(`${asset.path}: byte count ${bytes.length} != ${asset.bytes}`);
       else ok++;
@@ -46,7 +46,8 @@ export async function copyPackage() {
   if (source.failures.length) throw new Error("Source package failed verification:\n" + source.failures.join("\n"));
   const master = JSON.parse(await readFile(resolve(SOURCE, "catalog.json"), "utf8"));
   for (const path of ["catalog.json", ...master.assets.map((a) => a.path)]) {
-    const bytes = toLF(await readFile(resolve(SOURCE, path)));
+    const raw = await readFile(resolve(SOURCE, path));
+    const bytes = exactBytePolicy(master) ? raw : toLF(raw);
     const target = resolve(TARGET, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, bytes);
