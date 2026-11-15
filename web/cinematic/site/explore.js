@@ -1,37 +1,32 @@
-import { heardClass, makeSpatialPlan } from "../../audio/spatial-plan.js";
-import { createTransport } from "../../audio/transport.js";
-import { createDecodePlayback } from "../../decode.js";
-import { createDecodeSession } from "../../experiences/decode/session.js";
-import { loadDecodeCase } from "../../sources/decode/index.js";
+// Explore Earth: the learning page. Dust, Rainfall and Wind from the verified package (the same loaders, scales, sound engine and
+// meaning phrases as the Sound Studio). No levels, no scores, no profiles: when you are ready, Decode is one button away.
 import { drawWaveform } from "../audio-tap.js";
-import { DUST_BREAKPOINTS, levelFor } from "../../studio/ambience-core.js";
+import { DOCUMENTED_BREAKPOINTS, levelFor } from "../../studio/ambience-core.js";
+import { DECODE_LOCKED_DATES, PHENOMENA, isLocked, normalizer, openPackage, rampFromStops } from "../../studio/datasets.js";
+import { lonPan } from "../../studio/mapping.js";
+import { meaningLevel, meaningPhrase } from "../../studio/meaning.js";
 import { createRecordings } from "../../studio/recordings.js";
-import { copy as cinematicCopy } from "../copy.js";
-import { createScene } from "../scene.js";
-import { cellBounds, cellId, cellSize, fillIso, formatLat, formatLon, textureCrop, trimNumber } from "./cells.js";
-import { mountCellGrid } from "./cell-grid.js";
+import { dryNotice, isDryValue } from "../../studio/signal-core.js";
+import { directionFrom } from "../../experiences/levels/aggregate.js";
+import { cellBounds, cellId, formatLat, formatLon, formatUtcDate, textureCrop, trimNumber } from "./cells.js";
 import { h } from "./dom.js";
 import { exploreCopy } from "./explore-copy.js";
 import { mountNav } from "./nav.js";
-import { allowSpoilersThisVisit, spoilersUnlocked } from "./progress.js";
+import { allowSpoilersThisVisit, isDecodeFinished, spoilersUnlocked } from "./progress.js";
 import { loadSettings, saveSettings } from "./settings.js";
-import { scienceModel } from "./science.js";
 
-export const CASE_ID = "dust-geos-fp-20250819-1930-north-africa-med";
+export const PHENOMENA_ORDER = Object.freeze(["dust", "rainfall", "wind"]);
 const TEXTURE = "../assets/earth/blue-marble-4096.jpg";
-export const ZOOM_MIN = 1;
-export const ZOOM_MAX = 1.35;
+const BOUNDS = Object.freeze({ north: 45, south: 15, west: -20, east: 50 });
+const ROWS = 25;
+const COLS = 40;
+const DEFAULT_DATE = { dust: "2025-04-15", rainfall: "2025-08-15", wind: "2025-04-15" };
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const COMPASS_EN = { N: "north", NE: "north-east", E: "east", SE: "south-east", S: "south", SW: "south-west", W: "west", NW: "north-west" };
+const COMPASS_AR = { N: "الشمال", NE: "الشمال الشرقي", E: "الشرق", SE: "الجنوب الشرقي", S: "الجنوب", SW: "الجنوب الغربي", W: "الغرب", NW: "الشمال الغربي" };
+const fill = (text, tokens = {}) => String(text).replace(/\{(\w+)\}/g, (m, key) => (key in tokens ? tokens[key] : m));
 
-/** Cell record from a session snapshot, or undefined. Values exist here only because the session runs in learning mode. */
-export function cellOf(snapshot, row, col) {
-  return snapshot.grid.cells.find((cell) => cell.row === row && cell.col === col);
-}
-
-export function levelMax(snapshot) {
-  return Math.max(0, ...snapshot.grid.cells.map((cell) => (Number.isFinite(cell.value) ? cell.value : 0)));
-}
-
-/** Numerical difference and which cell is higher; pure so it can be tested. */
+/** Numerical difference and which place is higher; pure so it can be tested. */
 export function compareValues(a, b) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return { difference: Math.abs(a - b), higher: a === b ? null : a > b ? "a" : "b" };
@@ -43,52 +38,24 @@ export function startExplore(document = globalThis.document) {
   document.title = c.title + " · EARTHPULSE";
   const root = document.getElementById("explore-root");
   if (spoilersUnlocked()) return mountExplore(document, root, language);
+  const show = h(document, "button", { type: "button", class: "button ghost", text: c.lock.show });
+  show.addEventListener("click", () => { allowSpoilersThisVisit(); mountExplore(document, root, language); });
   root.replaceChildren(h(document, "section", { class: "panel lock", "aria-labelledby": "lock-title" },
-    h(document, "p", { class: "eyebrow", text: c.eyebrow }), h(document, "h1", { id: "lock-title", text: c.lock.title }),
-    h(document, "p", { class: "lede", text: c.lock.text }),
-    h(document, "div", { class: "actions" },
-      h(document, "a", { class: "button", href: "../" + (language === "ar" ? "?lang=ar" : ""), text: c.lock.decode }),
-      (() => { const show = h(document, "button", { type: "button", class: "button ghost", text: c.lock.show }); show.addEventListener("click", () => { allowSpoilersThisVisit(); mountExplore(document, root, language); }); return show; })())));
+    h(document, "p", { class: "eyebrow", text: c.eyebrow }), h(document, "h1", { id: "lock-title", text: c.lock.title }), h(document, "p", { class: "lede", text: c.lock.text }),
+    h(document, "div", { class: "actions" }, h(document, "a", { class: "button", href: "./decode.html", text: c.lock.decode }), show)));
   return Promise.resolve();
 }
 
 async function mountExplore(document, root, language) {
   const c = exploreCopy[language];
   const settings = loadSettings();
-  const body = document.body;
+  const compassName = language === "ar" ? COMPASS_AR : COMPASS_EN;
   root.replaceChildren(h(document, "p", { class: "status", role: "status", text: c.loading }));
-
-  // The 3D Earth: the same scene the Decode page uses, registered to the HTML grid below.
-  let scene = null;
+  let pkg;
+  const phens = {};
   try {
-    scene = createScene({ document });
-    scene.setDirection(language === "ar");
-    body.prepend(scene.canvas);
-    body.classList.add("explore-3d");
-    body.dataset.renderer = "webgl";
-    body.dataset.flight = "hero";
-    scene.onFrame(({ progress, target }) => {
-      const flight = progress !== target ? "flying" : target === 1 ? "done" : "hero";
-      if (body.dataset.flight !== flight) body.dataset.flight = flight;
-    });
-    scene.onLost(() => { body.dataset.renderer = "svg"; body.classList.remove("explore-3d"); scene.canvas.remove(); stageFallback(); });
-  } catch (error) {
-    console.warn("WebGL is unavailable; using the flat map.", error);
-    body.dataset.renderer = "svg";
-  }
-
-  // Listening here plays the user's recordings, chosen by the real value of the cell. The Decode session only keeps the focus and the captions.
-  const rec = createRecordings({ baseUrl: new URL("../../assets/ambient/", import.meta.url), reduced: () => matchMedia?.("(prefers-reduced-motion: reduce)").matches === true });
-  rec.setVolume(settings.volume);
-  const transport = createTransport();
-  const playback = createDecodePlayback(transport);
-  let caseData = null;
-  const session = createDecodeSession({
-    cases: [CASE_ID], makePlan: makeSpatialPlan, heardClass, transport: playback.transport, level: "quick", mode: "learning", condition: "sound",
-    async loadCase(id) { caseData = await loadDecodeCase(id); return caseData; },
-  });
-  try {
-    await session.ready;
+    pkg = await openPackage();
+    for (const id of PHENOMENA_ORDER) phens[id] = await pkg.openPhenomenon(id);
   } catch (error) {
     console.error(error);
     const retry = h(document, "button", { type: "button", class: "button", text: c.retry });
@@ -96,216 +63,245 @@ async function mountExplore(document, root, language) {
     root.replaceChildren(h(document, "p", { class: "status", role: "alert", text: c.error }), retry);
     return;
   }
-  const reachReveal = () => { for (let i = 0; i < 5 && session.getState().phase !== "reveal"; i++) session.dispatch({ type: "next" }); };
-  reachReveal();
-
-  const model = scienceModel(caseData, language);
-  const state = { a: null, b: null, zoom: 1 };
-  const view = () => playback.withActiveCell(session.getState());
+  const rec = createRecordings({ baseUrl: new URL("../../assets/ambient/", import.meta.url), reduced: () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true });
+  rec.setVolume(settings.volume);
+  const state = { id: new URL(document.URL).searchParams.get("phen"), snapshot: null, a: null, b: null, pickingB: false };
+  if (!PHENOMENA_ORDER.includes(state.id)) state.id = "dust";
+  const finished = isDecodeFinished();
+  const phen = () => phens[state.id];
+  const spec = () => PHENOMENA[state.id];
+  const unit = () => c.phen[state.id].unit;
+  const values = () => state.snapshot.values;
+  const fmt = (v) => (v === null || !Number.isFinite(v) ? "—" : String(Number(v.toFixed(spec().decimals))));
+  const locked = (date) => isLocked(state.id, date, finished);
+  const firstOpen = (id) => { const list = phens[id].list; return list.find((s) => s.date === DEFAULT_DATE[id] && !isLocked(id, s.date, finished)) ?? list.find((s) => !isLocked(id, s.date, finished)); };
+  state.snapshot = firstOpen(state.id);
   const el = {};
-  const idOf = ([row, col]) => cellId(row, col);
-  const bounds = caseData.bounds;
+  const centreOf = (index) => ({ lat: BOUNDS.north - ((Math.floor(index / COLS) + 0.5) * 30) / ROWS, lon: BOUNDS.west + (((index % COLS) + 0.5) * 70) / COLS });
+  const idOf = (index) => cellId(Math.floor(index / COLS), index % COLS);
+  const grid = phens.dust.grid;
+  const levelOfValue = (v) => levelFor({ phenomenon: state.id, value: Number.isFinite(v) ? v : null, breakpoints: DOCUMENTED_BREAKPOINTS[state.id] });
 
-  // ---- Left column
-  const features = h(document, "ul", { class: "xp-features" });
-  c.features.forEach(([title, text], index) => features.append(h(document, "li", {}, h(document, "span", { class: "xp-icon", "aria-hidden": "true", text: ["♫", "⌖", "⇄"][index] }), h(document, "div", {}, h(document, "h3", { text: title }), h(document, "p", { text: text })))));
-  const levelPicker = h(document, "fieldset", { class: "level-picker" }, h(document, "legend", { text: c.level }));
-  for (const level of ["quick", "advanced"]) {
-    const input = h(document, "input", { type: "radio", name: "xp-level", id: "xp-level-" + level, value: level, checked: level === "quick" });
-    input.addEventListener("change", () => { transport.pause(); session.dispatch({ type: "set-level", level }); reachReveal(); state.a = state.b = null; buildGrid(); renderAll(); });
-    levelPicker.append(h(document, "label", { for: input.id }, input, h(document, "span", { text: c[level] + " " + caseData.levels[level].rows + "×" + caseData.levels[level].cols })));
-  }
-  const left = h(document, "div", { class: "xp-left" },
-    h(document, "p", { class: "eyebrow", text: c.eyebrow }),
-    h(document, "h1", {}, c.titleLead + " ", h(document, "em", { text: c.titleAccent })),
-    h(document, "p", { class: "lede", text: c.lede }), features,
-    h(document, "section", { class: "panel xp-dataset" }, h(document, "h2", { text: c.dataset.title }),
-      h(document, "dl", { class: "kv" },
-        h(document, "dt", { text: "NASA" }), h(document, "dd", { class: "ltr", text: c.dataset.source }),
-        h(document, "dt", { text: "⌖" }), h(document, "dd", { text: c.dataset.region }),
-        h(document, "dt", { text: "◷" }), h(document, "dd", { text: fillIso(c.dataset.date, model, language) }),
-        h(document, "dt", { text: "▦" }), h(document, "dd", { class: "ltr", text: fillIso(c.dataset.coverage, model, language) }),
-        h(document, "dt", { text: "◌" }), h(document, "dd", { text: fillIso(c.dataset.variable, model, language) })), levelPicker),
-    h(document, "section", { class: "panel xp-dod" }, h(document, "h2", { text: c.dod.title }), h(document, "p", { text: c.dod.text }),
-      h(document, "p", { class: "callout", text: fillIso(c.dod.threshold, model, language) + ". " + c.dod.note })));
+  // ---- left: phenomenon, date, what it is
+  const tabs = h(document, "div", { class: "seg xp-tabs", role: "group", "aria-label": c.tabs.label });
+  const tabButtons = {};
+  for (const id of PHENOMENA_ORDER) { const b = h(document, "button", { type: "button", "aria-pressed": id === state.id, "data-phen": id, text: c.tabs[id] }); b.addEventListener("click", () => switchTo(id)); tabButtons[id] = b; tabs.append(b); }
+  el.date = h(document, "select", { id: "xp-date", "aria-label": c.date.label });
+  el.dry = h(document, "div", { class: "callout", role: "status", hidden: true });
+  el.about = h(document, "section", { class: "panel xp-dataset", "aria-labelledby": "xp-about-title" });
+  el.learn = h(document, "section", { class: "panel xp-learn", "aria-labelledby": "xp-learn-title" });
+  const left = h(document, "div", { class: "xp-left" }, h(document, "p", { class: "eyebrow", text: c.eyebrow }), h(document, "h1", {}, c.titleLead + " ", h(document, "em", { text: c.titleAccent })), h(document, "p", { class: "lede", text: c.lede }),
+    tabs, h(document, "label", { class: "xp-pick", for: "xp-date" }, h(document, "span", { text: c.date.label }), el.date), h(document, "p", { class: "small", text: c.date.note }), el.dry, el.about, el.learn);
 
-  // ---- Centre: stage registered to the globe
-  el.stage = h(document, "div", { class: "xp-stage", dir: "ltr" });
-  el.grid = h(document, "div", { class: "xp-grid" });
-  el.stage.append(el.grid);
-  const crop = textureCrop(bounds);
-  el.stage.style.aspectRatio = String(crop.aspect);
-  function stageFallback() {
-    el.stage.dataset.renderer = "svg";
-    el.stage.style.backgroundImage = `url("${TEXTURE}")`;
-    el.stage.style.backgroundSize = `${crop.sizeX}% ${crop.sizeY}%`;
-    el.stage.style.backgroundPosition = `${crop.posX}% ${crop.posY}%`;
-    el.note.hidden = false;
-  }
-  el.note = h(document, "p", { class: "small xp-fallback", role: "note", hidden: true, text: c.map.fallback });
-  el.caption = h(document, "p", { class: "small xp-particles", text: cinematicCopy[language].caption.dust });
-  const zoomIn = h(document, "button", { type: "button", class: "xp-tool", "aria-label": c.map.zoomIn, text: "+" });
-  const zoomOut = h(document, "button", { type: "button", class: "xp-tool", "aria-label": c.map.zoomOut, text: "−" });
-  const reset = h(document, "button", { type: "button", class: "xp-tool", "aria-label": c.map.reset, text: "⟲" });
-  const setZoom = (value) => { state.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)); el.stage.style.transform = `scale(${state.zoom})`; scene?.canvas && scene.setStage(el.stage); };
-  zoomIn.addEventListener("click", () => setZoom(state.zoom + 0.15));
-  zoomOut.addEventListener("click", () => setZoom(state.zoom - 0.15));
-  reset.addEventListener("click", () => setZoom(1));
+  // ---- centre: the map with the data colours
+  el.stage = h(document, "div", { class: "xp-stage xp-live-stage", dir: "ltr", "data-renderer": "svg" });
+  const crop = textureCrop(BOUNDS);
+  Object.assign(el.stage.style, { aspectRatio: String(crop.aspect), backgroundImage: `url("${TEXTURE}")`, backgroundSize: `${crop.sizeX}% ${crop.sizeY}%`, backgroundPosition: `${crop.posX}% ${crop.posY}%` });
+  el.canvas = h(document, "canvas", { class: "xp-map-canvas", tabindex: 0, role: "application", "aria-roledescription": "map", "aria-label": c.map.label, "aria-describedby": "xp-help" });
+  el.stage.append(el.canvas);
+  el.hover = h(document, "p", { class: "xp-hover small", "aria-hidden": "true" });
+  el.legend = h(document, "div", { class: "xp-legend panel" });
+  el.reading = h(document, "p", { class: "visually-hidden", role: "status", "aria-live": "polite" });
   const compass = h(document, "div", { class: "xp-compass", role: "img", "aria-label": c.map.compass }, h(document, "span", { "aria-hidden": "true", text: c.map.north }), h(document, "span", { class: "needle", "aria-hidden": "true", text: "↑" }));
-  const centre = h(document, "section", { class: "xp-centre", "aria-label": c.title },
-    h(document, "div", { class: "xp-stage-box" }, el.stage, h(document, "div", { class: "xp-tools", dir: "ltr" }, zoomIn, zoomOut, reset), compass),
-    h(document, "p", { class: "small", id: "xp-help", text: c.map.help }), el.note, el.caption,
-    h(document, "div", { class: "xp-scale panel" }, h(document, "h3", { id: "xp-scale-title", text: c.scale.title }), (el.scale = h(document, "div", {}))));
+  const centre = h(document, "section", { class: "xp-centre", "aria-label": c.title }, h(document, "div", { class: "xp-stage-box" }, el.stage, compass), el.hover, h(document, "p", { class: "small", id: "xp-help", text: c.map.help }), el.legend, el.reading);
 
-  function describe(row, col) {
-    const b = cellBounds(bounds, caseData.levels[view().level], row, col);
-    return c.map.cell.replace("{id}", cellId(row, col)).replace("{lat}", formatLat(b.north) + " – " + formatLat(b.south)).replace("{lon}", formatLon(b.west) + " – " + formatLon(b.east));
-  }
-  let gridApi;
-  function buildGrid() {
-    const snap = view();
-    gridApi = mountCellGrid(document, el.grid, { rows: snap.grid.rows, cols: snap.grid.cols, label: c.map.label, describe, onChoose: choose, helpId: "xp-help" });
-    gridApi.setSelected(state);
-  }
-
-  // ---- Right column
-  el.selected = h(document, "section", { class: "panel", "aria-labelledby": "xp-sel-title" });
-  el.listen = h(document, "section", { class: "panel", "aria-labelledby": "xp-listen-title" });
-  el.compare = h(document, "section", { class: "panel", "aria-labelledby": "xp-compare-title" });
-  el.selected.className = "xp-part";
-  el.listen.className = "xp-part";
-  el.compare.className = "xp-compare-body";
-  const drawerClose = h(document, "button", { type: "button", class: "icon-btn", "aria-label": c.compare.title + " ×", text: "×" });
-  const drawer = h(document, "aside", { class: "xp-drawer", id: "xp-compare-drawer", hidden: true, "aria-label": c.compare.title }, h(document, "div", { class: "xp-drawer-head" }, drawerClose), el.compare);
-  const openCompare = h(document, "button", { type: "button", class: "button ghost", "aria-expanded": "false", "aria-controls": "xp-compare-drawer", text: c.compare.title });
-  const setDrawer = (open, focus = false) => { drawer.hidden = !open; openCompare.setAttribute("aria-expanded", String(open)); if (open) drawerClose.focus(); else if (focus) openCompare.focus(); };
-  openCompare.addEventListener("click", () => setDrawer(drawer.hidden));
-  drawerClose.addEventListener("click", () => setDrawer(false, true));
-  drawer.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); setDrawer(false, true); } });
-  const right = h(document, "div", { class: "xp-right" }, h(document, "section", { class: "panel xp-card" }, el.selected, el.listen, openCompare), drawer);
-
+  // ---- right: selected place, listen, compare, call to action
+  el.selected = h(document, "section", { class: "xp-part", "aria-labelledby": "xp-sel-title" });
+  el.listen = h(document, "section", { class: "xp-part", "aria-labelledby": "xp-listen-title" });
+  el.compare = h(document, "section", { class: "xp-part", "aria-labelledby": "xp-compare-title" });
+  const cta = h(document, "section", { class: "panel xp-cta", "aria-labelledby": "xp-cta-title" }, h(document, "h2", { id: "xp-cta-title", text: c.cta.title }), h(document, "p", { text: c.cta.text }), h(document, "a", { class: "button", href: "./decode.html", text: c.cta.button }));
+  const right = h(document, "div", { class: "xp-right" }, h(document, "section", { class: "panel xp-card" }, el.selected, el.listen, el.compare), cta);
   root.replaceChildren(h(document, "div", { class: "xp-layout" }, left, centre, right), h(document, "p", { class: "credit", text: c.credit }));
-  if (!scene) stageFallback(); else { scene.setStage(el.stage); scene.setGeography({ caseId: caseData.id, bounds: { ...bounds }, projection: "plate-carree" }); }
 
-  // ---- Listen panel (built once; state text updates on transport ticks)
+  // ---- colours
+  let ramp = null;
+  let norm = null;
+  const rgbOf = (value) => { const t = Math.round(norm(value) * 255); return [ramp[t * 4], ramp[t * 4 + 1], ramp[t * 4 + 2]]; };
+  function draw() {
+    const w = el.stage.clientWidth || 640;
+    const hgt = el.stage.clientHeight || Math.round(w / crop.aspect);
+    const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+    el.canvas.width = Math.round(w * dpr); el.canvas.height = Math.round(hgt * dpr);
+    const ctx = el.canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, hgt);
+    const cw = w / COLS, ch = hgt / ROWS;
+    const v = values();
+    for (let i = 0; i < ROWS * COLS; i++) {
+      const value = v[i];
+      const x = (i % COLS) * cw, y = Math.floor(i / COLS) * ch;
+      if (!Number.isFinite(value)) { ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x, y, cw + 0.5, ch + 0.5); continue; }
+      const dry = isDryValue(state.id, value);
+      const [r, g, b] = rgbOf(value);
+      ctx.fillStyle = `rgba(${r},${g},${b},${dry ? 0.18 : 0.8})`;
+      ctx.fillRect(x, y, cw + 0.5, ch + 0.5);
+    }
+    const outline = (index, colour) => { if (index === null) return; ctx.lineWidth = 3; ctx.strokeStyle = colour; ctx.strokeRect((index % COLS) * cw + 1.5, Math.floor(index / COLS) * ch + 1.5, cw - 3, ch - 3); };
+    outline(state.b, "#ffcb86"); outline(state.a, "#68e0d0");
+  }
+
+  // ---- renderers
+  function renderLegend() {
+    const s = spec();
+    const stops = s.stops.map(([t, rgb]) => `rgb(${rgb.join(",")}) ${(t * 100).toFixed(1)}%`).join(",");
+    const ticks = s.ticks.map((v) => h(document, "span", { class: "tick ltr", style: `left:${norm(v) * 100}%`, text: String(v) }));
+    el.legend.replaceChildren(h(document, "p", { class: "st-legend-title", text: fill(c.map.legend, { unit: unit() }) }), h(document, "div", { class: "xp-bar-scale", style: `background:linear-gradient(90deg,${stops})`, "aria-hidden": "true" }), h(document, "div", { class: "xp-ticks ltr", "aria-hidden": "true" }, ...ticks),
+      h(document, "p", { class: "small ltr", "aria-hidden": "true", text: `${s.min} … ${s.max} ${unit()}` }));
+  }
+  function renderAbout() {
+    const p = c.phen[state.id];
+    const s = state.snapshot;
+    el.about.replaceChildren(h(document, "h2", { id: "xp-about-title", text: c.dataset.title }), h(document, "dl", { class: "kv" },
+      h(document, "dt", { text: c.dataset.source }), h(document, "dd", { class: "ltr", text: c.dataset.sourceValue }), h(document, "dt", { text: c.dataset.region }), h(document, "dd", { text: c.dataset.regionValue }),
+      h(document, "dt", { text: c.dataset.cells }), h(document, "dd", { text: c.dataset.cellsValue }), h(document, "dt", { text: c.dataset.variable }), h(document, "dd", { class: "ltr", text: p.variable }),
+      h(document, "dt", { text: c.dataset.unit }), h(document, "dd", { text: p.unit }), h(document, "dt", { text: c.dataset.window }), h(document, "dd", { text: p.window + " · " + formatUtcDate(s.time.start, language) })));
+    el.learn.replaceChildren(h(document, "h2", { id: "xp-learn-title", text: p.name }),
+      h(document, "h3", { text: language === "ar" ? "ما هو؟" : "What it is" }), h(document, "p", { text: p.what }),
+      h(document, "h3", { text: language === "ar" ? "ماذا تعني القيم العالية والمنخفضة؟" : "What high and low mean" }), h(document, "p", { text: p.highLow }),
+      h(document, "h3", { text: language === "ar" ? "لماذا تختلف المناطق؟" : "Why regions differ" }), h(document, "p", { text: p.why }),
+      h(document, "h3", { text: language === "ar" ? "كيف يُحوَّل إلى صوت؟" : "How it sounds" }), h(document, "p", { text: p.sound }));
+  }
+  function renderDates() {
+    el.date.replaceChildren();
+    for (const s of phen().list) {
+      const lock = locked(s.date);
+      el.date.append(h(document, "option", { value: s.id, disabled: lock, selected: s.id === state.snapshot.id, text: formatUtcDate(s.time.start, language) + (lock ? " — " + c.date.locked : "") }));
+    }
+  }
+  function renderDry() {
+    const notice = dryNotice({ phenomenon: state.id, list: phen().list, currentId: state.snapshot.id, exclude: finished ? [] : DECODE_LOCKED_DATES.filter(() => state.id === "dust") });
+    el.dry.hidden = !notice;
+    if (!notice) return;
+    const words = c.dry[state.id];
+    const buttons = notice.suggestions.map((s) => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: fill(words.pick, { date: formatUtcDate(phen().snapshot(s.id).time.start, language), n: Math.round(s.share * 100) }) }); b.addEventListener("click", () => setDate(s.id)); return b; });
+    el.dry.replaceChildren(h(document, "p", { text: words.notice }), h(document, "div", { class: "actions" }, ...buttons));
+  }
+  const readingOf = (index) => {
+    const v = values()[index];
+    const mean = meaningPhrase({ phenomenon: state.id, value: Number.isFinite(v) ? v : null, language });
+    const center = centreOf(index);
+    return [mean, Number.isFinite(v) ? fmt(v) + " " + unit() : null, `${formatLat(Math.round(center.lat * 10) / 10)}, ${formatLon(Math.round(center.lon * 10) / 10)}`].filter(Boolean).join(". ") + ".";
+  };
+  function windFrom(index) {
+    const s = state.snapshot;
+    return directionFrom(s.measures.uMps[index], s.measures.vMps[index]);
+  }
+  function badge(index) {
+    const v = values()[index];
+    const level = meaningLevel({ phenomenon: state.id, value: Number.isFinite(v) ? v : null });
+    return h(document, "p", { class: "xp-badge", dir: "auto", "data-level": level, "data-kind": state.id, text: meaningPhrase({ phenomenon: state.id, value: Number.isFinite(v) ? v : null, language }) });
+  }
+  function renderSelected() {
+    const parts = [h(document, "h2", { id: "xp-sel-title", text: c.selected.title })];
+    if (state.a === null) parts.push(h(document, "p", { text: c.selected.none }));
+    else {
+      const i = state.a;
+      const v = values()[i];
+      const b = cellBounds(BOUNDS, { rows: ROWS, cols: COLS }, Math.floor(i / COLS), i % COLS);
+      const level = levelOfValue(v);
+      const dir = state.id === "wind" && Number.isFinite(v) ? windFrom(i) : undefined;
+      parts.push(h(document, "div", { class: "xp-cell-head" }, h(document, "span", { class: "xp-cell-id", text: idOf(i) }), badge(i)),
+        h(document, "dl", { class: "kv" }, h(document, "dt", { text: c.selected.value }), h(document, "dd", { class: "ltr xp-value", text: Number.isFinite(v) ? fmt(v) + " " + unit() : c.selected.missing }),
+          h(document, "dt", { text: c.selected.where }), h(document, "dd", { class: "ltr", text: `${formatLat(b.south)} – ${formatLat(b.north)}, ${formatLon(b.west)} – ${formatLon(b.east)}` }),
+          h(document, "dt", { text: c.selected.when }), h(document, "dd", { text: formatUtcDate(state.snapshot.time.start, language) })),
+        h(document, "p", { class: "small", text: !Number.isFinite(v) ? "" : level ? fill(c.selected.sound, { level: c.levelWord[level] }) : c.selected.silent }),
+        dir !== undefined ? h(document, "p", { class: "small", text: dir === null ? c.selected.calm : fill(c.selected.dir, { dir: compassName[COMPASS[Math.round(dir / 45) % 8]], deg: Math.round(dir) }) }) : null);
+    }
+    el.selected.replaceChildren(...parts.filter(Boolean));
+  }
+  function renderCompare() {
+    const parts = [h(document, "h2", { id: "xp-compare-title", text: c.compare.title })];
+    const pick = h(document, "button", { type: "button", class: "button ghost", "aria-pressed": state.pickingB, text: state.pickingB ? c.compare.picking : c.compare.pick });
+    pick.disabled = state.a === null;
+    pick.addEventListener("click", () => { state.pickingB = !state.pickingB; renderCompare(); });
+    const clear = h(document, "button", { type: "button", class: "button ghost", text: c.compare.clear });
+    clear.hidden = state.b === null;
+    clear.addEventListener("click", () => { state.b = null; state.pickingB = false; renderCompare(); draw(); });
+    const hear = h(document, "button", { type: "button", class: "button", text: c.compare.hear });
+    hear.disabled = state.a === null || state.b === null;
+    hear.addEventListener("click", () => { hearCell(state.a, 1.4); clearTimeout(second); second = setTimeout(() => hearCell(state.b, 1.4), 1900); });
+    parts.push(h(document, "div", { class: "player-buttons" }, pick, clear, hear));
+    if (state.a !== null && state.b !== null) {
+      const va = values()[state.a], vb = values()[state.b];
+      const result = compareValues(va, vb);
+      const max = Math.max(...[va, vb].filter(Number.isFinite), 1e-9);
+      const bar = (index, value, tag) => h(document, "div", { class: "xp-bar-row" }, h(document, "span", { class: "ltr", text: tag + " · " + idOf(index) }), h(document, "div", { class: "xp-bar-track", "aria-hidden": "true" }, h(document, "div", { class: "xp-bar", style: `width:${Number.isFinite(value) ? Math.max(2, (value / max) * 100) : 0}%` })), h(document, "span", { class: "ltr", text: fmt(value) }));
+      parts.push(h(document, "div", { class: "xp-chart", role: "img", "aria-label": `${c.compare.chart}: ${idOf(state.a)} ${fmt(va)}, ${idOf(state.b)} ${fmt(vb)}` }, bar(state.a, va, c.compare.a), bar(state.b, vb, c.compare.b)));
+      if (result) parts.push(h(document, "p", { class: "xp-diff" }, h(document, "span", { text: c.compare.diff + ": " }), h(document, "strong", { class: "ltr", text: trimNumber(result.difference, spec().decimals) + " " + unit() }), " · " + (result.higher ? fill(c.compare.higher, { id: idOf(result.higher === "a" ? state.a : state.b) }) : c.compare.equal)));
+      else parts.push(h(document, "p", { class: "small", text: c.selected.missing }));
+      parts.push(h(document, "p", { class: "small", text: fill(c.compare.unit, { unit: unit() }) }));
+    } else parts.push(h(document, "p", { class: "small", text: c.compare.needBoth }));
+    el.compare.replaceChildren(...parts);
+  }
+  let second = 0;
+  function hearCell(index, seconds = 1.8) {
+    const v = values()[index];
+    const level = levelOfValue(v);
+    const center = centreOf(index);
+    rec.unlock().then(() => rec.preview(phen().id, level, lonPan(grid, center.lon), seconds)).catch(() => {});
+    el.state.textContent = level ? c.listen.playing : c.listen.ready;
+    return level;
+  }
+  // ---- listen panel (built once)
   el.state = h(document, "span", { class: "player-state", role: "status" });
-  el.cellLabel = h(document, "span", { class: "player-cell" });
   const play = h(document, "button", { type: "button", class: "button", text: c.listen.play });
   const stop = h(document, "button", { type: "button", class: "button ghost", text: c.listen.stop });
   el.volume = h(document, "input", { type: "range", min: 0, max: 100, step: 1, id: "xp-volume", value: Math.round(settings.volume * 100) });
   el.wave = h(document, "canvas", { width: 480, height: 80, role: "img", "aria-label": c.listen.wave });
-  el.caption2 = h(document, "p", { class: "captions", role: "status", "aria-live": "polite" });
-  el.caption2.classList.toggle("visually-hidden", !settings.captions);
-  el.listenNote = h(document, "p", { class: "small" });
-  el.listen.append(h(document, "h2", { id: "xp-listen-title", text: c.listen.title }), h(document, "div", { class: "player-line" }, el.cellLabel, el.state),
-    h(document, "div", { class: "player-buttons" }, play, stop), h(document, "label", { class: "volume", for: "xp-volume" }, h(document, "span", { text: c.listen.volume }), el.volume), el.wave, el.listenNote, el.caption2);
-  play.addEventListener("click", () => { if (!state.a) { el.caption2.textContent = c.listen.needCell; return; } hearCell(state.a[0], state.a[1]); el.caption2.textContent = fillIso(c.captions.playing, { id: idOf(state.a) }, language); });
-  stop.addEventListener("click", () => { rec.stop(); clearTimeout(second); el.state.textContent = c.listen.states.paused; el.caption2.textContent = c.captions.stopped; });
+  el.listen.append(h(document, "h2", { id: "xp-listen-title", text: c.listen.title }), h(document, "div", { class: "player-line" }, el.state), h(document, "div", { class: "player-buttons" }, play, stop),
+    h(document, "label", { class: "volume", for: "xp-volume" }, h(document, "span", { text: c.listen.volume }), el.volume), el.wave, h(document, "p", { class: "small", text: c.listen.note + " " + c.listen.pan }));
+  play.addEventListener("click", () => { if (state.a === null) { el.state.textContent = c.listen.needCell; return; } hearCell(state.a); });
+  stop.addEventListener("click", () => { rec.stop(); clearTimeout(second); el.state.textContent = c.listen.stopped; });
   el.volume.addEventListener("input", () => { const value = Number(el.volume.value) / 100; rec.setVolume(value); saveSettings({ volume: value }); });
-  const panOfCell = (row, col) => { const b = cellBounds(bounds, caseData.levels[view().level], row, col); const lon = (b.west + b.east) / 2; return Math.max(-1, Math.min(1, (2 * (lon - bounds.west)) / (bounds.east - bounds.west) - 1)); };
-  let second = 0;
-  function hearCell(row, col, seconds = 1.8) {
-    const value = cellOf(view(), row, col)?.value;
-    const level = levelFor({ phenomenon: "dust", value: Number.isFinite(value) ? value : null, breakpoints: DUST_BREAKPOINTS });
-    rec.unlock().then(() => rec.preview("dust", level, panOfCell(row, col), seconds));
-    el.state.textContent = level ? c.listen.states.playing : c.listen.states.idle;
-    return level;
+
+  // ---- interaction
+  function select(index, { hear = true } = {}) {
+    if (state.pickingB && state.a !== null && index !== state.a) { state.b = index; state.pickingB = false; } else { state.a = index; if (state.b === index) state.b = null; }
+    el.reading.textContent = readingOf(index);
+    if (hear) hearCell(index);
+    renderSelected(); renderCompare(); draw();
   }
-  el.listenLabel = h(document, "small", { class: "st-sound-note", text: language === "ar" ? "الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية." : "Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative." });
-  el.listen.append(el.listenLabel);
-
-  function choose(row, col) {
-    state.a = [row, col];
-    if (state.b && state.b[0] === row && state.b[1] === col) state.b = null;
-    session.dispatch({ type: "focus", row, col });
-    hearCell(row, col);
-    el.caption2.textContent = fillIso(c.captions.playing, { id: idOf(state.a) }, language);
-    gridApi.setSelected(state);
-    gridApi.focusCell(row, col);
-    renderPanels();
-  }
-
-  // ---- Panels that depend on the selection
-  function renderPanels() {
-    const snap = view();
-    const threshold = caseData.levels[snap.level].truth.threshold;
-    const tokens = { threshold: trimNumber(threshold, 4) };
-    // Selected cell
-    const parts = [h(document, "h2", { id: "xp-sel-title", text: c.selected.title })];
-    if (!state.a) parts.push(h(document, "p", { text: c.selected.none }));
-    else {
-      const [row, col] = state.a;
-      const record = cellOf(snap, row, col);
-      const b = cellBounds(bounds, caseData.levels[snap.level], row, col);
-      const size = cellSize(bounds, caseData.levels[snap.level]);
-      const measured = record?.status === "measured";
-      parts.push(
-        h(document, "div", { class: "xp-cell-head" }, h(document, "span", { class: "xp-cell-id", text: idOf(state.a) }), h(document, "span", { class: "badge badge-data", text: record?.status === "measured" ? c.selected.above.replace("{threshold}", tokens.threshold) : c.selected.below.replace("{threshold}", tokens.threshold) })),
-        h(document, "dl", { class: "kv" },
-          h(document, "dt", { text: c.selected.value }), h(document, "dd", { class: "ltr xp-value", text: Number.isFinite(record?.value) ? trimNumber(record.value, 3) : c.selected.missing }),
-          h(document, "dt", { text: c.selected.cellSize }), h(document, "dd", { class: "ltr", text: c.selected.size.replace("{lat}", trimNumber(size.lat)).replace("{lon}", trimNumber(size.lon)) }),
-          h(document, "dt", { text: "⌖" }), h(document, "dd", { class: "ltr", text: fillIso(c.selected.bounds, { south: formatLat(b.south), north: formatLat(b.north), west: formatLon(b.west), east: formatLon(b.east) }, language) })),
-        h(document, "p", { class: "callout", text: measured ? c.selected.aboveText : c.selected.belowText }));
-    }
-    el.selected.replaceChildren(...parts);
-    el.cellLabel.textContent = state.a ? idOf(state.a) : "—";
-    el.listenNote.textContent = state.a ? (cellOf(snap, ...state.a)?.status === "measured" ? c.listen.from : c.listen.silentCell) : c.listen.needCell;
-
-    // Compare
-    const cmp = [h(document, "h2", { id: "xp-compare-title", text: c.compare.title })];
-    const select = h(document, "select", { id: "xp-other", "aria-label": c.compare.other });
-    select.append(h(document, "option", { value: "", text: c.compare.choose }));
-    for (const cell of snap.grid.cells) {
-      if (state.a && cell.row === state.a[0] && cell.col === state.a[1]) continue;
-      select.append(h(document, "option", { value: cell.row + "," + cell.col, text: cellId(cell.row, cell.col), selected: state.b && state.b[0] === cell.row && state.b[1] === cell.col }));
-    }
-    select.disabled = !state.a;
-    select.addEventListener("change", () => { state.b = select.value ? select.value.split(",").map(Number) : null; gridApi.setSelected(state); renderPanels(); select.focus?.(); });
-    const hear = h(document, "button", { type: "button", class: "button", text: c.compare.hear });
-    hear.disabled = !(state.a && state.b);
-    hear.addEventListener("click", () => {
-      session.dispatch({ type: "focus", row: state.b[0], col: state.b[1] });
-      hearCell(state.a[0], state.a[1], 1.4);
-      clearTimeout(second);
-      second = setTimeout(() => hearCell(state.b[0], state.b[1], 1.4), 1900);
-      el.caption2.textContent = fillIso(c.captions.contrast, { a: idOf(state.a), b: idOf(state.b) }, language);
-    });
-    cmp.push(h(document, "label", { class: "xp-pick", for: "xp-other" }, h(document, "span", { text: c.compare.other }), select), h(document, "div", { class: "player-buttons" }, hear), h(document, "p", { class: "small", text: c.compare.hearNote }));
-    if (state.a && state.b) {
-      const va = cellOf(snap, ...state.a)?.value;
-      const vb = cellOf(snap, ...state.b)?.value;
-      const result = compareValues(va, vb);
-      const max = levelMax(snap) || 1;
-      const bar = (id, value, tag) => h(document, "div", { class: "xp-bar-row" }, h(document, "span", { class: "ltr", text: id + (tag ? " " + c.compare.selectedTag : "") }),
-        h(document, "div", { class: "xp-bar-track", "aria-hidden": "true" }, h(document, "div", { class: "xp-bar", style: `width:${Math.max(2, (value / max) * 100)}%` })), h(document, "span", { class: "ltr", text: trimNumber(value, 3) }));
-      if (result) {
-        cmp.push(h(document, "div", { class: "xp-chart", role: "img", "aria-label": c.compare.chart + ": " + idOf(state.a) + " " + trimNumber(va, 3) + ", " + idOf(state.b) + " " + trimNumber(vb, 3) }, bar(idOf(state.a), va, true), bar(idOf(state.b), vb, false)),
-          h(document, "p", { class: "xp-diff" }, h(document, "span", { text: c.compare.diff + ": " }), h(document, "strong", { class: "ltr", text: trimNumber(result.difference, 3) }), " · " + (result.higher ? c.compare.higher.replace("{id}", idOf(result.higher === "a" ? state.a : state.b)) : c.compare.equal)));
-      }
-    } else cmp.push(h(document, "p", { class: "small", text: c.compare.needBoth }));
-    el.compare.replaceChildren(...cmp);
-
-    // Scale: only the real maximum of this grid and the documented threshold.
-    const max = levelMax(snap);
-    el.scale.replaceChildren(h(document, "div", { class: "scale-bar", style: "position:relative", "aria-hidden": "true" }, h(document, "span", { class: "scale-mark", style: `left:${Math.min(100, (threshold / (max || 1)) * 100)}%` })),
-      h(document, "div", { class: "scale-labels ltr", "aria-hidden": "true" }, h(document, "span", { text: "0" }), h(document, "span", { class: "scale-threshold", text: c.scale.threshold.replace("{threshold}", tokens.threshold) }), h(document, "span", { text: trimNumber(max, 3) })),
-      h(document, "p", { class: "small", text: c.scale.note }));
-  }
-
-  function renderAll() { renderPanels(); }
-
-  // ---- Wiring
-  session.subscribe(() => {
-    const snap = view();
-    scene?.setSnapshot(snap);
-    const t = snap.transport;
-    void t;
+  const cellAtEvent = (event) => {
+    const r = el.canvas.getBoundingClientRect();
+    const col = Math.min(COLS - 1, Math.max(0, Math.floor(((event.clientX - r.left) / r.width) * COLS)));
+    const row = Math.min(ROWS - 1, Math.max(0, Math.floor(((event.clientY - r.top) / r.height) * ROWS)));
+    return row * COLS + col;
+  };
+  el.canvas.addEventListener("click", (event) => { el.canvas.focus({ preventScroll: true }); select(cellAtEvent(event)); });
+  el.canvas.addEventListener("pointermove", (event) => { if (event.pointerType !== "mouse") return; const i = cellAtEvent(event); el.hover.textContent = fill(c.map.hover, { id: idOf(i), value: Number.isFinite(values()[i]) ? fmt(values()[i]) + " " + unit() : c.map.noValue }); });
+  el.canvas.addEventListener("pointerleave", () => { el.hover.textContent = ""; });
+  el.canvas.addEventListener("keydown", (event) => {
+    const steps = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (steps[event.key]) {
+      event.preventDefault();
+      const cur = state.pickingB && state.b !== null ? state.b : state.a ?? Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2);
+      const row = Math.max(0, Math.min(ROWS - 1, Math.floor(cur / COLS) + steps[event.key][0]));
+      const col = Math.max(0, Math.min(COLS - 1, (cur % COLS) + steps[event.key][1]));
+      select(row * COLS + col, { hear: false });
+    } else if ((event.key === "Enter" || event.key === " ") && state.a !== null) { event.preventDefault(); hearCell(state.a); }
+    else if ((event.key === "b" || event.key === "B") && state.a !== null) { event.preventDefault(); state.pickingB = !state.pickingB; renderCompare(); }
+    else if (event.key === "Escape") { state.pickingB = false; renderCompare(); }
   });
-  buildGrid();
+  function setDate(id) { state.snapshot = phen().snapshot(id); renderAll(); }
+  el.date.addEventListener("change", () => setDate(el.date.value));
+  function switchTo(id) {
+    if (id === state.id) return;
+    rec.stop();
+    state.id = id; state.snapshot = firstOpen(id); state.b = null; state.pickingB = false;
+    for (const [key, b] of Object.entries(tabButtons)) b.setAttribute("aria-pressed", String(key === id));
+    renderAll();
+  }
+  function renderAll() {
+    norm = normalizer(spec());
+    ramp = rampFromStops(spec().stops);
+    renderDates(); renderDry(); renderAbout(); renderLegend(); renderSelected(); renderCompare();
+    if (state.a !== null) el.reading.textContent = readingOf(state.a);
+    draw();
+  }
   renderAll();
-  let frame;
-  const loop = () => { drawWaveform(el.wave, rec.analyser, { color: "#68e0d0" }); frame = requestAnimationFrame(loop); };
-  frame = requestAnimationFrame(loop);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelAnimationFrame(frame); frame = undefined; } else if (frame === undefined) frame = requestAnimationFrame(loop); });
-  if (new URL(document.URL).searchParams.has("debug")) window.__explore = { session, scene, transport, state, rec };
+  new ResizeObserver(() => draw()).observe(el.stage);
+  let frame = requestAnimationFrame(function loop() { drawWaveform(el.wave, rec.analyser, { color: "#68e0d0" }); frame = requestAnimationFrame(loop); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelAnimationFrame(frame); frame = undefined; } else if (frame === undefined) frame = requestAnimationFrame(function loop() { drawWaveform(el.wave, rec.analyser, { color: "#68e0d0" }); frame = requestAnimationFrame(loop); }); });
+  if (new URL(document.URL).searchParams.has("debug")) window.__explore = { state, phens, rec, select, switchTo, setDate };
 }

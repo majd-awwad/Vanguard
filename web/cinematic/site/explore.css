@@ -74,3 +74,28 @@ body.explore-3d[data-flight="hero"] .xp-grid, body.explore-3d[data-flight="flyin
 body:has(.panel.lock) .next-step { display: none; }
 .lock { padding-block: 3.5rem; }
 .lock { min-height: calc(100dvh - var(--nav-h) - 17rem); display: grid; align-content: center; }
+
+/* Explore Earth v2: the data colours on the map, phenomenon tabs, learning text, meaning badge */
+.xp-live-stage { background-repeat: no-repeat; }
+.xp-map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; border-radius: 2px; touch-action: manipulation; }
+.xp-map-canvas:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.xp-tabs { display: flex; flex-wrap: wrap; margin: .8rem 0; }
+.xp-hover { min-height: 1.4rem; margin: 0; color: var(--muted); font-family: var(--mono); }
+.xp-legend { padding: .8rem 1rem; display: grid; gap: .35rem; }
+.xp-legend .st-legend-title { margin: 0; color: var(--muted); font-size: var(--fs-small); }
+.xp-bar-scale { height: .8rem; border-radius: 99px; border: 1px solid var(--line); }
+.xp-ticks { position: relative; height: 1.1rem; font: .72rem var(--mono); color: var(--muted); }
+.xp-ticks .tick { position: absolute; transform: translateX(-50%); }
+.xp-learn h2 { margin-bottom: .4rem; }
+.xp-learn h3 { margin: .9rem 0 .2rem; font-size: 1rem; color: var(--teal); font-weight: 600; }
+.xp-learn p { margin: 0; }
+.xp-cta { display: grid; gap: .6rem; border-color: var(--teal); }
+.xp-cta h2 { margin: 0; font-size: 1.3rem; }
+.xp-badge { display: inline-block; margin: 0; padding: .15rem .6rem; border-radius: 999px; font: 600 var(--fs-small)/1.35 var(--sans); background: #dfe6ee; color: #14202c; }
+.xp-badge[data-level="low"] { background: #cfe3f5; color: #0e2a45; }
+.xp-badge[data-level="mid"] { background: #f1dfa6; color: #3a2c00; }
+.xp-badge[data-level="high"] { background: #e9b48f; color: #3b1700; }
+.xp-badge[data-level="none"], .xp-badge[data-level="missing"] { background: #dde2e8; color: #2a3440; }
+.xp-cell-head { flex-wrap: wrap; }
+.xp-left .callout .actions { margin-top: .5rem; }
+@media (max-width: 900px) { .xp-left .panel { display: block; } }

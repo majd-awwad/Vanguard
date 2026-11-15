@@ -4,7 +4,7 @@ import { cellBounds, cellId, formatLat, formatLon, textureCrop } from "./cells.j
 import { mountCellGrid } from "./cell-grid.js";
 import { h } from "./dom.js";
 import { mountNav } from "./nav.js";
-import { markDecodeCompleted, spoilersUnlocked } from "./progress.js";
+import { markDecodeCompleted, markDecodeFinished, spoilersUnlocked } from "./progress.js";
 import { loadSettings, saveSettings } from "./settings.js";
 import { describeRule, gameCopy } from "./decode-game-copy.js";
 import { CERT_SIZE, downloadCanvas, drawCertificate } from "../../experiences/levels/award.js";
@@ -42,7 +42,7 @@ async function ensureData(app) {
 
 function setScreen(app, name, ...nodes) {
   app.root.dataset.screen = name;
-  app.root.replaceChildren(...nodes, h(app.document, "p", { class: "credit", text: app.c.credit }));
+  app.root.replaceChildren(...nodes.filter(Boolean), h(app.document, "p", { class: "credit", text: app.c.credit }));
   app.root.querySelector("h1, h2")?.setAttribute("tabindex", "-1");
   app.root.querySelector("h1, h2")?.focus({ preventScroll: true });
   globalThis.scrollTo?.(0, 0);
@@ -287,6 +287,7 @@ function mountPlay(app, level, run) {
     const result = run.result();
     const outcome = store.completeLevel(profile.id, result);
     if (result.levelId === 1) markDecodeCompleted();
+    if (outcome?.allDone) markDecodeFinished();
     showResult(app, level, run, result, outcome);
   }
 
@@ -393,7 +394,7 @@ function mountPlay(app, level, run) {
     const volume = h(document, "input", { type: "range", min: 0, max: 100, step: 1, id: "dg-volume", value: Math.round(app.settings.volume * 100), "aria-label": p.volume });
     volume.addEventListener("input", () => { const value = Number(volume.value) / 100; app.rec.setVolume(value); app.settings.volume = value; saveSettings({ volume: value }); });
     parts.push(h(document, "div", { class: "dg-sound" }, h(document, "h3", { text: p.cueTitle }), h(document, "div", { class: "dg-actions" }, soundToggle, volume), cues, el.cue, el.soundNote));
-    side.replaceChildren(...parts);
+    side.replaceChildren(...parts.filter(Boolean));
   }
   function hearAndShowSilent() { el.cue.textContent = app.cues || !app.sound ? st.cue : (st.cue.split(" · ")[0] ?? ""); }
   function hearBoth(index) {

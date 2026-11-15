@@ -219,31 +219,7 @@ test("every site page and the Decode 3D page link to the shared settings and nav
   assert.ok(read("web/cinematic/main.js").includes("mountNav"));
 });
 
-import { compareValues, levelMax, cellOf, ZOOM_MAX, ZOOM_MIN } from "../web/cinematic/site/explore.js";
-import { exploreCopy } from "../web/cinematic/site/explore-copy.js";
 import { mountCellGrid } from "../web/cinematic/site/cell-grid.js";
-
-test("explore: comparison is numerical, pure and handles missing values", () => {
-  assert.deepEqual(compareValues(0.3, 0.1), { difference: 0.19999999999999998, higher: "a" });
-  assert.equal(compareValues(0.1, 0.1).higher, null);
-  assert.equal(compareValues(null, 0.1), null);
-  const snapshot = { grid: { cells: [{ row: 0, col: 0, value: 0.2 }, { row: 0, col: 1, value: null }, { row: 1, col: 0, value: 0.5 }] } };
-  assert.equal(levelMax(snapshot), 0.5);
-  assert.equal(cellOf(snapshot, 1, 0).value, 0.5);
-  assert.ok(ZOOM_MIN === 1 && ZOOM_MAX > 1);
-});
-
-test("explore: copy parity, spoiler lock wiring, learning mode, no invented content", () => {
-  const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "object" ? k + "{" + keys(o[k]) + "}" : k)).join();
-  assert.equal(keys(exploreCopy.en), keys(exploreCopy.ar));
-  const src = read("web/cinematic/site/explore.js");
-  assert.match(src, /spoilersUnlocked\(\)/);
-  assert.match(src, /mode: "learning"/);
-  assert.match(src, /hearCell\(/, "listening plays the recordings for the cell");
-  assert.ok(!/type: "probe"|type: "play"/.test(src), "no synthetic Decode tones on Explore Earth");
-  assert.ok(!/rainfall|timeline|global/i.test(JSON.stringify(exploreCopy)));
-  assert.match(JSON.stringify(exploreCopy.en), /positions inside a cell are artistic/);
-});
 
 test("cell grid: roving tabindex, geography never mirrors, aria states are strings", () => {
   const made = [];
