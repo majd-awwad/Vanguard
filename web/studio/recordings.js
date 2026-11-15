@@ -157,17 +157,19 @@ export function createRecordings({
       previewTimer = setTimer(() => { wanted = null; apply(); }, seconds * 1000);
     },
     /** One short slice for a step: about 0.7 s with 80 ms fades, from the matching recording. */
-    async slice(phenomenon, levelName, { pan = 0, durationS = SLICE_S, fadeS = SLICE_FADE_S, offsetS = 0 } = {}) {
+    async slice(phenomenon, levelName, { pan = 0, durationS = SLICE_S, fadeS = SLICE_FADE_S, offsetS = 0, rate = 1 } = {}) {
       if (!phenomenon || !levelName) return;
       try {
         ensureContext();
         if (context.state === "suspended") await context.resume?.();
         const buffer = await bufferFor(fileFor(phenomenon, levelName));
-        const length = Math.min(durationS, buffer.duration);
+        const speed = Math.max(0.5, Math.min(2, rate));
+        const length = Math.min(durationS, buffer.duration / speed);
         const start = context.currentTime + 0.005;
         const source = context.createBufferSource();
         const gain = context.createGain();
         source.buffer = buffer;
+        source.playbackRate.value = speed;
         source.connect(gain);
         const panner = pannerFor(pan);
         if (panner) { gain.connect(panner); panner.connect(master); } else gain.connect(master);
@@ -176,8 +178,9 @@ export function createRecordings({
         gain.gain.linearRampToValueAtTime(SLICE_GAIN, start + f);
         gain.gain.setValueAtTime(SLICE_GAIN, start + length - f);
         gain.gain.linearRampToValueAtTime(0, start + length);
-        const offset = buffer.duration > length ? Math.abs(offsetS) % (buffer.duration - length) : 0;
-        source.start(start, offset, length + 0.02);
+        const needed = length * speed;
+        const offset = buffer.duration > needed ? Math.abs(offsetS) % (buffer.duration - needed) : 0;
+        source.start(start, offset, (length + 0.02) * speed);
         const entry = { source, gain, panner };
         slices.add(entry);
         source.onended = () => { slices.delete(entry); source.disconnect(); gain.disconnect(); panner?.disconnect(); };

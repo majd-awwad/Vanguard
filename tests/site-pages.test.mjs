@@ -238,7 +238,7 @@ test("explore: copy parity, spoiler lock wiring, learning mode, no invented cont
   assert.equal(keys(exploreCopy.en), keys(exploreCopy.ar));
   const src = read("web/cinematic/site/explore.js");
   assert.match(src, /spoilersUnlocked\(\)/);
-  assert.match(src, /mode: "learning"/);
+  assert.ok(src.includes("createScene({ document })"), "the original 3D globe page");
   assert.match(src, /hearCell\(/, "listening plays the recordings for the cell");
   assert.ok(!/type: "probe"|type: "play"/.test(src), "no synthetic Decode tones on Explore Earth");
   assert.ok(!/rainfall|timeline|global/i.test(JSON.stringify(exploreCopy)));

@@ -74,3 +74,22 @@ body.explore-3d[data-flight="hero"] .xp-grid, body.explore-3d[data-flight="flyin
 body:has(.panel.lock) .next-step { display: none; }
 .lock { padding-block: 3.5rem; }
 .lock { min-height: calc(100dvh - var(--nav-h) - 17rem); display: grid; align-content: center; }
+
+/* Dust · Rainfall · Wind switch, the date, the meaning badge and the call to Decode (added to the original page; nothing else changed) */
+.xp-switch { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .4rem; }
+.xp-switch select { flex: 1 1 11rem; min-width: 0; background: rgb(255 255 255 / .06); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: .45rem .7rem; min-height: 2.75rem; font: inherit; }
+.xp-switch select option { background: #0a141f; color: #f0f4fa; }
+.xp-dry { margin: 0 0 .4rem; }
+.xp-dry .actions { margin-top: .5rem; }
+.xp-badge { display: inline-block; max-width: 100%; margin: 0; padding: .12rem .6rem; border-radius: 999px; font: 600 var(--fs-small)/1.35 var(--sans); background: #dfe6ee; color: #14202c; }
+.xp-badge[data-level="low"] { background: #cfe3f5; color: #0e2a45; }
+.xp-badge[data-level="mid"] { background: #f1dfa6; color: #3a2c00; }
+.xp-badge[data-level="high"] { background: #e9b48f; color: #3b1700; }
+.xp-badge[data-level="none"], .xp-badge[data-level="missing"] { background: #dde2e8; color: #2a3440; }
+.xp-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .8rem 1.4rem; margin: 1.6rem auto 0; text-align: center; }
+.xp-cta p { margin: 0; color: var(--muted); }
+.xp-cell-head .xp-badge { flex: 1 1 100%; width: fit-content; }
+.xp-layout > * { min-width: 0; }
+.xp-switch select { max-width: 100%; text-overflow: ellipsis; }
+@media (max-width: 900px) { .xp-layout { grid-template-columns: minmax(0, 1fr); } }
+.xp-centre { grid-template-columns: minmax(0, 1fr); }

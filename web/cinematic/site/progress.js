@@ -5,6 +5,8 @@
 
 export const COMPLETED_KEY = "earthpulse.decode.completed.v1";
 export const OVERRIDE_KEY = "earthpulse.spoilers.override.v1";
+/** Set when a profile has completed all five Decode levels: only then do the dust dates of the original challenge (2025-08-15 and 2025-08-19) open in Explore Earth. */
+export const FINISHED_KEY = "earthpulse.decode.finished.v1";
 
 const local = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const session = () => { try { return globalThis.sessionStorage ?? null; } catch { return null; } };
@@ -18,6 +20,14 @@ export function markDecodeCompleted(storage = local()) {
 }
 
 let memoryOverride = false;
+
+export function isDecodeFinished(storage = local()) {
+  try { return storage?.getItem(FINISHED_KEY) === "1"; } catch { return false; }
+}
+
+export function markDecodeFinished(storage = local()) {
+  try { storage?.setItem(FINISHED_KEY, "1"); return true; } catch { return false; }
+}
 
 export function allowSpoilersThisVisit(storage = session()) {
   memoryOverride = true;
