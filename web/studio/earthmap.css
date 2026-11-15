@@ -78,3 +78,8 @@
 #studio-root input[type="range"] { min-height: 2.75rem; }
 #studio-root .button { min-width: 2.75rem; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
 .site-menu-button { min-height: 2.75rem; }
+
+/* Long unbreakable strings (model build labels) must wrap inside the tool column, never push over the map. */
+.em-tools, .em-tabpanel, .em-tabpanel .panel, .em-col { min-width: 0; max-width: 100%; }
+.em-tools * { overflow-wrap: anywhere; }
+.em-chart { max-width: 100%; }
