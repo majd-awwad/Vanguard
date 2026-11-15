@@ -42,7 +42,7 @@ test("the same pattern covers wind, and phenomena without a floor never get a no
   for (const s of wind.list) assert.equal(dryNotice({ phenomenon: "wind", list: wind.list, currentId: s.id }), null, "wind is almost never calm in this region");
   const calm = [{ id: "a", date: "2025-01-01", values: new Array(100).fill(0) }, { id: "b", date: "2025-02-01", values: new Array(100).fill(2) }];
   assert.deepEqual(dryNotice({ phenomenon: "wind", list: calm, currentId: "a" }).suggestions.map((s) => s.date), ["2025-02-01"]);
-  for (const id of ["dust", "temperature"]) {
+  for (const id of ["dust"]) {
     const phen = await pkg.openPhenomenon(id);
     assert.equal(dryNotice({ phenomenon: id, list: phen.list, currentId: phen.list[0].id }), null, id);
   }
@@ -53,7 +53,6 @@ test("a dry cell is explained, a missing value is not called dry", () => {
   assert.equal(isDryValue("rainfall", 0.05), true);
   assert.equal(isDryValue("rainfall", 0.1), false);
   assert.equal(isDryValue("rainfall", null), false);
-  assert.equal(isDryValue("temperature", -5), false);
   assert.ok(copy.includes("no measurable rain (< 0.1 mm/h)"));
   assert.ok(copy.includes("Little or no measurable rain on this date. Try a wetter date:"));
   assert.ok(copy.includes("قلّما يوجد مطر قابل للقياس في هذا التاريخ. جرّب تاريخًا أكثر مطرًا:"));

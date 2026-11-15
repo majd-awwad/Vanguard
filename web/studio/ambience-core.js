@@ -1,7 +1,7 @@
 // The optional "illustrative ambience" layer: which recording plays, chosen from the REAL value under the cursor.
 // Pure functions only (no audio, no DOM). Documented in docs/earth-map/SONIFICATION_MAPPING.md.
 
-/** Phenomena that have a recording. Temperature has none. */
+/** Phenomena that have a recording: all three. */
 export const AMBIENCE_PHENOMENA = Object.freeze(["dust", "rainfall", "wind"]);
 /** Dust breakpoints (33rd / 66th percentile of all 13,000 values), for pages that do not load the whole package. A test keeps them equal to the catalog. */
 export const DUST_BREAKPOINTS = Object.freeze({ low: 0.03822357523323673, high: 0.12473433711410145 });

@@ -1,4 +1,4 @@
-// Earth Map data layer: the four phenomena of Mohammad's verified JSON package, their documented scales, and a loader
+// Earth Map data layer: the three phenomena of Mohammad's verified JSON package, their documented scales, and a loader
 // that checks every file's SHA-256 against the master catalog in the browser (LF-normalised, see
 // scripts/earth-map/copy-package.mjs). Everything here is NASA GMAO GEOS-FP *model* output, never measured.
 
@@ -24,13 +24,6 @@ export const PHENOMENA = Object.freeze({
     stops: [[0, hex(0x17324d)], [0.25, hex(0x2a73c9)], [0.55, hex(0x46c2f0)], [0.8, hex(0xb6f0ff)], [1, hex(0xffffff)]],
     change: { max: 3, nearZero: 0.05 },
     related: [{ label: "SVS 4285 (IMERG, a different product)", url: "https://svs.gsfc.nasa.gov/4285/", relation: "RELATED_CONTEXT" }],
-  },
-  temperature: {
-    id: "temperature", short: "DFPT1NXSLV", variable: "T2M", measure: "celsius", unit: "degC", unitLabel: "°C", decimals: 1,
-    window: "one-hour mean", defaultThreshold: 35, transform: "linear", min: -15, max: 45, ticks: [0, 20, 40],
-    stops: [[0, hex(0x3b4cc0)], [0.25, hex(0x6fa8dc)], [0.45, hex(0xf2e9c9)], [0.65, hex(0xf6b26b)], [0.85, hex(0xe8563a)], [1, hex(0x8b0f1c)]],
-    change: { max: 20, nearZero: 0.5 },
-    related: [{ label: "SVS 5147", url: "https://svs.gsfc.nasa.gov/5147/", relation: "RELATED_CONTEXT" }],
   },
   wind: {
     id: "wind", short: "DFPT1NXSLV", variable: "U10M, V10M", measure: "speedMps", unit: "m s-1", unitLabel: "m/s", decimals: 1,

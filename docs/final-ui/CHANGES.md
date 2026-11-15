@@ -73,7 +73,7 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 
 ## Data sync from main (Mohammad's PR #9, 3bb5f7b)
 - `git merge origin/main` into feat/final-ui: clean, no conflicts; only `deliverables/EarthPulse-JSON-ONLY/**` changed and was not edited by us.
-- `node scripts/earth-map/copy-package.mjs` refreshed `web/assets/earthpulse-json/`: 63/63 files match the new master catalog SHA-256 and byte counts. Five dust snapshots were re-serialized (same values, new hashes); every catalog gained `modelSource` per snapshot, and rainfall, temperature and wind gained `compatibilityGroups` and `compatibilityPolicy`.
+- `node scripts/earth-map/copy-package.mjs` refreshed `web/assets/earthpulse-json/`: 63/63 files match the new master catalog SHA-256 and byte counts. Five dust snapshots were re-serialized (same values, new hashes); every catalog gained `modelSource` per snapshot, and rainfall and wind gained `compatibilityGroups` and `compatibilityPolicy`.
 - The app now uses the catalog's `compatibilityGroups` and `compatibilityPolicy` directly; the derived rule (literal `modelSource` of each snapshot) is only the fallback. Blocked cross-build comparisons show the catalog's policy text. Find signals and Find similar read the build from the same groups.
 - Rain ambience: below 0.1 mm/h is silence; the levels are the 33rd and 66th percentiles (0.1637 and 0.3115 mm/h) of the 1,074 values at or above 0.1 mm/h across the 13 dates.
 
@@ -81,7 +81,7 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - A date with almost no signal (rain: fewer than 10% of cells at or above 0.1 mm/h; the same pattern is ready for wind below 0.3 m/s) shows a notice on the map with the three wettest real dates, counted from the data (rain: 15 Aug 15%, 15 Jul 11%, 15 Nov 11% of cells). On phones the notice sits in the Data card so it does not cover the small map. Hovering a dry cell says "no measurable rain (< 0.1 mm/h)" and the selected-place card says it too. English and Arabic. Tests: `tests/dry-dates.test.mjs`.
 
 ## Sound is the user's recordings only (3 levels by real value)
-- The Sound Studio, Explore Earth listening, the Science "How it sounds" examples and the Hunter/Echo listening play only the nine recordings (dust, rain, wind × low/mid/high), chosen from the real value with the documented breakpoints. The synthesized data tones are no longer played anywhere outside Decode. Temperature has no recording ("No recording for temperature").
+- The Sound Studio, Explore Earth listening, the Science "How it sounds" examples and the Hunter/Echo listening play only the nine recordings (dust, rain, wind × low/mid/high), chosen from the real value with the documented breakpoints. The synthesized data tones are no longer played anywhere outside Decode.
 - One sound button and one volume. The sound-style selector and the separate ambience toggle are gone (spoken guidance follows the "Spoken instructions" setting). Old stored sound settings are reset once.
 - Scans, paths, Region A/B and Echo play one slice (about 0.7 s, 80 ms fades) of the matching recording per step, in order, with the clock and playhead in sync. Pan follows longitude.
 - Credits: every recording is listed with its source in the manifest, the Science page credits and the table above; all licences are "to verify".
@@ -91,5 +91,13 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - One source of truth: the "Spoken instructions" setting (`guidance`). The dialog, the Studio switch, the settings drawer and the settings page all read and write it and stay in sync through the `earthpulse:settings` event. Switching keeps position, tab, findings and matches.
 
 ## Meaning of each value (Guided Voice and a badge in every mode)
-- A short relative phrase (for example "Dust: high compared with this dataset") from the same level that picks the recording; temperature gets low/mid/high from its own 33rd/66th percentiles (18.52 / 26.74 degrees C). Rain below 0.1 mm/h says "no measurable rain"; a missing value says "no data here".
+- A short relative phrase (for example "Dust: high compared with this dataset") from the same level that picks the recording. Rain below 0.1 mm/h says "no measurable rain"; a missing value says "no data here".
 - Guided Voice speaks: phrase, value with unit, place (1 decimal), date only when it changed. The same phrase shows as a small badge in the selected-place card and the hover tooltip; Pure Sonification never speaks it.
+
+## Temperature removed from the product (the app uses Dust, Rain and Wind)
+- The Sound Studio (phenomenon switch, timeline labels, Hunter, Echo, Compare, Region A/B, share links, Guided Voice phrases, tooltips, help), Explore Earth, Science, About and every EN/AR text no longer have a temperature phenomenon. There is no disabled button and no note: it does not exist. Old share links with `phen=temperature` fall back to Dust.
+- Code: the temperature dataset entry, its colour scale, breakpoints, sound mapping and branches are deleted; the Studio's "no recording" branches are gone because all three phenomena have their three recordings.
+- Data copy: `web/assets/earthpulse-json/temperature/` is removed and `scripts/earth-map/copy-package.mjs` skips it (the copy verifies 48/48 files; the source package is still verified 63/63). `provenance.mjs` no longer builds a temperature manifest.
+- Docs updated: SONIFICATION_MAPPING.md, DATA_INVENTORY.md, DATA_PROVENANCE.md (regenerated), FEATURE_STATUS.md, provenance.json and this file. A test (`tests/no-temperature.test.mjs`) fails if our pages, scripts, UI strings or Earth Map docs mention it again.
+- Scope: the separate Atlas "Ocean heat" case (sea-surface temperature, `web/platform.js`, `web/atlas.html`) is a different dataset and is untouched; the vendored NASA source pages under `science/decode/` are untouched.
+- **NOTE:** the package `deliverables/EarthPulse-JSON-ONLY/temperature/` (Mohammad's verified package) is not edited or deleted; the app intentionally does not use it. The master `catalog.json` copy stays verbatim, so it still lists those files.

@@ -15,7 +15,7 @@ import { mountEcho } from "./echo-ui.js";
 import { mountHunter } from "./hunter-ui.js";
 import { lonPan } from "./mapping.js";
 import { cellInfo } from "./sonify.js";
-import { MEANING_PHENOMENA, meaningLevel, meaningPhrase, spokenNumber } from "./meaning.js";
+import { meaningLevel, meaningPhrase, spokenNumber } from "./meaning.js";
 import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { decodeShare, mountShare } from "./share.js";
@@ -23,7 +23,7 @@ import { GUIDED, PURE, createSpeech } from "./speech.js";
 import { AUDIO, SOUND_MODES, TOOLS, createAppState, createStore } from "./state.js";
 import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
-import { AMBIENCE_PHENOMENA, DOCUMENTED_BREAKPOINTS, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
+import { DOCUMENTED_BREAKPOINTS, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
 import { createRecordings } from "./recordings.js";
 import { SIGNAL, dryNotice, isDryValue } from "./signal-core.js";
 import { infoIcon } from "./studio-ui-kit.js";
@@ -326,7 +326,6 @@ async function mountApp(document, root, language, initialMode) {
   };
   function soundText(d) {
     if (d.value === null) return c.understand.missingSound;
-    if (!SOUND_PHENOMENA.includes(phen.id)) return m.sound.noRecording;
     const level = levelAt(d.index);
     return level ? T(m.sound.levelText, { level: m.sound.levels[level] }) : m.sound.silence;
   }
@@ -377,9 +376,9 @@ async function mountApp(document, root, language, initialMode) {
     return phen.id === "wind" && d.value !== null ? base + " " + windText(d.index) + "." : base;
   };
 
-  // ---- Meaning of a value: a relative phrase from the same level that chooses the recording (temperature: its own percentiles)
+  // ---- Meaning of a value: a relative phrase from the same level that chooses the recording
   function meaningFor(index) {
-    if (layerKind() === "change" || !MEANING_PHENOMENA.includes(phen.id) || index === undefined || index < 0) return null;
+    if (layerKind() === "change" || index === undefined || index < 0) return null;
     const value = state.snapshot.values[index];
     const args = { phenomenon: phen.id, value, breakpoints: bpFor() };
     return { level: meaningLevel(args), text: meaningPhrase({ ...args, language }) };
@@ -454,7 +453,6 @@ async function mountApp(document, root, language, initialMode) {
   const explain = () => { if (state.cursor) speech.say(spoken(state.cursor, "", true)); else speech.say(m.info.none); };
 
   // ---- Sound: the user's recordings, chosen by the REAL value (low / mid / high). No synthesized tones.
-  const SOUND_PHENOMENA = AMBIENCE_PHENOMENA;
   const slotFor = () => 0.3;
   const tonesFor = () => [{ offsetS: 0, tone: undefined }]; // markers only: the recording slice plays when the step becomes active
   const bpCache = new Map();
@@ -465,7 +463,6 @@ async function mountApp(document, root, language, initialMode) {
   const soundCell = () => state.cursor ?? state.selected;
   function updateSoundStatus() {
     if (!el.soundLevel) return;
-    if (!SOUND_PHENOMENA.includes(phen.id)) { el.soundLevel.textContent = m.sound.noRecording; return; }
     const cell = soundCell();
     if (!cell) { el.soundLevel.textContent = ""; return; }
     const level = levelAt(cell.index);
@@ -475,7 +472,7 @@ async function mountApp(document, root, language, initialMode) {
     updateSoundStatus();
     if (!audio.enabled || state.busy) return;
     const cell = soundCell();
-    if (!cell || !SOUND_PHENOMENA.includes(phen.id)) { rec.silence(); return; }
+    if (!cell) { rec.silence(); return; }
     const level = levelAt(cell.index);
     if (force) rec.preview(phen.id, level, panOf(cell)); else rec.hold(phen.id, level, panOf(cell));
   }
@@ -486,7 +483,7 @@ async function mountApp(document, root, language, initialMode) {
   // Scans, paths, comparisons and Echo: the clock reports each active step and a slice of the matching recording plays.
   audio.onEvent = (event) => {
     rec.silence();
-    if (!SOUND_PHENOMENA.includes(phen.id) || !(event.row >= 0)) return;
+    if (!(event.row >= 0)) return;
     const value = event.evidence && event.evidence.recValue !== undefined ? event.evidence.recValue : state.snapshot.values[event.row * grid.cols + event.col];
     const level = levelOfValue(value);
     if (level) rec.slice(phen.id, level, { pan: event.pan ?? 0, offsetS: (event.step ?? 0) * 0.37 });
