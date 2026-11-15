@@ -6,7 +6,7 @@ import { TEXT_SIZES, applySettings, loadSettings, resolveLanguage, saveSettings 
 // re-based for the page that renders them.
 
 export const NAV_ITEMS = Object.freeze([
-  { id: "decode", path: "index.html" },
+  { id: "decode", path: "pages/decode.html" },
   { id: "explore", path: "pages/explore.html" },
   { id: "studio", path: "pages/studio.html" },
   { id: "science", path: "pages/science.html" },
@@ -17,8 +17,8 @@ export const NEXT_STEPS = Object.freeze({
   decode: { path: "pages/explore.html", en: ["Explore the data", "You listened and decoded. Now look at the real data, cell by cell."], ar: ["استكشف البيانات", "استمعت وفككت الشيفرة. الآن انظر إلى البيانات الحقيقية خلية بخلية."] },
   explore: { path: "pages/studio.html", en: ["Open the Sound Studio", "Compare dates, find signals and listen across the whole map."], ar: ["افتح استوديو الصوت", "قارن التواريخ وابحث عن الإشارات واستمع عبر الخريطة كلها."] },
   science: { path: "pages/studio.html", en: ["Open the Sound Studio", "Now hear these numbers on the map, for dust, rain and wind."], ar: ["افتح استوديو الصوت", "والآن استمع إلى هذه الأرقام على الخريطة: غبار ومطر ورياح."] },
-  about: { path: "index.html", en: ["Start with Decode", "The best way to understand EARTHPULSE is to listen to it."], ar: ["ابدأ بفك الشيفرة", "أفضل طريقة لفهم EARTHPULSE هي أن تستمع إليه."] },
-  settings: { path: "index.html", en: ["Back to Decode", "Your settings are saved on this device."], ar: ["العودة إلى فك الشيفرة", "إعداداتك محفوظة على هذا الجهاز."] },
+  about: { path: "pages/decode.html", en: ["Start with Decode", "The best way to understand EARTHPULSE is to listen to it."], ar: ["ابدأ بفك الشيفرة", "أفضل طريقة لفهم EARTHPULSE هي أن تستمع إليه."] },
+  settings: { path: "pages/decode.html", en: ["Back to Decode", "Your settings are saved on this device."], ar: ["العودة إلى فك الشيفرة", "إعداداتك محفوظة على هذا الجهاز."] },
 });
 
 export function mountNext(document, { language, from = "root", active, host = document.getElementById("site-footer") } = {}) {

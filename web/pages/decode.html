@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Decode · EARTHPULSE</title>
+  <link rel="icon" href="../assets/atlas/pulse.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../cinematic/site/site.css">
+  <link rel="stylesheet" href="../cinematic/site/explore.css">
+  <link rel="stylesheet" href="../cinematic/site/decode-game.css">
+</head>
+<body class="dg-page">
+  <header id="site-nav"></header>
+  <main id="site-main" class="site-main">
+    <div id="decode-root"></div>
+    <noscript><p>This page needs JavaScript.</p></noscript>
+  </main>
+  <script type="module">
+    import { startDecodeGame } from "../cinematic/site/decode-game.js";
+    startDecodeGame();
+  </script>
+</body>
+</html>
