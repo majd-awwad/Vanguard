@@ -11,6 +11,10 @@ const words = {
   ar: { title: "كيف يبدو الصوت", lede: "كل صوت في الاستوديو يتبع قاعدة واحدة لكل ظاهرة. اضغط زرًا لتسمع المحرك الحقيقي يعزف أدنى قيمة وأعلى قيمة في التاريخ المأخوذ {date}. لا شيء هنا تسجيل.", low: "اسمع الأدنى", high: "اسمع الأعلى", loading: "جارٍ تحميل البيانات…", playing: "يُعزف {name}، القيمة {which}.", error: "تعذّر تحميل هذا المثال.", lowName: "الدنيا", highName: "العليا", rows: "القاعدة" },
 };
 const DATE = "2025-04-15";
+const credits = {
+  en: { title: "Ambient recordings (optional layer in the Studio)", note: "Illustrative recording, not data. The level (low/mid/high) follows the real value.", licence: "Licence: to verify. Not confirmed yet.", failed: "The credits list could not be loaded." },
+  ar: { title: "تسجيلات الأجواء (طبقة اختيارية في الاستوديو)", note: "تسجيل توضيحي وليس بيانات. المستوى يتبع القيمة الحقيقية.", licence: "الترخيص: قيد التحقق. لم يُؤكَّد بعد.", failed: "تعذّر تحميل قائمة الاعتمادات." },
+};
 
 export function howItSounds(document, language) {
   const w = words[language];
@@ -49,6 +53,12 @@ export function howItSounds(document, language) {
     high.addEventListener("click", () => play(id, "high", high));
     return h(document, "div", { class: "sound-row" }, h(document, "h3", { text: m.phen[id] }), h(document, "p", { text: m.phen.soundMeaning[id] }), h(document, "div", { class: "sound-row-actions" }, low, high));
   });
+  const cr = credits[language];
+  const list = h(document, "ul", { class: "ambient-credits small" });
+  const details = h(document, "details", { class: "ambient-details" }, h(document, "summary", { text: cr.title }), h(document, "p", { class: "small", text: cr.note + " " + cr.licence }), list);
+  fetch(new URL("../../assets/ambient/manifest.json", import.meta.url)).then((r) => r.json()).then((manifest) => {
+    for (const item of manifest.items) list.append(h(document, "li", {}, h(document, "span", { class: "mono ltr", text: item.file }), " · ", h(document, "span", { class: "ltr", text: item.original }), " · ", h(document, "span", { text: cr.licence.split(".")[0] })));
+  }).catch(() => { list.append(h(document, "li", { text: cr.failed })); });
   return h(document, "section", { class: "panel sound-how", id: "sound", "aria-labelledby": "sound-how-title" },
-    h(document, "h2", { id: "sound-how-title", text: w.title }), h(document, "p", { text: w.lede.replace("{date}", DATE) }), ...rows, status);
+    h(document, "h2", { id: "sound-how-title", text: w.title }), h(document, "p", { text: w.lede.replace("{date}", DATE) }), ...rows, status, details);
 }

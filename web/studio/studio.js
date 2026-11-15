@@ -22,6 +22,9 @@ import { GUIDED, PURE, createSpeech } from "./speech.js";
 import { AUDIO, SOUND_MODES, TOOLS, createAppState, createStore } from "./state.js";
 import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
+import { AMBIENCE_PHENOMENA, breakpoints, levelFor } from "./ambience-core.js";
+import { createAmbience } from "./ambience.js";
+import { infoIcon } from "./studio-ui-kit.js";
 import { studioCopy } from "./studio-copy.js";
 import { mountTools } from "./tools.js";
 import { clampView, createView, geoToScreen, lerpView, panBy, pixelsPerDegree, screenToGeo, zoomAt } from "./view.js";
@@ -287,7 +290,10 @@ async function mountApp(document, root, language, initialMode) {
 
   // ---- Audio, speech
   const audio = createStudioAudio({ volume: settings.volume });
-  const speech = createSpeech({ language: () => language, liveRegion: el.live, onState: (s) => store.dispatch("SET_SPEECH", { speech: s }), onDuck: (on) => audio.setDuck(on) });
+  const ambience = createAmbience({ baseUrl: new URL("../assets/ambient/", import.meta.url), reduced });
+  ambience.setDataVolume(settings.volume);
+  ambience.setVolume(settings.ambienceVolume);
+  const speech = createSpeech({ language: () => language, liveRegion: el.live, onState: (s) => store.dispatch("SET_SPEECH", { speech: s }), onDuck: (on) => { audio.setDuck(on); ambience.setDuck(on); } });
   speech.setMode(initialMode);
   const speak = (text) => speech.say(text);
   const guided = (text) => speech.announce(text);
@@ -401,6 +407,7 @@ async function mountApp(document, root, language, initialMode) {
     store.dispatch("SELECT_SAMPLE", { sampleId: cell.index });
     renderInfo();
     invalidate();
+    updateAmbience();
     for (const hook of state.selectHooks ?? []) hook(cell, { user });
     if (user && typeof app !== "undefined" && app.dataset.flyout !== "open" && win.innerHeight >= 700) setInspectorCollapsed(false);
     if (play) soundForCursor(true);
@@ -426,6 +433,7 @@ async function mountApp(document, root, language, initialMode) {
     if (force) audio.play(planFor(cell)); else audio.hover(cursorKey(), () => planFor(cell));
   }
   state.onCursor = (cell) => {
+    updateAmbience();
     if (state.tool === "explore") soundForCursor();
     if (cell && state.tool === "explore" && store.state.tool === TOOLS.EXPLORE) guided(readText(cell));
   };
@@ -438,6 +446,7 @@ async function mountApp(document, root, language, initialMode) {
     el.soundButton.setAttribute("data-tip", soundLabel);
     if (on) { await audio.enable(); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : m.sound.on; } else { audio.disable(); el.soundState.textContent = m.sound.off; }
     store.dispatch("SET_AUDIO", { audio: on ? AUDIO.IDLE : AUDIO.MUTED });
+    updateAmbience();
     renderInfo();
     if (on && state.cursor) soundForCursor();
   };
@@ -555,7 +564,7 @@ async function mountApp(document, root, language, initialMode) {
   el.soundButton.append(el.soundLabel);
   el.soundState = h(document, "p", { class: "visually-hidden", role: "status", "aria-live": "polite", text: m.sound.off });
   el.volume = h(document, "input", { type: "range", id: "st-volume", min: 0, max: 100, step: 1, value: Math.round(settings.volume * 100), "aria-label": m.voice.dataVolume });
-  el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); saveSettings({ volume: v }); });
+  el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); ambience.setDataVolume(v); saveSettings({ volume: v }); });
   speech.setSpeechVolume(settings.speechVolume);
   el.soundButton.addEventListener("click", () => setSound(!audio.enabled));
   el.wave = h(document, "canvas", { width: 120, height: 36, role: "img", "aria-label": c.sound.wave });
@@ -579,6 +588,42 @@ async function mountApp(document, root, language, initialMode) {
     renderModeButton();
     el.live.textContent = m.mode.switched[mode];
     if (mode === GUIDED && state.cursor) speak(m.mode.switched[mode] + " " + readText(state.cursor));
+  }
+
+  // ---- Ambience (optional, illustrative): OFF by default; the level follows the REAL value under the cursor
+  let ambienceOn = settings.ambience === true;
+  const bpCache = new Map();
+  const bpFor = () => { if (!bpCache.has(phen.id)) bpCache.set(phen.id, breakpoints(phen.list.map((s) => s.values))); return bpCache.get(phen.id); };
+  el.ambToggle = h(document, "button", { type: "button", class: "switch", role: "switch", "aria-checked": String(ambienceOn), "aria-label": m.ambience.label }, h(document, "span", { class: "knob" }));
+  el.ambVolume = h(document, "input", { type: "range", id: "st-amb-volume", min: 0, max: 100, step: 1, value: Math.round(settings.ambienceVolume * 100), "aria-label": m.ambience.volume });
+  el.ambInfo = h(document, "span", { class: "st-inline-info" });
+  el.ambStatus = h(document, "small", { class: "st-amb-status", role: "status", "aria-live": "polite" });
+  el.ambRow = h(document, "div", { class: "st-amb" },
+    h(document, "div", { class: "st-amb-row" }, h(document, "span", { class: "st-amb-label", text: m.ambience.label }), el.ambInfo, el.ambToggle),
+    h(document, "label", { class: "volume", for: "st-amb-volume" }, h(document, "span", { text: m.ambience.volume }), el.ambVolume),
+    h(document, "small", { class: "st-amb-note", text: m.ambience.note }), el.ambStatus);
+  el.ambToggle.addEventListener("click", () => {
+    if (el.ambToggle.disabled) return;
+    ambienceOn = !ambienceOn;
+    saveSettings({ ambience: ambienceOn });
+    updateAmbience();
+  });
+  el.ambVolume.addEventListener("input", () => { const v = Number(el.ambVolume.value) / 100; ambience.setVolume(v); saveSettings({ ambienceVolume: v }); });
+  function updateAmbience() {
+    if (!el.ambToggle) return;
+    const supported = AMBIENCE_PHENOMENA.includes(phen.id);
+    el.ambToggle.disabled = !supported;
+    el.ambToggle.setAttribute("aria-checked", String(ambienceOn && supported));
+    const tip = supported ? m.ambience.note : m.ambience.none;
+    el.ambToggle.title = tip;
+    el.ambInfo.replaceChildren(infoIcon(document, tip));
+    // No autoplay: nothing starts before the user has enabled sound.
+    if (!ambienceOn || !supported || !audio.enabled) { ambience.stop(); el.ambStatus.textContent = ""; return; }
+    const cell = state.cursor ?? state.selected;
+    const raw = cell ? state.snapshot.values[cell.index] : null;
+    const level = levelFor({ phenomenon: phen.id, value: raw, breakpoints: bpFor() });
+    ambience.setLevel(phen.id, level);
+    el.ambStatus.textContent = level ? m.ambience.levels[level] : m.ambience.silent;
   }
 
   // ---- Phenomena and date (top left over the map)
@@ -894,6 +939,7 @@ async function mountApp(document, root, language, initialMode) {
 
   function onDataChanged() {
     renderLegend();
+    updateAmbience();
     renderLayerChip();
     renderInfo();
     invalidate();
@@ -946,7 +992,7 @@ async function mountApp(document, root, language, initialMode) {
   el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
   el.exploreHint = h(document, "p", { class: "st-hint", text: c.tools.help.explore });
   el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline);
-  el.soundMore.replaceChildren(el.modeSeg, h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.voice.dataVolume }), el.volume));
+  el.soundMore.replaceChildren(el.modeSeg, h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.voice.dataVolume }), el.volume), el.ambRow);
   const title = (text) => h(document, "h2", { text });
   const head = h(document, "header", { class: "st-head" }, h(document, "p", { class: "eyebrow", text: m.cards.eyebrow }), h(document, "h1", {}, m.cards.title[0] + " ", h(document, "em", { text: m.cards.title[1] })), h(document, "p", { class: "lede", text: m.cards.lede }));
   const dataCard = h(document, "section", { class: "st-card", "aria-label": m.cards.data }, title(m.cards.data), el.phenGroup,
@@ -963,7 +1009,7 @@ async function mountApp(document, root, language, initialMode) {
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
-  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
+  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); ambience.setDataVolume(s.volume); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
 
 
   // First load: a real value is already in the inspector (nearest data cell to the centre of the coverage), sound off.
@@ -985,7 +1031,7 @@ async function mountApp(document, root, language, initialMode) {
   }
 
   const api = {
-    vw, vh, panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
+    ambience, vw, vh, panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
     layerValues, layerKind, applyLayer, onDataChanged, renderInfo, readText, tonesFor, slotFor, setTab, requestDate, switchPhenomenon, sampleName, explain, speak, guided,
     get phen() { return phen; }, get catalog() { return catalog(); }, get list() { return phen.list; }, get renderer() { return renderer; }, phenomenonId: () => phen.id,
     getSnapshot: async (id) => phen.snapshot(id),

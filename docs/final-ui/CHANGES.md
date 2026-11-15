@@ -54,3 +54,19 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - `web/assets/team/team-vanguard-nablus-2026.jpg` (1600x1066, 275,264 bytes, SHA-256 `4678b1c455435ce8334ed90c83cd115225b9f3ad4516f686606d3c23ce9a8ac0`) and `web/assets/team/team-vanguard-nablus-2026-800.jpg` (800x533, 78,929 bytes, SHA-256 `9cfd8ffb1f26ff4bfae9d6404e25f4f7824ae4d72d30cf4b7283cc89a8be5af5`, used through `srcset` on phones).
 - Re-encoded from the original in a canvas, so no EXIF or GPS metadata is carried over. The original (2048x1365) stays outside the repo.
 - Shown in "Meet the team" with the EN/AR caption and alt text, `loading="lazy"`, width/height set, rounded corners and a soft glow; the six names sit beside it (below it on phones). No one in the photo is labelled. The footer keeps the "not endorsed by NASA" note.
+
+## Ambient sound pack (optional ambience layer)
+- 9 MP3s and `manifest.json` in `web/assets/ambient/` (from `earthpulse-ambient-sounds.zip`). Illustrative recordings, **not data**. SHA-256 of every file is checked in `tests/ambience.test.mjs`.
+- Behaviour and breakpoints: `docs/earth-map/SONIFICATION_MAPPING.md`. Licences are **TO VERIFY** for every file, including the Freesound and WhatsApp ones; they are listed on the Science page credits too.
+
+| File | Source (as recorded in the manifest) | Licence | SHA-256 |
+|---|---|---|---|
+| dust-high.mp3 | WhatsApp_Audio_2026-11-15_at_7.37.38_AM_1.mpeg | to verify | `9091a2270d74ec3da2851e43f0b6017f3df255ebe340adfb1a90e28d8b3766eb` |
+| dust-low.mp3 | WhatsApp_Audio_2026-11-15_at_7.37.39_AM.mpeg | to verify | `4253cc7ad75e2fc8e0aacfefeed3f5a801477ce2000989b8aa2cabccd5ebdc7c` |
+| dust-mid.mp3 | WhatsApp_Audio_2026-11-15_at_7.37.38_AM.mpeg | to verify | `67d2b889e6818eb240008f002f1f97d2623382d8cf2cda5c43bba1e6c780956c` |
+| rain-high.mp3 | Mixkit #2399 heavy rain drops | to verify | `edac7559acba1146a422e0abdd57190ca9b5c269ef7039472a69afb611d551eb` |
+| rain-low.mp3 | Freesound #810468 by designerschoice (rain-samsung-galaxy-smartphone ... light) | to verify | `900226c62bcd7f9b0f2e19f0ad10cb930fc1aef72986c30ac014813fcdd722ef` |
+| rain-mid.mp3 | Freesound #217236 by roofusj (steady rain in the city) | to verify | `cdd5609f92b1f29f41c484d6452d7064117590942d338d6b2b2c10370ae78776` |
+| wind-high.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM.mpeg | to verify | `b6af8a890650f16f08c1fa45be9a4be1f900d0cd33cd10eb0ce9ae819ad6bb7d` |
+| wind-low.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM_2.mpeg | to verify | `ba8433a72ddc1573b13b354996793804645fa5517948370afee95aad5c687c07` |
+| wind-mid.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM_1.mpeg | to verify | `e4f4d1d5c6b1e5ecbc774657334791a606dd8851f6b4e19851a5ba6d7126debe` |
