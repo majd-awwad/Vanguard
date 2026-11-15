@@ -5,12 +5,10 @@
 import { LEVELS, PACKAGE_ID, RANK_NAMES, levelOf, objectivePoints, rankOf } from "./levels.js";
 
 export const PASS_F1 = 0.8 - 1e-9;
-/** Fair deductions: a wrong attempt costs 15% of the objective's points, a hint 10%, and an objective never pays less than 40%. */
-export const WRONG_COST = 0.15;
+/** Fair scoring: every objective is answered once and then revealed. A hint costs 10% of its points; a wrong answer pays the floor (40%), or for marks 75% of the F1 score when that is higher; nothing pays less than 40%. */
 export const HINT_COST = 0.1;
 export const FLOOR = 0.4;
-/** After this many wrong attempts the answer may be shown (the objective then pays the floor). */
-export const SHOW_AFTER = 3;
+export const WRONG_MARK_SHARE = 0.75;
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 export const compassOf = (degrees) => COMPASS[Math.round((((degrees % 360) + 360) % 360) / 45) % 8];
 
@@ -28,10 +26,9 @@ export function scoreMarks(truth, marked) {
   return { hits, extra, missing, f1, pass: f1 >= PASS_F1 };
 }
 
-/** Points of one objective: pass fraction (F1 for marks) minus deductions, never below the floor, whole points. */
-export function earnedPoints(points, { fraction = 1, wrong = 0, hints = 0, shown = false }) {
-  if (shown) return Math.round(points * FLOOR);
-  const raw = points * fraction - points * WRONG_COST * wrong - points * HINT_COST * hints;
+/** Points of one objective: the fraction it earned (1 when right, F1 for marks) minus the cost of hints, never below the floor, whole points. */
+export function earnedPoints(points, { fraction = 1, hints = 0 }) {
+  const raw = points * fraction - points * HINT_COST * hints;
   return Math.max(Math.round(points * FLOOR), Math.round(Math.min(points, raw)));
 }
 
@@ -54,7 +51,7 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
     return now >= term.atLeast;
   };
   const markTruth = (obj) => { const out = []; for (let i = 0; i < n; i++) if (obj.where.every((t) => holds(t, i))) out.push(i); return out; };
-  const state = new Map(level.objectives.map((obj, k) => [obj.id, { done: false, earned: 0, wrong: 0, hints: 0, shown: false, cell: null, hintLevel: 0, points: points[k] }]));
+  const state = new Map(level.objectives.map((obj, k) => [obj.id, { done: false, earned: 0, wrong: 0, hints: 0, cell: null, points: points[k] }]));
   const defs = new Map(level.objectives.map((obj) => [obj.id, obj]));
   const truthCache = new Map();
   const truthOf = (id) => {
@@ -118,7 +115,7 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
     const st = state.get(obj.id);
     const view = {
       id: obj.id, type: obj.type, stage: obj.stage, phen: obj.phen, change: Boolean(obj.change), together: obj.together ?? null, index: objectives.indexOf(obj), total,
-      points: st.points, wrong: st.wrong, hintsUsed: st.hints, hintsLeft: Math.max(0, level.hints - st.hints), canShowAnswer: st.wrong >= SHOW_AFTER,
+      points: st.points, hintsUsed: st.hints, hintsLeft: Math.max(0, level.hints - st.hints),
       candidates: null, pair: null, options: null, arrow: null, restricted: Boolean(obj.restrictTo),
       // The rule itself is not a secret (it is the question); the answer is.
       where: obj.where ?? null, layers: [...new Set([obj.phen, ...(obj.where ?? []).map((t) => t.phen)])],
@@ -136,16 +133,54 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
     for (const phen of level.phenomena) {
       const clean = (arr) => arr.map((v) => (Number.isFinite(v) ? v : null));
       out[phen] = { main: clean(values(phen)), direction: phen === "wind" ? data.main.windDirection.map((d) => (Number.isFinite(d) ? d : null)) : undefined };
-      if (data.from) out[phen].from = clean(values(phen, "from"));
+      if (data.from) { out[phen].from = clean(values(phen, "from")); if (phen === "wind") out[phen].fromDirection = data.from.windDirection.map((d) => (Number.isFinite(d) ? d : null)); }
     }
     return out;
+  }
+
+  /**
+   * The reveal after one objective: only the cells involved. A cell keeps its data hidden (but still shows its outcome symbol) when it is the
+   * SUBJECT of a later objective (a pair to compare, the cell of a wind arrow, the candidates of a restricted search), and a missed cell of a
+   * "mark" objective keeps its data hidden while a later objective still works on the same layer. Everything is revealed at the end of the level.
+   */
+  function buildReveal(obj, index, involved, correct, detail) {
+    const later = objectives.slice(index + 1);
+    const subjects = new Set();
+    const layersLater = new Set();
+    for (const next of later) {
+      for (const phen of new Set([next.phen, ...(next.where ?? []).map((t) => t.phen)])) layersLater.add(phen);
+      if (next.type === "pick-higher") { const p = pairOf(next); subjects.add(p.A); subjects.add(p.B); }
+      if (next.type === "direction") subjects.add(directionAnswer(next).cell);
+      if (next.type === "find-max" && next.restrictTo) for (const i of truthOf(next.restrictTo)) subjects.add(i);
+    }
+    const layers = [...new Set([obj.phen, ...(obj.where ?? []).map((t) => t.phen)])];
+    const sameLayerLater = layers.some((phen) => layersLater.has(phen));
+    const clean = (v) => (Number.isFinite(v) ? v : null);
+    const cells = involved.map(({ index: i, outcome }) => {
+      const withheld = subjects.has(i) || (obj.type === "mark-set" && outcome === "missed" && sameLayerLater);
+      const record = { index: i, row: Math.floor(i / cols), col: i % cols, outcome, withheld };
+      if (!withheld) {
+        record.layers = layers.map((phen) => ({
+          phen, value: clean(values(phen)[i]),
+          ...(data.from && obj.change ? { fromValue: clean(values(phen, "from")[i]) } : {}),
+          ...(phen === "wind" && Number.isFinite(data.main.windDirection[i]) ? { direction: data.main.windDirection[i] } : {}),
+        }));
+      }
+      return record;
+    });
+    const value = (i, phen = obj.phen) => { const cell = cells.find((x) => x.index === i); return cell && !cell.withheld ? clean(values(phen)[i]) : null; };
+    const feedback = { ...detail, correct, phen: obj.phen, change: Boolean(obj.change), together: obj.together ?? null, anyWithheld: cells.some((x) => x.withheld) };
+    if (detail.kind === "pick") { feedback.values = value(detail.higher) !== null && value(detail.lower) !== null ? [value(detail.higher), value(detail.lower)] : null; }
+    if (detail.kind === "max") { feedback.value = value(detail.cell); feedback.level = levelOf(obj.phen, values(obj.phen)[detail.cell]); }
+    if (detail.kind === "direction") feedback.degrees = Math.round(data.main.windDirection[detail.cell]);
+    return { cells, feedback };
   }
 
   const finish = (obj, fraction, extra = {}) => {
     const st = state.get(obj.id);
     st.done = true;
-    st.earned = earnedPoints(st.points, { fraction, wrong: st.wrong, hints: st.hints, shown: Boolean(extra.shown) });
-    st.shown = Boolean(extra.shown);
+    st.earned = earnedPoints(st.points, { fraction, hints: st.hints });
+    st.wrong = extra.wrong ? 1 : 0;
     if (extra.cell !== undefined) st.cell = extra.cell;
   };
 
@@ -171,27 +206,50 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
       const missing = rankOf(phen, value) < 0;
       return { phenomenon: PACKAGE_ID[phen], level: level0, missing, pan: -1 + (2 * (c.col + 0.5)) / cols, rate: 0.85 + 0.4 * (rows > 1 ? 1 - c.row / (rows - 1) : 0.5) };
     },
+    /**
+     * The one answer to the current objective. The objective is then closed (right or wrong) and the cells involved are revealed:
+     * { ok (right), completed: true, earned, reveal: { cells: [{ index, row, col, outcome, withheld, layers }], feedback } }.
+     */
     submit(answer) {
       const index = currentIndex();
       if (index < 0) return { ok: false, error: "finished" };
       const obj = objectives[index];
-      const st = state.get(obj.id);
-      if (obj.type === "mark-set") {
-        const result = scoreMarks(truthOf(obj.id), answer.cells ?? []);
-        if (result.pass) { finish(obj, result.f1); return { ok: true, completed: true, earned: st.earned, ...result, truth: truthOf(obj.id).map(cell) }; }
-        st.wrong += 1;
-        return { ok: false, completed: false, ...result, canShowAnswer: st.wrong >= SHOW_AFTER };
-      }
       let correct = false;
-      if (obj.type === "find-max") correct = truthOf(obj.id).includes(answer.cell);
-      else if (obj.type === "pick-higher") correct = pairOf(obj)[answer.pick] === pairOf(obj).higher;
-      else if (obj.type === "direction") correct = answer.option === directionAnswer(obj).from;
-      if (correct) {
-        finish(obj, 1, obj.type === "find-max" ? { cell: answer.cell } : {});
-        return { ok: true, completed: true, earned: st.earned, truth: truthOf(obj.id).map(cell) };
+      let fraction = 1;
+      let detail = {};
+      let involved = [];
+      if (obj.type === "mark-set") {
+        const truth = truthOf(obj.id);
+        const marked = [...new Set((answer.cells ?? []).filter((i) => Number.isInteger(i) && i >= 0 && i < n))];
+        const result = scoreMarks(truth, marked);
+        correct = result.pass;
+        fraction = result.pass ? result.f1 : Math.max(FLOOR, result.f1 * WRONG_MARK_SHARE);
+        detail = { kind: "marks", hits: result.hits, extra: result.extra, missing: result.missing, total: truth.length };
+        const t = new Set(truth);
+        involved = [...new Set([...marked, ...truth])].sort((x, y) => x - y).map((i) => ({ index: i, outcome: marked.includes(i) ? (t.has(i) ? "correct" : "wrong") : "missed" }));
+      } else if (obj.type === "find-max") {
+        const truth = truthOf(obj.id);
+        correct = truth.includes(answer.cell);
+        detail = { kind: "max", cell: answer.cell };
+        involved = [{ index: answer.cell, outcome: correct ? "correct" : "wrong" }];
+        if (!correct) involved.push({ index: truth[0], outcome: "missed" });
+      } else if (obj.type === "pick-higher") {
+        const pair = pairOf(obj);
+        const picked = pair[answer.pick];
+        correct = picked === pair.higher;
+        const lower = pair.A === pair.higher ? pair.B : pair.A;
+        detail = { kind: "pick", higher: pair.higher, lower };
+        involved = correct ? [{ index: pair.higher, outcome: "correct" }, { index: lower, outcome: "none" }] : [{ index: picked, outcome: "wrong" }, { index: pair.higher, outcome: "missed" }];
+      } else {
+        const truth = directionAnswer(obj);
+        correct = answer.option === truth.from;
+        detail = { kind: "direction", cell: truth.cell, from: truth.from, chosen: answer.option };
+        involved = [{ index: truth.cell, outcome: correct ? "correct" : "wrong" }];
       }
-      st.wrong += 1;
-      return { ok: false, completed: false, canShowAnswer: st.wrong >= SHOW_AFTER };
+      if (!correct && obj.type !== "mark-set") fraction = FLOOR;
+      finish(obj, fraction, { wrong: !correct, cell: obj.type === "find-max" ? answer.cell : undefined });
+      const st = state.get(obj.id);
+      return { ok: correct, completed: true, earned: st.earned, reveal: buildReveal(obj, index, involved, correct, detail) };
     },
     /** Progressive hint: 1 method, 2 region, 3 one correct cell. Costs points. Returns null when none is left. */
     hint() {
@@ -210,30 +268,19 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
       if (obj.type === "direction" && stage >= 2) view.from = directionAnswer(obj).from;
       return view;
     },
-    /** After SHOW_AFTER wrong attempts: complete the objective at the floor and return the answer. */
-    showAnswer() {
-      const index = currentIndex();
-      if (index < 0) return null;
-      const obj = objectives[index];
-      const st = state.get(obj.id);
-      if (st.wrong < SHOW_AFTER) return null;
-      const truth = truthOf(obj.id);
-      finish(obj, 0, { shown: true, cell: obj.type === "find-max" ? truth[0] : null });
-      return { truth: truth.map(cell), earned: st.earned };
-    },
     result() {
-      const list = objectives.map((obj) => ({ id: obj.id, type: obj.type, points: state.get(obj.id).points, earned: state.get(obj.id).earned, wrong: state.get(obj.id).wrong, hints: state.get(obj.id).hints, shown: state.get(obj.id).shown }));
+      const list = objectives.map((obj) => ({ id: obj.id, type: obj.type, points: state.get(obj.id).points, earned: state.get(obj.id).earned, wrong: state.get(obj.id).wrong, hints: state.get(obj.id).hints }));
       return { levelId: level.id, score: score(), objectives: list, wrong: list.reduce((s, x) => s + x.wrong, 0), hints: list.reduce((s, x) => s + x.hints, 0), perfect: score() === 100 };
     },
     /** What a profile stores to resume this level later (no data values). */
     snapshot() {
-      return { levelId: level.id, objectives: Object.fromEntries([...state].map(([id, st]) => [id, { done: st.done, earned: st.earned, wrong: st.wrong, hints: st.hints, shown: st.shown, cell: st.cell }])) };
+      return { levelId: level.id, objectives: Object.fromEntries([...state].map(([id, st]) => [id, { done: st.done, earned: st.earned, wrong: st.wrong, hints: st.hints, cell: st.cell }])) };
     },
   };
   if (restore && restore.levelId === level.id) {
     for (const [id, saved] of Object.entries(restore.objectives ?? {})) {
       const st = state.get(id);
-      if (st && saved && typeof saved === "object") Object.assign(st, { done: Boolean(saved.done), earned: Number(saved.earned) || 0, wrong: Number(saved.wrong) || 0, hints: Number(saved.hints) || 0, shown: Boolean(saved.shown), cell: Number.isInteger(saved.cell) ? saved.cell : null });
+      if (st && saved && typeof saved === "object") Object.assign(st, { done: Boolean(saved.done), earned: Number(saved.earned) || 0, wrong: Number(saved.wrong) || 0, hints: Number(saved.hints) || 0, cell: Number.isInteger(saved.cell) ? saved.cell : null });
     }
   }
   return run;

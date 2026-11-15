@@ -5,7 +5,7 @@ import test from "node:test";
 import { openPackage } from "../web/studio/datasets.js";
 import { CALM_MPS, LEVEL_GRIDS, SOURCE_GRID, aggregateValues, aggregateWind, directionFrom, overlaps } from "../web/experiences/levels/aggregate.js";
 import { LEVELS, LEVEL_COUNT, PACKAGE_ID, buildLevelData, levelOf, objectivePoints, rankOf } from "../web/experiences/levels/levels.js";
-import { FLOOR, HINT_COST, PASS_F1, SHOW_AFTER, WRONG_COST, compassOf, createRun, earnedPoints, scoreMarks } from "../web/experiences/levels/engine.js";
+import { FLOOR, HINT_COST, PASS_F1, WRONG_MARK_SHARE, compassOf, createRun, earnedPoints, scoreMarks } from "../web/experiences/levels/engine.js";
 import { ACHIEVEMENTS, AVATARS, PROFILES_KEY, createProfileStore } from "../web/experiences/levels/profiles.js";
 import { DOCUMENTED_BREAKPOINTS } from "../web/studio/ambience-core.js";
 
@@ -191,7 +191,7 @@ test("answer safety: nothing readable before the reveal contains a value of the 
   assert.ok(!/"values?"|"truth"|"answer"/.test(before));
   assert.deepEqual(run.view().revealed, {});
   const plain = createRun({ level, data });
-  assert.deepEqual(Object.keys(plain).sort(), ["cue", "grid", "hint", "level", "result", "showAnswer", "snapshot", "submit", "view"], "only the intended API");
+  assert.deepEqual(Object.keys(plain).sort(), ["cue", "grid", "hint", "level", "result", "snapshot", "submit", "view"], "only the intended API");
   assert.ok(!("_truth" in plain) && !("_pair" in plain), "the app never exposes the truth");
   for (const phen of ["dust", "rain", "wind"]) for (const sample of [0, 7, 20]) {
     const v = (phen === "wind" ? data.main.wind : data.main[phen])[sample];
@@ -206,7 +206,7 @@ test("answer safety: nothing readable before the reveal contains a value of the 
   const r1 = run.submit({ pick: p.A === p.higher ? "A" : "B" });
   assert.ok(r1.ok);
   assert.deepEqual(run.view().revealed, {});
-  assert.ok(r1.truth.every((c) => Number.isInteger(c.row) && Number.isInteger(c.col) && !("value" in c)));
+  assert.ok(r1.reveal.cells.every((c) => Number.isInteger(c.row) && Number.isInteger(c.col)));
   for (const [k, obj] of level.objectives.slice(1).entries()) {
     const truth = run._truth(obj.id);
     if (obj.type === "mark-set") run.submit({ cells: truth }); else if (obj.type === "find-max") run.submit({ cell: truth[0] });
@@ -230,14 +230,13 @@ test("cues: pan follows the column (west -1, east +1), playback rate follows the
   assert.equal(run.cue("rain", 5).phenomenon, "rainfall");
 });
 
-test("scoring: 100 per level, wrong attempts and hints cost points, the floor keeps it fair, marks are scored by F1", () => {
+test("scoring: 100 per level, a hint costs points, a wrong answer pays the floor, marks are scored by F1", () => {
   assert.equal(earnedPoints(20, {}), 20);
-  assert.equal(earnedPoints(20, { wrong: 1 }), 17);
   assert.equal(earnedPoints(20, { hints: 1 }), 18);
-  assert.equal(earnedPoints(20, { wrong: 10, hints: 3 }), Math.round(20 * FLOOR));
-  assert.equal(earnedPoints(20, { shown: true }), 8);
-  assert.equal(WRONG_COST, 0.15);
+  assert.equal(earnedPoints(20, { hints: 20 }), Math.round(20 * FLOOR));
+  assert.equal(earnedPoints(20, { fraction: FLOOR }), 8);
   assert.equal(HINT_COST, 0.1);
+  assert.equal(WRONG_MARK_SHARE, 0.75);
   assert.ok(scoreMarks([1, 2, 3, 4], [1, 2, 3, 4]).pass);
   assert.ok(scoreMarks([1, 2, 3, 4], [1, 2, 3]).pass, "3 of 4 with nothing extra passes (F1 0.857)");
   assert.ok(!scoreMarks([1, 2, 3, 4], [1, 2]).pass);
@@ -245,29 +244,110 @@ test("scoring: 100 per level, wrong attempts and hints cost points, the floor ke
   assert.equal(scoreMarks([1, 2], [3]).hits, 0);
   assert.ok(PASS_F1 < 0.8 && PASS_F1 > 0.79);
   const level = LEVELS[0];
+  // a wrong answer closes the objective at the floor and reveals; a right one pays in full; a hint costs 10%
   const run = createRun({ level, data: buildLevelData(level, phens), exposeTruth: true });
-  // wrong then right on the first objective
   const p = run._pair("l1-pick");
   const wrong = p.A === p.higher ? "B" : "A";
   const r1 = run.submit({ pick: wrong });
   assert.equal(r1.ok, false);
-  assert.equal(run.view().current.wrong, 1);
-  const hint = run.hint();
-  assert.equal(hint.level, 1);
-  run.submit({ pick: wrong === "A" ? "B" : "A" });
+  assert.equal(r1.completed, true, "one answer per objective");
   const pts = run.view().objectives[0].points;
-  assert.equal(run.view().objectives[0].earned, earnedPoints(pts, { wrong: 1, hints: 1 }));
+  assert.equal(run.view().objectives[0].earned, earnedPoints(pts, { fraction: FLOOR }));
+  assert.equal(run.view().index, 1, "the next objective is current");
+  const hinted = createRun({ level, data: buildLevelData(level, phens), exposeTruth: true });
+  assert.equal(hinted.hint().level, 1);
+  const p2 = hinted._pair("l1-pick");
+  hinted.submit({ pick: p2.A === p2.higher ? "A" : "B" });
+  assert.equal(hinted.view().objectives[0].earned, earnedPoints(pts, { hints: 1 }));
+  // a wrong set of marks still earns a share of the F1 score, never below the floor
+  const marks = createRun({ level: LEVELS[1], data: buildLevelData(LEVELS[1], phens), exposeTruth: true });
+  const pp = marks._pair("l2-pick");
+  marks.submit({ pick: pp.A === pp.higher ? "A" : "B" });
+  const t = marks._truth("l2-any");
+  marks.submit({ cells: t.slice(0, 1) });
+  assert.equal(marks.view().objectives[1].earned >= Math.round(marks.view().objectives[1].points * FLOOR), true);
   // hints are limited per level and shrink with the level
   const run5 = createRun({ level: LEVELS[4], data: buildLevelData(LEVELS[4], phens), exposeTruth: true });
   assert.ok(run5.hint());
   assert.equal(run5.hint(), null, "level 5 allows one hint per objective");
-  // after SHOW_AFTER wrong attempts the answer may be shown and the objective pays the floor
-  const run2 = createRun({ level: LEVELS[0], data: buildLevelData(LEVELS[0], phens), exposeTruth: true });
-  assert.equal(run2.showAnswer(), null, "not available yet");
-  for (let i = 0; i < SHOW_AFTER; i++) run2.submit({ pick: run2._pair("l1-pick").A === run2._pair("l1-pick").higher ? "B" : "A" });
-  assert.equal(run2.view().current.canShowAnswer, true);
-  const shown = run2.showAnswer();
-  assert.ok(shown.earned > 0 && shown.earned === earnedPoints(run2.view().objectives[0].points, { shown: true }));
+});
+
+test("the reveal after an objective: only the cells involved, with value, meaning level and outcome; nothing a later objective needs", () => {
+  const level = LEVELS[0];
+  const data = buildLevelData(level, phens);
+  const run = createRun({ level, data, exposeTruth: true });
+  const p = run._pair("l1-pick");
+  const wrong = p.A === p.higher ? "B" : "A";
+  const r = run.submit({ pick: wrong });
+  const cells = r.reveal.cells;
+  assert.deepEqual(cells.map((c) => c.index).sort(), [p.A, p.B].sort(), "only the two cells of the question");
+  const byOutcome = Object.fromEntries(cells.map((c) => [c.outcome, c]));
+  assert.equal(byOutcome.wrong.index, p[wrong], "the picked cell is wrong");
+  assert.equal(byOutcome.missed.index, p.higher, "the higher cell is the one that was missed");
+  for (const c of cells) { assert.equal(c.withheld, false); assert.ok(Number.isFinite(c.layers[0].value) && c.layers[0].phen === "dust"); }
+  assert.equal(r.reveal.feedback.kind, "pick");
+  assert.deepEqual(r.reveal.feedback.values, [data.main.dust[p.higher], data.main.dust[p.A === p.higher ? p.B : p.A]]);
+  assert.ok(r.reveal.feedback.values[0] > r.reveal.feedback.values[1]);
+  assert.deepEqual(run.view().revealed, {}, "the rest of the map is still hidden");
+  // marks: the player's marks (correct / wrong) and the missed cells; a missed cell keeps its data while a later objective uses the same layer
+  const l2 = LEVELS[1];
+  const d2 = buildLevelData(l2, phens);
+  const run2 = createRun({ level: l2, data: d2, exposeTruth: true });
+  const pp = run2._pair("l2-pick");
+  run2.submit({ pick: pp.A === pp.higher ? "A" : "B" });
+  const any = run2._truth("l2-any");
+  const bad = [...Array(16).keys()].find((i) => !any.includes(i));
+  const rAny = run2.submit({ cells: [any[0], bad] });
+  const outcomes = Object.fromEntries(rAny.reveal.cells.map((c) => [c.index, c]));
+  assert.equal(outcomes[any[0]].outcome, "correct");
+  assert.equal(outcomes[bad].outcome, "wrong");
+  assert.ok(any.slice(1).every((i) => outcomes[i].outcome === "missed" && outcomes[i].withheld === true && !("layers" in outcomes[i])), "missed cells show the symbol but keep their data until the end of the level");
+  assert.equal(outcomes[any[0]].withheld, false);
+  assert.ok(rAny.reveal.feedback.anyWithheld);
+  const maxTruth = run2._truth("l2-max");
+  const rMax = run2.submit({ cell: maxTruth[0] });
+  assert.equal(rMax.reveal.cells.length, 1);
+  assert.equal(rMax.reveal.cells[0].outcome, "correct");
+  // a cell that a later objective compares (its pair) is never revealed early
+  const l4 = LEVELS[3];
+  const d4 = buildLevelData(l4, phens);
+  const run4 = createRun({ level: l4, data: d4, exposeTruth: true });
+  const wind = l4.objectives.find((o) => o.type === "find-max" && o.restrictTo);
+  assert.ok(wind, "level 4 has a restricted search");
+  const dustPair = run4._pair("l4-dust");
+  run4.submit({ pick: dustPair.A === dustPair.higher ? "A" : "B" });
+  const rainTruth = run4._truth("l4-rain");
+  const rRain = run4.submit({ cells: rainTruth });
+  assert.ok(rRain.reveal.cells.every((c) => c.outcome === "correct" && c.withheld === true && !("layers" in c)), "these cells are the candidates of a later search: the symbol shows, the data waits for the end of the level");
+  const windTruth = run4._truth("l4-wind");
+  const rWind = run4.submit({ cells: windTruth });
+  const candidates = new Set(rainTruth);
+  assert.ok(rWind.reveal.cells.filter((c) => candidates.has(c.index)).every((c) => c.withheld), "the cells of the later restricted search are not revealed");
+  // level 5 change objectives reveal both dates; the arrow cell of a later direction question stays hidden until it is asked
+  const l5 = LEVELS[4];
+  const d5 = buildLevelData(l5, phens);
+  const run5 = createRun({ level: l5, data: d5, exposeTruth: true });
+  const up = run5.submit({ cells: run5._truth("l5-dust-up") });
+  assert.ok(up.reveal.cells.every((c) => Number.isFinite(c.layers[0].fromValue) && Number.isFinite(c.layers[0].value)));
+  // direction: the question's own cell is revealed with its direction
+  const l3 = LEVELS[2];
+  const d3 = buildLevelData(l3, phens);
+  const run3 = createRun({ level: l3, data: d3, exposeTruth: true });
+  const p3 = run3._pair("l3-pick");
+  run3.submit({ pick: p3.A === p3.higher ? "A" : "B" });
+  run3.submit({ cell: run3._truth("l3-max")[0] });
+  const high = run3.submit({ cells: run3._truth("l3-high") });
+  assert.ok(high.reveal.cells.every((c) => (c.withheld ? !c.layers : true)));
+  const dir = run3.submit({ option: run3._direction("l3-dir").from });
+  assert.equal(dir.reveal.cells.length, 1);
+  assert.ok(Number.isFinite(dir.reveal.cells[0].layers[0].direction));
+  assert.equal(dir.reveal.feedback.from, run3._direction("l3-dir").from);
+  // at the end of the level everything is revealed
+  run3.submit({ cells: run3._truth("l3-west") });
+  const end = run3.view();
+  assert.equal(end.finished, true);
+  assert.equal(end.revealed.wind.main.length, 30);
+  assert.ok(end.revealed.wind.main.every(Number.isFinite));
 });
 
 test("progress can be saved and restored (no data values in the snapshot)", () => {

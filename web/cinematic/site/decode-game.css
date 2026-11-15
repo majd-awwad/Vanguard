@@ -105,3 +105,24 @@
 
 :root[lang="ar"] .dg-stage .xp-cell[data-pair="A"]::before { content: "أ"; }
 :root[lang="ar"] .dg-stage .xp-cell[data-pair="B"]::before { content: "ب"; }
+
+/* The reveal: outcome (colour AND symbol), real data colours and values on the cells involved */
+.dg-stage .xp-cell[data-outcome="correct"] { border: 3px solid #68e0d0; }
+.dg-stage .xp-cell[data-outcome="wrong"] { border: 3px solid #ff4fd8; }
+.dg-stage .xp-cell[data-outcome="missed"] { border: 3px dashed #b9a2ff; }
+.dg-sym { position: absolute; inset-block-start: 3px; inset-inline-end: 3px; width: 1.45rem; height: 1.45rem; border-radius: 50%; display: inline-grid; place-items: center; font: 800 1rem/1 var(--sans); color: #06121c; background: #68e0d0; text-shadow: none; }
+.dg-sym[data-outcome="wrong"] { background: #ff4fd8; }
+.dg-sym[data-outcome="missed"] { background: #b9a2ff; }
+.dg-sym.none { display: none; }
+.dg-cellval { display: block; line-height: 1.05; font: 700 .68rem/1.05 var(--mono); color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; pointer-events: none; }
+.dg-reveal-title { margin: .4rem 0 0; font-size: 1rem; color: var(--muted); font-weight: 500; }
+.dg-reveal { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.dg-reveal li { display: flex; flex-wrap: wrap; gap: .3rem .5rem; align-items: baseline; padding: .4rem .6rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: var(--fs-small); }
+.dg-reveal li[data-outcome="correct"] { border-color: #68e0d0; }
+.dg-reveal li[data-outcome="wrong"] { border-color: #ff4fd8; }
+.dg-reveal li[data-outcome="missed"] { border-color: #b9a2ff; border-style: dashed; }
+.dg-reveal .dg-sym { position: static; flex: none; }
+.dg-feedback[data-correct="1"] { border-color: #68e0d0; }
+.dg-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
+.dg-effect-note { color: var(--muted); }
+.dg-reveal-screen .dg-stage .xp-cell { min-height: 2.2rem; }
