@@ -89,3 +89,7 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 ## Guided Voice / Pure Sonification restored (recordings stay the only sound)
 - The entry dialog (two choices) and the Guided / Pure switch in the Studio sound controls are back. Guided Voice = spoken guidance (live region and visible text when no voice exists) plus the recordings, ducked while speaking. Pure Sonification = the recordings only, no automatic speech.
 - One source of truth: the "Spoken instructions" setting (`guidance`). The dialog, the Studio switch, the settings drawer and the settings page all read and write it and stay in sync through the `earthpulse:settings` event. Switching keeps position, tab, findings and matches.
+
+## Meaning of each value (Guided Voice and a badge in every mode)
+- A short relative phrase (for example "Dust: high compared with this dataset") from the same level that picks the recording; temperature gets low/mid/high from its own 33rd/66th percentiles (18.52 / 26.74 degrees C). Rain below 0.1 mm/h says "no measurable rain"; a missing value says "no data here".
+- Guided Voice speaks: phrase, value with unit, place (1 decimal), date only when it changed. The same phrase shows as a small badge in the selected-place card and the hover tooltip; Pure Sonification never speaks it.
