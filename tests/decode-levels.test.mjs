@@ -201,14 +201,21 @@ test("answer safety: nothing readable before the reveal contains a value of the 
   const cue = plain.cue("dust", 3);
   assert.ok(["low", "mid", "high"].includes(cue.level) || cue.level === null);
   assert.ok(cue.pan >= -1 && cue.pan <= 1 && cue.rate >= 0.85 && cue.rate <= 1.25);
-  // completing the rain objective reveals rain only
-  const t = run._truth("l4-dust") ?? [];
+  // completing objectives shows where the answers were, never the values; the values come with the final reveal
   const p = run._pair("l4-dust");
-  run.submit({ pick: p.A === p.higher ? "A" : "B" });
-  assert.deepEqual(Object.keys(run.view().revealed), ["dust"]);
-  run.submit({ cells: run._truth("l4-rain") });
-  assert.deepEqual(Object.keys(run.view().revealed).sort(), ["dust", "rain"]);
-  void t;
+  const r1 = run.submit({ pick: p.A === p.higher ? "A" : "B" });
+  assert.ok(r1.ok);
+  assert.deepEqual(run.view().revealed, {});
+  assert.ok(r1.truth.every((c) => Number.isInteger(c.row) && Number.isInteger(c.col) && !("value" in c)));
+  for (const [k, obj] of level.objectives.slice(1).entries()) {
+    const truth = run._truth(obj.id);
+    if (obj.type === "mark-set") run.submit({ cells: truth }); else if (obj.type === "find-max") run.submit({ cell: truth[0] });
+    if (k < level.objectives.length - 2) assert.deepEqual(run.view().revealed, {}, "still nothing before the last objective: " + obj.id);
+  }
+  const done = run.view();
+  assert.equal(done.finished, true);
+  assert.deepEqual(Object.keys(done.revealed).sort(), ["dust", "rain", "wind"]);
+  assert.equal(done.revealed.dust.main.length, 36);
 });
 
 test("cues: pan follows the column (west -1, east +1), playback rate follows the row (south 0.85, north 1.25)", () => {

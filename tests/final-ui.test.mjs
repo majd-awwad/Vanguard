@@ -6,10 +6,10 @@ import { defaults, sanitize } from "../web/cinematic/site/settings.js";
 
 const text = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 
-test("nav: exactly five links, every target exists, Decode is the home page", () => {
+test("nav: exactly five links, every target exists, Decode is the five-level game and the cinematic page stays the home page", () => {
   assert.deepEqual(NAV_ITEMS.map((i) => i.id), ["decode", "explore", "studio", "science", "about"]);
   for (const item of NAV_ITEMS) assert.ok(existsSync(new URL("../web/" + item.path, import.meta.url)), item.path + " must exist (no 404)");
-  assert.equal(NAV_ITEMS[0].path, "index.html");
+  assert.equal(NAV_ITEMS[0].path, "pages/decode.html", "the Decode link opens the five-level game");
   assert.match(text("web/index.html"), /cinematic/);
   assert.ok(existsSync(new URL("../web/atlas.html", import.meta.url)), "the old atlas stays as the archive");
 });

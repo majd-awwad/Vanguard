@@ -119,7 +119,9 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
     const view = {
       id: obj.id, type: obj.type, stage: obj.stage, phen: obj.phen, change: Boolean(obj.change), together: obj.together ?? null, index: objectives.indexOf(obj), total,
       points: st.points, wrong: st.wrong, hintsUsed: st.hints, hintsLeft: Math.max(0, level.hints - st.hints), canShowAnswer: st.wrong >= SHOW_AFTER,
-      candidates: null, pair: null, options: null, arrow: null,
+      candidates: null, pair: null, options: null, arrow: null, restricted: Boolean(obj.restrictTo),
+      // The rule itself is not a secret (it is the question); the answer is.
+      where: obj.where ?? null, layers: [...new Set([obj.phen, ...(obj.where ?? []).map((t) => t.phen)])],
     };
     if (obj.type === "pick-higher") { const p = pairOf(obj); view.pair = { A: cell(p.A), B: cell(p.B) }; }
     if (obj.type === "find-max") view.candidates = (candidatesOf(obj) ?? null)?.map(cell) ?? null;
@@ -127,14 +129,14 @@ export function createRun({ level: levelOrId, data, restore = null, exposeTruth 
     return view;
   }
 
+  /** The real values, only once the whole level is finished (the final reveal). Before that: nothing. Each layer is { main, from? } (from only on a two-date level). */
   function revealedLayers() {
+    if (currentIndex() >= 0) return {};
     const out = {};
-    for (const obj of objectives) {
-      if (!state.get(obj.id).done) continue;
-      for (const phen of new Set([obj.phen, ...(obj.together ?? []), ...obj.where?.map((t) => t.phen) ?? []])) {
-        out[phen] ??= { main: values(phen).map((v) => (Number.isFinite(v) ? v : null)) };
-        if (data.from && obj.change && !out[phen].from) out[phen].from = values(phen, "from").map((v) => (Number.isFinite(v) ? v : null));
-      }
+    for (const phen of level.phenomena) {
+      const clean = (arr) => arr.map((v) => (Number.isFinite(v) ? v : null));
+      out[phen] = { main: clean(values(phen)), direction: phen === "wind" ? data.main.windDirection.map((d) => (Number.isFinite(d) ? d : null)) : undefined };
+      if (data.from) out[phen].from = clean(values(phen, "from"));
     }
     return out;
   }
