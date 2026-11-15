@@ -24,6 +24,7 @@ import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
 import { AMBIENCE_PHENOMENA, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
 import { createAmbience } from "./ambience.js";
+import { SIGNAL, dryNotice, isDryValue } from "./signal-core.js";
 import { infoIcon } from "./studio-ui-kit.js";
 import { studioCopy } from "./studio-copy.js";
 import { mountTools } from "./tools.js";
@@ -241,7 +242,7 @@ async function mountApp(document, root, language, initialMode) {
     if (!tip) return;
     if (!cell || (state.selected && cell.index === state.selected.index)) { tip.hidden = true; return; }
     const d = describeCell(cell);
-    tip.textContent = d.value === null ? m.info.missing : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
+    tip.textContent = d.value === null ? m.info.missing : d.kind !== "change" && isDryValue(phen.id, d.value) ? m.dry[phen.id].cell : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
     tip.hidden = false;
     const x = Math.min(state.width - tip.offsetWidth - 6, p.x + 14);
     tip.style.transform = `translate(${Math.max(6, Math.round(x))}px, ${Math.max(6, Math.round(p.y - 34))}px)`;
@@ -626,6 +627,24 @@ async function mountApp(document, root, language, initialMode) {
     el.ambStatus.textContent = level ? m.ambience.levels[level] : m.ambience.silent;
   }
 
+  // ---- Dry dates: explain a date with almost no signal and suggest the wettest real dates
+  el.dryNotice = h(document, "div", { class: "st-dry", role: "status", "aria-live": "polite", hidden: true });
+  function renderDryNotice() {
+    if (!el.dryNotice) return;
+    const rule = SIGNAL[phen.id];
+    const notice = !rule || state.comparison ? null : dryNotice({ phenomenon: phen.id, list: phen.list, currentId: state.snapshot.id, exclude: api.lockedDates() });
+    el.dryNotice.hidden = !notice;
+    if (!notice) { el.dryNotice.replaceChildren(); return; }
+    const words = m.dry[phen.id];
+    const buttons = notice.suggestions.map((s) => {
+      const pct = Math.round(s.share * 100);
+      const b = h(document, "button", { type: "button", class: "button ghost small-button", "aria-label": T(m.dry.pick, { date: s.date, n: pct }), title: T(m.dry.share, { n: pct }), text: s.date });
+      b.addEventListener("click", () => requestDate(s.id));
+      return b;
+    });
+    el.dryNotice.replaceChildren(h(document, "p", { text: words.notice }), h(document, "div", { class: "st-dry-dates" }, ...buttons));
+  }
+
   // ---- Phenomena and date (top left over the map)
   const phenButtons = {};
   el.phenGroup = h(document, "div", { class: "seg", role: "group", "aria-label": m.phen.label });
@@ -791,7 +810,7 @@ async function mountApp(document, root, language, initialMode) {
     const range = h(document, "bdi", { dir: "ltr", text: formatUtcTime(s.time.start).replace(" UTC", "") + "–" + formatUtcTime(s.time.end) });
     el.insWhen.replaceChildren(dateOf(s) + " · ", range);
     el.insSub.textContent = state.cmpSources ? state.cmpSources.a.date + " → " + state.cmpSources.b.date + ": " + fmt(state.cmpSources.a.values[d.index]) + " → " + fmt(state.cmpSources.b.values[d.index]) : phen.id === "wind" && d.value !== null ? windText(d.index) : "";
-    el.insSound.textContent = soundText(d);
+    el.insSound.textContent = d.kind !== "change" && isDryValue(phen.id, d.value) ? m.dry[phen.id].cell + ". " + soundText(d) : soundText(d);
     el.handle.setAttribute("aria-label", m.mobile.expand);
     positionCard();
   }
@@ -939,6 +958,7 @@ async function mountApp(document, root, language, initialMode) {
 
   function onDataChanged() {
     renderLegend();
+    renderDryNotice();
     updateAmbience();
     renderLayerChip();
     renderInfo();
@@ -999,12 +1019,18 @@ async function mountApp(document, root, language, initialMode) {
     h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.timewrap, h(document, "div", { class: "st-inline" }, el.layerChip, el.timePlay), el.lock, el.lockFoot);
   const soundCard = h(document, "section", { class: "st-card st-sound", role: "group", "aria-label": c.sound.title }, title(m.cards.sound), el.soundButton, el.soundState, el.soundMore, el.wave);
   const toolsCard = h(document, "section", { class: "st-card", "aria-label": m.cards.tools }, title(m.cards.tools), el.rail, el.exploreHint, el.flyout);
+  let mapBoxEl;
   const how = h(document, "details", { class: "st-card st-how" }, h(document, "summary", { text: m.cards.how }), ...helpNodes());
   const app = h(document, "div", { class: "st-page", "data-flyout": "closed", "data-tool": "explore", "data-timeline": "bar" },
-    h(document, "div", { class: "st-mapcol" }, h(document, "div", { class: "st-mapbox" }, el.frame, el.hint, el.legend, el.cluster, el.hoverTip, el.note)),
+    h(document, "div", { class: "st-mapcol" }, (mapBoxEl = h(document, "div", { class: "st-mapbox" }, el.frame, el.hint, el.legend, el.cluster, el.hoverTip, el.note, el.dryNotice))),
     h(document, "div", { class: "st-col" }, head, dataCard, soundCard, el.inspector, toolsCard, how));
+  // On small screens the dry-date notice moves into the Data card so it never covers the small map.
+  const narrow = win.matchMedia?.("(max-width: 1023px)");
+  const placeDry = () => { if (narrow?.matches) dataCard.insertBefore(el.dryNotice, el.timewrap); else mapBoxEl.append(el.dryNotice); };
+  narrow?.addEventListener?.("change", placeDry);
   function setFlyout(open) { app.dataset.flyout = open ? "open" : "closed"; el.exploreHint.hidden = open; invalidate(); }
   function placeTimeline() { app.dataset.timeline = "bar"; layoutChanged(false); }
+  placeDry();
   setFlyout(false);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
