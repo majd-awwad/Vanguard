@@ -188,6 +188,7 @@ function mountPlay(app, level, run) {
   const grid = h(document, "div", { class: "xp-grid" });
   stage.append(grid);
   const crop = textureCrop(SOURCE_BOUNDS);
+  stage.style.setProperty("--dg-rows", String(level.grid.rows));
   Object.assign(stage.style, { aspectRatio: String(crop.aspect), backgroundImage: `url("${TEXTURE}")`, backgroundSize: `${crop.sizeX}% ${crop.sizeY}%`, backgroundPosition: `${crop.posX}% ${crop.posY}%` });
   const label = (r, col) => fill(p.cellLabel, { id: cellId(r, col), lat: formatLat(cellBounds(SOURCE_BOUNDS, level.grid, r, col).north) + "–" + formatLat(cellBounds(SOURCE_BOUNDS, level.grid, r, col).south), lon: formatLon(cellBounds(SOURCE_BOUNDS, level.grid, r, col).west) + "–" + formatLon(cellBounds(SOURCE_BOUNDS, level.grid, r, col).east) });
   const api = mountCellGrid(document, grid, { rows, cols, label: p.gridLabel, describe: label, onChoose: (r, col) => choose(r * cols + col), helpId: "dg-help" });
@@ -437,6 +438,7 @@ function showResult(app, level, run, result, outcome) {
   const grid = h(document, "div", { class: "xp-grid" });
   stage.append(grid);
   const crop = textureCrop(SOURCE_BOUNDS);
+  stage.style.setProperty("--dg-rows", String(level.grid.rows));
   Object.assign(stage.style, { aspectRatio: String(crop.aspect), backgroundImage: `url("${TEXTURE}")`, backgroundSize: `${crop.sizeX}% ${crop.sizeY}%`, backgroundPosition: `${crop.posX}% ${crop.posY}%` });
   const readout = h(document, "p", { class: "dg-cue", role: "status", "aria-live": "polite", text: r.reviewNote });
   const state = { phen: level.phenomena[0], which: "main" };

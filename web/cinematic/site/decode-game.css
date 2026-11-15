@@ -96,7 +96,9 @@
 @media (max-width: 900px) {
   .dg-layout { grid-template-columns: 1fr; }
   .dg-mapcol { position: static; }
-  .dg-stage .xp-cell { min-height: 2.75rem; font-size: .7rem; }
+  /* Narrow screens: tall enough for touch cells; the picture stretches with the box but still shows the same region. */
+  .dg-stage { aspect-ratio: auto !important; height: calc(var(--dg-rows, 4) * 2.5rem); max-height: none; }
+  .dg-stage .xp-cell { min-height: 0; font-size: .7rem; }
 }
 
 .dg-page h1:focus, .dg-page h2:focus { outline: none; }
