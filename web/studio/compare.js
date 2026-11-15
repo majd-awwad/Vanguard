@@ -1,6 +1,7 @@
 import { cellId, formatLat, formatLon } from "../cinematic/site/cells.js";
 import { h } from "../cinematic/site/dom.js";
-import { cellRect, rectCells, summarize } from "./field.js";
+import { cellCenter, cellRect, rectCells, summarize } from "./field.js";
+import { compareCopy } from "./compare-copy.js";
 import { joinPlans, scanSteps, sequencePlan, strideFor } from "./mapping.js";
 
 // Milestone M5: compare two dates (published comparison, or computed only inside one model-build group, otherwise
@@ -48,6 +49,7 @@ export function mountCompare(api) {
   const { state, el, grid, c, T, document, audio } = api;
   const transport = audio.transport;
   state.places = { a: null, b: null };
+  const k = compareCopy[api.language];
   state.cmpSources = null;
 
   const select = (id, label) => h(document, "select", { id, "aria-label": label });
@@ -141,7 +143,7 @@ export function mountCompare(api) {
   const playBoth = h(document, "button", { type: "button", class: "button", text: c.compare.playBoth });
   el.placeNote = h(document, "p", { class: "small", role: "status", "aria-live": "polite" });
   const label = (place) => (!place ? c.compare.none : place.type === "cell" ? cellId(place.cell.row, place.cell.col) : T("{south} to {north}, {west} to {east}", { south: formatLat(place.rect.south), north: formatLat(place.rect.north), west: formatLon(place.rect.west), east: formatLon(place.rect.east) }));
-  function refreshPlaces() {
+  function refreshPlacesLegacy() {
     const values = api.layerValues();
     const rows = [];
     const summaries = {};
@@ -167,28 +169,31 @@ export function mountCompare(api) {
   state.dataHooks.push(refreshPlaces);
 
   let playing = null;
+  playBoth.textContent = k.listen;
   playBoth.addEventListener("click", async () => {
     const { a, b } = state.places;
     if (!a || !b) { el.placeNote.textContent = c.compare.needBoth; return; }
     if (!audio.enabled) await api.setSound(true);
     api.stopRun?.(true);
-    const values = api.layerValues();
-    const kind = api.layerKind();
+    const cellsOnly = a.type === "cell" && b.type === "cell";
+    const values = cellsOnly ? state.snapshot.values : api.layerValues();
+    const kind = cellsOnly ? "dust" : api.layerKind();
     const plan = joinPlans(fingerprintPlan(a, values, kind, grid, api.tonesFor), fingerprintPlan(b, values, kind, grid, api.tonesFor));
     state.busy = true;
     playing = { plan, revision: null, place: "a" };
     audio.play(plan);
     playing.revision = transport.snapshot().planRevision;
-    el.placeNote.textContent = c.compare.a;
+    el.placeNote.textContent = T(k.playing, { x: "A" });
+    markPlaying("a");
     api.invalidate();
   });
   transport.subscribe((snap) => {
     if (!playing || snap.planRevision !== playing.revision) return;
     if (snap.status === "playing" && snap.activeEventId) {
       const event = playing.plan.events.findLast((e) => e.id === snap.activeEventId);
-      if (event && event.place !== playing.place) { playing.place = event.place; el.placeNote.textContent = event.place === "a" ? c.compare.a : c.compare.b; api.invalidate(); }
+      if (event && event.place !== playing.place) { playing.place = event.place; el.placeNote.textContent = T(k.playing, { x: event.place.toUpperCase() }); markPlaying(event.place); api.invalidate(); }
     }
-    if (snap.status === "ended") { playing = null; state.busy = false; el.placeNote.textContent = ""; api.invalidate(); }
+    if (snap.status === "ended") { playing = null; state.busy = false; el.placeNote.textContent = k.done; markPlaying(null); api.invalidate(); }
   });
 
   state.extraOverlay.push((overlay, svg, toScreen) => {
@@ -205,19 +210,127 @@ export function mountCompare(api) {
     }
   });
 
+  // ---- Region A / B on the map: click a cell to set the next region; both values come from the loaded snapshot.
+  let last = null;
+  let forced = null;
+  let lastSnap = state.snapshot.id;
+  let cmpPlaying = null;
+  const target = () => (!state.places.a ? "a" : !state.places.b ? "b" : forced ?? (last === "a" ? "b" : "a"));
+  const isCell = (p) => p?.type === "cell";
+  const valueOf = (place) => { const v = state.snapshot.values[place.cell.index]; return v === null || v === undefined || Number.isNaN(v) ? null : v; };
+  function markPlaying(which) { cmpPlaying = which; for (const card of el.placeTable.querySelectorAll(".cmp-card")) card.dataset.playing = String(card.dataset.which === which); }
+  function stopCompareAudio() { if (playing) { audio.stop(); playing = null; state.busy = false; } cmpPlaying = null; }
+  function announce(text) { el.placeNote.textContent = text; }
+  function setCell(which, cell) {
+    stopCompareAudio();
+    state.places[which] = { type: "cell", cell: { row: cell.row, col: cell.col, index: cell.index } };
+    last = which;
+    forced = null;
+    refreshPlaces();
+    const v = valueOf(state.places[which]);
+    announce(T(k.setTo, { x: which.toUpperCase(), id: cellId(cell.row, cell.col), value: v === null ? "—" : api.fmt(v), unit: v === null ? k.noValue : api.unitText() }));
+  }
+  el.cmpPrompt = h(document, "p", { class: "cmp-prompt", role: "status", "aria-live": "polite" });
+  el.cmpReplace = h(document, "div", { class: "seg cmp-replace", role: "group", "aria-label": k.replace });
+  const replaceButtons = {};
+  for (const which of ["a", "b"]) {
+    const b = h(document, "button", { type: "button", "aria-pressed": "false", text: which === "a" ? k.replaceA : k.replaceB });
+    b.addEventListener("click", () => { forced = which; renderPrompt(); });
+    replaceButtons[which] = b;
+    el.cmpReplace.append(b);
+  }
+  const swapButton = h(document, "button", { type: "button", class: "button ghost small-button", text: k.swap });
+  const clearButton = h(document, "button", { type: "button", class: "button ghost small-button", text: k.clear });
+  swapButton.addEventListener("click", () => {
+    stopCompareAudio();
+    [state.places.a, state.places.b] = [state.places.b, state.places.a];
+    refreshPlaces();
+    announce(k.swapped);
+  });
+  clearButton.addEventListener("click", () => {
+    stopCompareAudio();
+    state.places = { a: null, b: null };
+    last = null; forced = null;
+    refreshPlaces();
+    announce(k.cleared);
+  });
+  function renderPrompt() {
+    const { a, b } = state.places;
+    const t = target();
+    el.cmpPrompt.textContent = !a ? k.promptA : !b ? k.promptB : T(k.nextReplace, { x: t.toUpperCase() });
+    el.cmpReplace.hidden = !(a && b);
+    for (const [which, button] of Object.entries(replaceButtons)) button.setAttribute("aria-pressed", String(which === t));
+    swapButton.disabled = !(a && b);
+    clearButton.disabled = !(a || b);
+    playBoth.disabled = !(a && b);
+  }
+  function renderCellCompare() {
+    const unit = api.unitText();
+    const card = (which) => {
+      const place = state.places[which];
+      const box = h(document, "div", { class: "cmp-card", "data-which": which, "data-empty": String(!place), "data-playing": String(cmpPlaying === which) }, h(document, "span", { class: "cmp-tag", text: which === "a" ? k.regionA : k.regionB }));
+      if (!place) { box.append(h(document, "span", { class: "cmp-empty", text: k.notSet })); return box; }
+      const v = valueOf(place);
+      const centre = cellCenter(grid, place.cell.row, place.cell.col);
+      box.append(h(document, "strong", { class: "cmp-id ltr", text: cellId(place.cell.row, place.cell.col) }), h(document, "span", { class: "cmp-where ltr", text: formatLat(centre.lat) + ", " + formatLon(centre.lon) }),
+        h(document, "strong", { class: "cmp-value ltr", text: v === null ? "—" : api.fmt(v) }), h(document, "span", { class: "cmp-unit", text: v === null ? k.noValue : unit }));
+      return box;
+    };
+    const { a, b } = state.places;
+    const nodes = [h(document, "div", { class: "cmp-cards" }, card("a"), card("b"))];
+    if (a && b) {
+      const va = valueOf(a);
+      const vb = valueOf(b);
+      let sentence = k.missing;
+      let diffText = "—";
+      if (va !== null && vb !== null) {
+        const d = vb - va;
+        diffText = api.fmtChange(d) + " " + unit;
+        sentence = d === 0 ? k.equal : T(d > 0 ? k.higher : k.lower, { x: api.fmtChange(Math.abs(d)).replace(/^\+/, ""), unit });
+      }
+      nodes.push(h(document, "div", { class: "cmp-diff" }, h(document, "span", { class: "cmp-diff-label", text: k.diff }), h(document, "strong", { class: "cmp-diff-value ltr", text: diffText }), h(document, "p", { class: "cmp-diff-text", text: sentence })));
+      const facts = h(document, "dl", { class: "kv cmp-facts" },
+        h(document, "dt", { text: k.phenomenon }), h(document, "dd", { text: api.phenName() }),
+        h(document, "dt", { text: k.date }), h(document, "dd", { text: api.dateText() }),
+        h(document, "dt", { text: k.unit }), h(document, "dd", { text: unit }));
+      nodes.push(facts);
+      if (state.comparison) nodes.push(h(document, "p", { class: "small", text: k.changeLayer }));
+      nodes.push(h(document, "p", { class: "small cmp-note", text: k.note }));
+    }
+    return nodes;
+  }
+  function refreshPlaces() {
+    const { a, b } = state.places;
+    if (lastSnap !== state.snapshot.id) { lastSnap = state.snapshot.id; if (a || b) { stopCompareAudio(); announce(T(k.dateUpdated, { date: api.dateText() })); } }
+    if ((!a || isCell(a)) && (!b || isCell(b))) {
+      el.placeTable.replaceChildren(...renderCellCompare());
+      api.invalidate();
+    } else refreshPlacesLegacy();
+    renderPrompt();
+  }
+  state.selectHooks = [...(state.selectHooks ?? []), (cell, opts) => { if (state.compareActive && opts?.user !== false) setCell(target(), cell); }];
+
   const panel = h(document, "section", { class: "panel st-compare", "aria-labelledby": "st-cmp-title" }, h(document, "h2", { id: "st-cmp-title", text: c.compare.title }),
+    h(document, "h3", { text: k.title }),
+    el.cmpPrompt, el.cmpReplace, el.placeTable,
+    h(document, "div", { class: "st-tools-row cmp-actions" }, playBoth, swapButton, clearButton), el.placeNote, h(document, "p", { class: "small", text: k.listenHint }),
     h(document, "h3", { text: c.compare.time }),
     h(document, "label", { class: "st-pick", for: "st-cmp-a" }, h(document, "span", { text: c.compare.first }), el.cmpA), h(document, "label", { class: "st-pick", for: "st-cmp-b" }, h(document, "span", { text: c.compare.second }), el.cmpB),
     el.cmpStatus, el.cmpInfo, el.cmpButton, h(document, "p", { class: "small", text: c.compare.noMissing }), h(document, "p", { class: "small", text: c.compare.sound }),
-    h(document, "h3", { text: c.compare.places }),
-    h(document, "div", { class: "st-tools-row" }, ...placeButtons("a")), h(document, "div", { class: "st-tools-row" }, ...placeButtons("b")), el.placeTable,
-    h(document, "div", { class: "st-tools-row" }, playBoth), el.placeNote, h(document, "p", { class: "small", text: c.compare.fingerprint + " " + c.compare.pointFp + " " + T(c.compare.areaFp, { n: FINGERPRINT_CELLS }) }));
+    h(document, "details", { class: "cmp-more" }, h(document, "summary", { text: k.more }),
+      h(document, "div", { class: "st-tools-row" }, ...placeButtons("a")), h(document, "div", { class: "st-tools-row" }, ...placeButtons("b")),
+      h(document, "p", { class: "small", text: c.compare.fingerprint + " " + c.compare.pointFp + " " + T(c.compare.areaFp, { n: FINGERPRINT_CELLS }) })));
   state.right.insertBefore(panel, state.right.children[state.right.children.length - 1]);
   api.panels.compare = panel;
   describe();
   refreshPlaces();
   api.phenomenonHooks = api.phenomenonHooks ?? [];
-  api.phenomenonHooks.push(() => { if (state.comparison) hideChange(); fillSelects(); describe(); });
+  api.phenomenonHooks.push(() => {
+    if (state.comparison) hideChange();
+    fillSelects();
+    describe();
+    if (state.places.a || state.places.b) { stopCompareAudio(); state.places = { a: null, b: null }; last = null; forced = null; refreshPlaces(); announce(k.clearedPhen); }
+  });
   Object.assign(api, { showChange, hideChange, describeComparison: describe, refreshPlaces, state });
   return api;
 }

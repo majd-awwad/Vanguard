@@ -698,6 +698,8 @@ async function mountApp(document, root, language, initialMode) {
   }
   function openTool(id, { focus = false } = {}) {
     currentTool = id;
+    state.compareActive = id === "compare";
+    el.side.dataset.tool = id;
     speech.cancel();
     for (const [key, b] of Object.entries(railButtons)) b.setAttribute("aria-pressed", String(key === id));
     const mapTool = id === "area" || id === "path" ? id : "explore";
@@ -869,7 +871,7 @@ async function mountApp(document, root, language, initialMode) {
   }
 
   const api = {
-    panels: {}, toast, hoverPin, state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
+    panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
     layerValues, layerKind, applyLayer, onDataChanged, renderInfo, readText, tonesFor, slotFor, setTab, requestDate, switchPhenomenon, sampleName, explain, speak, guided,
     get phen() { return phen; }, get catalog() { return catalog(); }, get list() { return phen.list; }, get renderer() { return renderer; }, phenomenonId: () => phen.id,
     getSnapshot: async (id) => phen.snapshot(id),
