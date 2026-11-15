@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { EXCLUDED_PHENOMENA, SOURCE, TARGET } from "../scripts/earth-map/copy-package.mjs";
 import { PHENOMENON_IDS } from "../web/studio/datasets.js";
 import { copyFor } from "../web/studio/studio-ui-copy.js";
 
-const root = new URL("../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const root = fileURLToPath(new URL("../", import.meta.url));
 const WORDS = /temperature|حرار|T2M|degC|warmer|cooler|أدفأ|أبرد/i;
 // Our files: the Studio, the site, the pages, the scripts and the Earth Map docs. Not scanned: the verified data copy (Mohammad's package, verbatim)
 // and the NOTE in docs/final-ui/CHANGES.md. scripts/earth-map/copy-package.mjs is the one script that must name what it skips.

@@ -1,2 +1,4 @@
 /science/gedi/sample.json text eol=lf
 /science/atlas/*.csv text eol=lf
+# Publisher fingerprints describe exact UTF-8 LF bytes, including on Windows checkouts.
+/deliverables/EarthPulse-JSON-ONLY/** text eol=lf

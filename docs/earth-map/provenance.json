@@ -50,7 +50,25 @@
     "qualityFlags": [
       "model output, not a direct observation",
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
-      "native footprints inferred from regular coordinate centres; no explicit datum declaration"
+      "native footprints inferred from regular coordinate centres; no explicit datum declaration",
+      "Publication conflict; Orchestra excludes geos-fp-dust-20241215-1930: collection fingerprint differs from master asset fingerprint; collection byte count differs from master asset byte count",
+      "Publication conflict; Orchestra excludes geos-fp-dust-20250115-1930: collection fingerprint differs from master asset fingerprint; collection byte count differs from master asset byte count"
+    ],
+    "publicationConflicts": [
+      {
+        "id": "geos-fp-dust-20241215-1930",
+        "issues": [
+          "collection fingerprint differs from master asset fingerprint",
+          "collection byte count differs from master asset byte count"
+        ]
+      },
+      {
+        "id": "geos-fp-dust-20250115-1930",
+        "issues": [
+          "collection fingerprint differs from master asset fingerprint",
+          "collection byte count differs from master asset byte count"
+        ]
+      }
     ],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
@@ -127,6 +145,7 @@
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
       "native footprints inferred from regular coordinate centres; no explicit datum declaration"
     ],
+    "publicationConflicts": [],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",
@@ -202,6 +221,7 @@
       "different literal model build labels are not comparable (differences and Echo blocked across them)",
       "native footprints inferred from regular coordinate centres; no explicit datum declaration"
     ],
+    "publicationConflicts": [],
     "licenseAndCredit": "Data: NASA GMAO GEOS-FP. Earth imagery: NASA Earth Observatory Blue Marble. No NASA logo; EARTHPULSE is a student project and is not endorsed by NASA.",
     "assetHash": {
       "master": "catalog.json",

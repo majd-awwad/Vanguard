@@ -1,0 +1,89 @@
+/* Scientific Orchestra: a workspace in the page flow, below the map. Shared Studio tokens only. */
+.st-app { display: flex; flex-direction: column; }
+.st-stage { position: relative; flex: 1 1 auto; min-height: 0; }
+.st-app.orchestra-open { height: auto; min-height: calc(100dvh - var(--nav-h)); }
+.orchestra-open .st-stage { flex: 0 0 auto; min-height: 24rem; height: max(24rem, calc(100dvh - var(--nav-h) - 24rem)); }
+.orchestra-open .st-inspector { display: none; }
+.orchestra-workspace { flex: 0 0 auto; border-block-start: 1px solid var(--line-strong); background: var(--surface-solid); color: var(--ink); padding: .8rem var(--s-3); }
+.orchestra-workspace[hidden] { display: none; }
+.orchestra-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; }
+.orchestra-heading h2 { margin: 0; font: 400 1.55rem/1.2 var(--serif); }
+.orchestra-heading .eyebrow { font-size: .6rem; letter-spacing: .16em; margin: 0 0 .2rem; }
+.orchestra-heading > button { margin-inline-start: auto; }
+.orchestra-status { color: var(--teal); font-size: .78rem; }
+.orchestra-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; max-width: 36rem; color: var(--muted); font-size: .72rem; margin: .5rem 0 0; }
+.orchestra-counts strong { color: var(--teal); font: 500 .9rem var(--mono); }
+.orchestra-map-context { color: var(--muted); font-size: .68rem; margin: 0 0 .5rem; line-height: 1.6; }
+.orchestra-window-notice { color: var(--amber); font-size: .75rem; line-height: 1.6; margin: .5rem 0; overflow-wrap: anywhere; }
+.orchestra-window-notice[hidden] { display: none; }
+.orchestra-window-notice button { margin-inline-start: .5rem; }
+.orchestra-jumps { display: none; }
+.orchestra-scroll { max-height: 34dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding-inline-end: .25rem; }
+.orchestra-scroll-hint { display: none; color: var(--muted); font-size: .65rem; margin: .25rem 0; }
+.orchestra-transport { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem 1rem; margin-block: .7rem; }
+.orchestra-context { flex: 1 1 20rem; color: var(--muted); font-size: .7rem; margin: 0; }
+.orchestra-window-label { display: flex; gap: .5rem; align-items: center; color: var(--muted); font-size: .72rem; }
+.orchestra-window-label select { min-width: 0; max-width: 100%; font-size: .72rem; }
+.orchestra-actions { display: flex; gap: .3rem; flex-wrap: wrap; }
+.orchestra-actions .button:first-child { background: rgb(104 224 208 / .14); border-color: var(--teal); }
+.orchestra-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .7rem; }
+.orchestra-channel { min-width: 0; border-inline-start: 2px solid var(--line); padding: .3rem .7rem; font-size: .75rem; }
+.orchestra-channel[data-audible="true"] { border-color: var(--teal); }
+.orchestra-channel[data-available="false"] { border-color: var(--amber); }
+.orchestra-channel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .25rem .5rem; }
+.orchestra-channel-head label { display: flex; gap: .4rem; align-items: center; font-weight: 600; min-height: 2.75rem; }
+.orchestra-channel input[type="checkbox"] { accent-color: var(--teal); width: 1.1rem; height: 1.1rem; }
+.orchestra-value { font: 500 .9rem var(--mono); }
+.orchestra-meta { font: .6rem/1.6 var(--mono); color: var(--muted); margin: .25rem 0; overflow-wrap: anywhere; text-align: start; }
+.orchestra-availability { font-size: .69rem; line-height: 1.5; margin: .25rem 0 .5rem; min-height: 2.1rem; color: var(--muted); }
+.orchestra-channel[data-available="false"] .orchestra-availability { color: var(--amber); }
+.orchestra-channel-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.orchestra-channel .button, .orchestra-actions .button, .orchestra-heading .button { min-height: 2.75rem; padding-inline: .65rem; font-size: .72rem; }
+.orchestra-channel .button[aria-pressed="true"] { border-color: var(--teal); background: rgb(104 224 208 / .18); }
+.orchestra-gain { flex: 1 1 6rem; display: flex; align-items: center; gap: .25rem; min-width: 0; }
+.orchestra-gain input { width: 100%; min-width: 2rem; min-height: 2.75rem; }
+.orchestra-gain output { min-width: 3ch; font: .65rem var(--mono); }
+.orchestra-mapping { font-size: .7rem; color: var(--muted); }
+.orchestra-mapping summary { cursor: pointer; padding-block: .5rem; min-height: 2.75rem; }
+.orchestra-mapping p { line-height: 1.7; margin-block: .25rem; }
+.orchestra-evidence { white-space: pre-line; overflow-wrap: anywhere; font-size: .65rem; }
+.orchestra-note, .orchestra-explanation { color: var(--muted); font-size: .65rem; line-height: 1.6; margin: .65rem 0 0; }
+.orchestra-explanation { color: var(--ink); border-block-start: 1px solid var(--line); padding-block-start: .5rem; }
+#orchestra-toggle { flex: 0 0 auto; white-space: nowrap; }
+#orchestra-toggle[aria-expanded="true"] { border-color: var(--teal); color: var(--teal); }
+.orchestra-workspace :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (min-width: 901px) {
+  .orchestra-workspace { animation: orchestra-reveal .18s var(--ease); }
+  .orchestra-open .st-rail { flex-direction: row; inset-block: auto 8rem; transform: none; }
+  .orchestra-open .st-rail-help { margin: 0; border: 0; border-radius: 50%; }
+}
+@keyframes orchestra-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 1100px) { .orchestra-channels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .orchestra-open .st-stage { min-height: 25rem; height: max(25rem, calc(100dvh - var(--nav-h) - 24rem)); }
+  .orchestra-workspace { padding: .65rem var(--s-2); }
+  .orchestra-heading h2 { font-size: 1.35rem; }
+  .orchestra-heading .eyebrow { display: none; }
+  .orchestra-status { font-size: .68rem; }
+  .orchestra-scroll { max-height: 28dvh; min-height: 14rem; }
+  .orchestra-jumps { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .25rem; margin-block: .5rem; }
+  .orchestra-jumps .button { min-width: 0; min-height: 2.75rem; padding-inline: .25rem; font-size: .7rem; }
+  .orchestra-jumps [data-available="true"] { border-color: var(--teal); }
+  .orchestra-counts { font-size: .65rem; }
+  .orchestra-scroll-hint { display: block; }
+  .orchestra-window-label { flex: 1 1 100%; flex-wrap: wrap; }
+  .orchestra-window-label select { flex: 1; }
+  .orchestra-context { flex-basis: 100%; }
+  .orchestra-channels { grid-template-columns: 1fr; gap: .5rem; }
+  .orchestra-channel { padding-block: .5rem; }
+  .orchestra-availability { min-height: 0; }
+  .orchestra-channel-controls { flex-wrap: nowrap; }
+  .st-app .st-bottom { flex-wrap: wrap; }
+  .orchestra-open .st-sound .seg { display: flex; }
+  .orchestra-open .st-sound { max-width: 100%; }
+  .orchestra-open .st-sound .seg button { font-size: .65rem; padding-inline: .5rem; }
+  .orchestra-open .st-sound input[type="range"] { display: none; }
+  .orchestra-open .st-bottom { inset-block: 11.5rem auto; }
+  .orchestra-open .st-cluster { inset-block: auto 4.5rem; flex-direction: row; }
+}
+@media (prefers-reduced-motion: reduce) { .orchestra-workspace { animation: none; } }

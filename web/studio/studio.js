@@ -29,6 +29,7 @@ import { SIGNAL, dryNotice, isDryValue } from "./signal-core.js";
 import { infoIcon } from "./studio-ui-kit.js";
 import { studioCopy } from "./studio-copy.js";
 import { mountTools } from "./tools.js";
+import { mountOrchestra } from "./orchestra.js";
 import { clampView, createView, geoToScreen, lerpView, panBy, pixelsPerDegree, screenToGeo, zoomAt } from "./view.js";
 
 export const DEFAULT_DATE = "2025-04-15";
@@ -471,6 +472,7 @@ async function mountApp(document, root, language, initialMode) {
   function soundForCursor(force = false) {
     updateSoundStatus();
     if (!audio.enabled || state.busy) return;
+    if (api.orchestra?.open) { if (force) api.orchestra.play(); return; }
     const cell = soundCell();
     if (!cell) { rec.silence(); return; }
     const level = levelAt(cell.index);
@@ -502,11 +504,11 @@ async function mountApp(document, root, language, initialMode) {
     el.soundButton.setAttribute("aria-label", soundLabel);
     el.soundLabel.textContent = soundLabel;
     el.soundButton.setAttribute("data-tip", soundLabel);
-    if (on) { await audio.enable(); await unlocking; el.soundState.textContent = rec.state === "none" ? c.sound.unavailable : m.sound.on; } else { audio.disable(); audio.stop(); rec.stop(); el.soundState.textContent = m.sound.off; }
+    if (on) { await audio.enable(); await unlocking; el.soundState.textContent = rec.state === "none" ? c.sound.unavailable : m.sound.on; } else { api.orchestra?.stop(); audio.disable(); audio.stop(); rec.stop(); el.soundState.textContent = m.sound.off; }
     store.dispatch("SET_AUDIO", { audio: on ? AUDIO.IDLE : AUDIO.MUTED });
     renderInfo();
     refreshSound();
-    if (on) soundForCursor(true);
+    if (on && !api.orchestra?.open) soundForCursor(true);
   };
 
   // ---- Pointer, wheel, touch
@@ -901,6 +903,7 @@ async function mountApp(document, root, language, initialMode) {
     invalidate();
   }
   function openTool(id, { focus = false } = {}) {
+    if (id !== "explore" && api.orchestra?.open) api.orchestra.setOpen(false);
     const previous = currentTool;
     if (previous !== id) leaveTool(previous);
     currentTool = id;
@@ -1060,6 +1063,8 @@ async function mountApp(document, root, language, initialMode) {
   function placeTimeline() { app.dataset.timeline = "bar"; layoutChanged(false); }
   placeDry();
   setFlyout(false);
+  el.orchestraSlot = soundCard;
+  el.orchestraHost = app.querySelector(".st-col");
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
@@ -1136,6 +1141,7 @@ async function mountApp(document, root, language, initialMode) {
   openTool("explore");
   selectDefaultCell();
   setInspectorCollapsed(true);
+  mountOrchestra(api, app);
   if (params.has("debug")) win.__studio = api;
   if (initialMode === GUIDED) speak(m.voice.welcome.GUIDED_VOICE);
   return api;
