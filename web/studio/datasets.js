@@ -130,9 +130,9 @@ export function validateSnapshot(spec, s) {
 }
 
 /** Same build label for both snapshots, or the reason a difference is blocked. */
-export function comparability(a, b) {
+export function comparability(a, b, { groupOf = (s) => s.source.modelSource, policy = null } = {}) {
   if (!a || !b) return { ok: false, reason: "missing snapshot" };
-  return a.source.modelSource === b.source.modelSource ? { ok: true } : { ok: false, reason: BUILD_REASON };
+  return groupOf(a) === groupOf(b) ? { ok: true } : { ok: false, reason: policy ?? BUILD_REASON };
 }
 
 export const isLocked = (phenomenon, date, unlocked) => phenomenon === "dust" && DECODE_LOCKED_DATES.includes(date) && !unlocked;
@@ -164,8 +164,15 @@ export async function openPackage({ baseUrl = PACKAGE_URL(), fetchImpl = fetch, 
         snapshots.set(entry.id, { id: entry.id, phenomenon: id, date: entry.date, time: s.time, source: s.source, warnings: s.warnings ?? [], statistics: s.statistics, visualLink: s.visualLink ?? null, measures, values: measures[spec.measure], variables: s.variables ?? null });
       });
       const list = [...snapshots.values()].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-      const groups = new Map();
-      for (const s of list) { if (!groups.has(s.source.modelSource)) groups.set(s.source.modelSource, []); groups.get(s.source.modelSource).push(s.id); }
+      // The catalog's own compatibilityGroups are used directly; the derived rule (the literal modelSource of each snapshot) is only the fallback.
+      const derived = new Map();
+      for (const s of list) { if (!derived.has(s.source.modelSource)) derived.set(s.source.modelSource, []); derived.get(s.source.modelSource).push(s.id); }
+      const declared = Array.isArray(catalog.compatibilityGroups) ? catalog.compatibilityGroups.filter((g) => g && typeof g.modelSource === "string" && Array.isArray(g.snapshotIds)) : [];
+      const covered = new Set(declared.flatMap((g) => g.snapshotIds));
+      const useCatalog = declared.length > 0 && list.every((s) => covered.has(s.id));
+      const groupList = useCatalog ? declared.map((g) => ({ modelSource: g.modelSource, snapshotIds: [...g.snapshotIds] })) : [...derived].map(([modelSource, snapshotIds]) => ({ modelSource, snapshotIds }));
+      const groupById = new Map(groupList.flatMap((g) => g.snapshotIds.map((sid) => [sid, g.modelSource])));
+      const compatibilityPolicy = typeof catalog.compatibilityPolicy === "string" ? catalog.compatibilityPolicy : null;
       const seasons = [];
       for (const s of list) {
         let season = seasons.find((x) => x.key === s.time.season.key);
@@ -175,11 +182,11 @@ export async function openPackage({ baseUrl = PACKAGE_URL(), fetchImpl = fetch, 
       const comparisons = (catalog.comparisons ?? []).map((c) => ({ ...c, path: `${id}/${c.path}` }));
       return {
         id, spec, grid, catalog, list, snapshots, seasons, comparisons,
-        compatibilityGroups: [...groups].map(([modelSource, snapshotIds]) => ({ modelSource, snapshotIds })),
+        compatibilityGroups: groupList, compatibilityPolicy, groupsFrom: useCatalog ? "catalog" : "derived",
         unavailableComparisons: catalog.unavailableComparisons ?? [],
         snapshot: (snapshotId) => snapshots.get(snapshotId) ?? null,
         byDate: (date) => list.find((s) => s.date === date) ?? null,
-        groupOf: (snapshotId) => snapshots.get(snapshotId)?.source.modelSource ?? null,
+        groupOf: (snapshotId) => groupById.get(snapshotId) ?? snapshots.get(snapshotId)?.source.modelSource ?? null,
       };
     })();
     opened.set(id, job);
@@ -191,7 +198,7 @@ export async function openPackage({ baseUrl = PACKAGE_URL(), fetchImpl = fetch, 
     if (idA === idB) return { status: "same" };
     const [first, second] = phen.snapshot(idA).date <= phen.snapshot(idB).date ? [idA, idB] : [idB, idA];
     const published = phen.comparisons.find((p) => p.first === first && p.second === second);
-    const cmp = comparability(phen.snapshot(first), phen.snapshot(second));
+    const cmp = comparability(phen.snapshot(first), phen.snapshot(second), { groupOf: (s) => phen.groupOf(s.id), policy: phen.compatibilityPolicy });
     if (published && cmp.ok) return { status: "published", first, second, id: published.id, path: published.path };
     if (cmp.ok) return { status: "computed", first, second };
     const known = phen.unavailableComparisons.find((p) => p.first === first && p.second === second);

@@ -22,7 +22,7 @@ import { GUIDED, PURE, createSpeech } from "./speech.js";
 import { AUDIO, SOUND_MODES, TOOLS, createAppState, createStore } from "./state.js";
 import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
-import { AMBIENCE_PHENOMENA, breakpoints, levelFor } from "./ambience-core.js";
+import { AMBIENCE_PHENOMENA, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
 import { createAmbience } from "./ambience.js";
 import { infoIcon } from "./studio-ui-kit.js";
 import { studioCopy } from "./studio-copy.js";
@@ -133,7 +133,7 @@ async function mountApp(document, root, language, initialMode) {
   const fmt = (value) => formatValue(spec(), value);
   const fmtChange = (value) => formatChange(spec(), value);
   const unitText = () => m.phen.unitName[phen.id];
-  const catalog = () => ({ snapshots: phen.list, comparisons: phen.comparisons, compatibilityGroups: phen.compatibilityGroups, unavailableComparisons: phen.unavailableComparisons, bounds });
+  const catalog = () => ({ snapshots: phen.list, comparisons: phen.comparisons, compatibilityGroups: phen.compatibilityGroups, policy: phen.compatibilityPolicy, unavailableComparisons: phen.unavailableComparisons, bounds });
   const dateOf = (snapshot) => formatUtcDate(snapshot.time.start, language);
   const sampleName = (index) => cellId(Math.floor(index / grid.cols), index % grid.cols);
 
@@ -593,7 +593,7 @@ async function mountApp(document, root, language, initialMode) {
   // ---- Ambience (optional, illustrative): OFF by default; the level follows the REAL value under the cursor
   let ambienceOn = settings.ambience === true;
   const bpCache = new Map();
-  const bpFor = () => { if (!bpCache.has(phen.id)) bpCache.set(phen.id, breakpoints(phen.list.map((s) => s.values))); return bpCache.get(phen.id); };
+  const bpFor = () => { if (!bpCache.has(phen.id)) bpCache.set(phen.id, breakpoints(phen.list.map((s) => s.values), { min: MIN_VALUE[phen.id] ?? -Infinity })); return bpCache.get(phen.id); };
   el.ambToggle = h(document, "button", { type: "button", class: "switch", role: "switch", "aria-checked": String(ambienceOn), "aria-label": m.ambience.label }, h(document, "span", { class: "knob" }));
   el.ambVolume = h(document, "input", { type: "range", id: "st-amb-volume", min: 0, max: 100, step: 1, value: Math.round(settings.ambienceVolume * 100), "aria-label": m.ambience.volume });
   el.ambInfo = h(document, "span", { class: "st-inline-info" });

@@ -70,3 +70,9 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 | wind-high.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM.mpeg | to verify | `b6af8a890650f16f08c1fa45be9a4be1f900d0cd33cd10eb0ce9ae819ad6bb7d` |
 | wind-low.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM_2.mpeg | to verify | `ba8433a72ddc1573b13b354996793804645fa5517948370afee95aad5c687c07` |
 | wind-mid.mp3 | WhatsApp_Audio_2026-11-15_at_7.35.24_AM_1.mpeg | to verify | `e4f4d1d5c6b1e5ecbc774657334791a606dd8851f6b4e19851a5ba6d7126debe` |
+
+## Data sync from main (Mohammad's PR #9, 3bb5f7b)
+- `git merge origin/main` into feat/final-ui: clean, no conflicts; only `deliverables/EarthPulse-JSON-ONLY/**` changed and was not edited by us.
+- `node scripts/earth-map/copy-package.mjs` refreshed `web/assets/earthpulse-json/`: 63/63 files match the new master catalog SHA-256 and byte counts. Five dust snapshots were re-serialized (same values, new hashes); every catalog gained `modelSource` per snapshot, and rainfall, temperature and wind gained `compatibilityGroups` and `compatibilityPolicy`.
+- The app now uses the catalog's `compatibilityGroups` and `compatibilityPolicy` directly; the derived rule (literal `modelSource` of each snapshot) is only the fallback. Blocked cross-build comparisons show the catalog's policy text. Find signals and Find similar read the build from the same groups.
+- Rain ambience: below 0.1 mm/h is silence; the levels are the 33rd and 66th percentiles (0.1637 and 0.3115 mm/h) of the 1,074 values at or above 0.1 mm/h across the 13 dates.

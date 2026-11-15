@@ -25,7 +25,7 @@ export function resolveComparison(catalog, idA, idB) {
   if (published) return { status: "published", first, second, id: published.id, path: published.path };
   if (groupOf(catalog, first) && groupOf(catalog, first) === groupOf(catalog, second)) return { status: "computed", first, second };
   const known = catalog.unavailableComparisons.find((p) => p.first === first && p.second === second);
-  return { status: "unavailable", first, second, reason: known?.reason ?? DEFAULT_REASON };
+  return { status: "unavailable", first, second, reason: known?.reason ?? catalog.policy ?? DEFAULT_REASON };
 }
 
 /** A place is one cell or one rectangle; its summary uses the real values of the current layer. */

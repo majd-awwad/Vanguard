@@ -81,16 +81,16 @@ and data volume are separate sliders. Pure Sonification never speaks automatical
 An optional layer under the data sonification. **Illustrative recording, not data. The level (low/mid/high) follows the real value.** It is OFF by default, remembered in settings, and starts only after the user has enabled sound. Temperature has no recording.
 
 - Which recording: `{dust|rain|wind}-{low|mid|high}.mp3` from `web/assets/ambient/` (`manifest.json` lists each file with its SHA-256, original source and licence status).
-- Which level: from the REAL value of the snapshot under the cursor, the selected cell, or the scan position. At or below the low breakpoint is low, at or below the high breakpoint is mid, above it is high. A missing value gives silence. Rain at exactly 0 gives silence. Wind uses speed.
-- Fixed breakpoints, computed once per phenomenon: the 33rd and 66th percentiles (linear interpolation) of every valid value across all 13 sampled dates (13,000 values each). They are tested against the catalog in `tests/ambience.test.mjs`.
+- Which level: from the REAL value of the snapshot under the cursor, the selected cell, or the scan position. At or below the low breakpoint is low, at or below the high breakpoint is mid, above it is high. A missing value gives silence. Rain below 0.1 mm/h counts as no measurable rain and gives silence. Wind uses speed.
+- Fixed breakpoints, computed once per phenomenon: the 33rd and 66th percentiles (linear interpolation) of every valid value across all 13 sampled dates (13,000 values each). For rain, only values at or above 0.1 mm/h are used (below that is "no measurable rain"). They are tested against the catalog in `tests/ambience.test.mjs`.
 
 | Phenomenon | Unit | Low breakpoint (p33) | High breakpoint (p66) |
 |---|---|---|---|
 | Dust | unitless | 0.03822 | 0.1247 |
-| Rainfall | mm per hour | 7.930e-25 | 0.0003109 |
+| Rainfall (values >= 0.1 mm/h) | mm per hour | 0.1637 | 0.3115 |
 | Wind | m/s | 2.477 | 4.068 |
 
-Rainfall note: 3,158 of the 13,000 values are exactly 0 (silence), and the 33rd percentile of all values is practically zero, so almost every cell with any rain is "mid" or "high". This follows the specified rule and is reported as is.
+Rainfall note: only 1,074 of the 13,000 values are at or above 0.1 mm/h; the other 11,926 give silence. The breakpoints come from those 1,074 values. (The first version used all values and its 33rd percentile was practically zero; the 0.1 mm/h floor replaced it.)
 
 - Mix: about 12 dB below the data sonification (gain 0.251 times the data volume), with its own volume slider; ducked further to 15% while Guided Voice speaks; mute and sound-off stop it.
 - Looping: two overlapping sources with a 0.5 s crossfade; 400 ms crossfade when the level changes (60 ms with reduced motion); at most two recordings are alive and never two levels at full volume.
