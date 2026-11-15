@@ -2,14 +2,13 @@
 
 Branch `feat/explore-decode` (from `feat/final-ui`, committed locally, **not pushed**, no PR).
 
-## Explore Earth (learning page, no game)
-- `web/pages/explore.html` · `web/cinematic/site/explore.js`, `explore-copy.js`, `explore.css`.
-- Exactly **Dust, Rainfall, Wind**, switchable; switching changes the dataset, the colours, the legend, the values, the explanation and the sound.
-- Each phenomenon: a real colour scale and legend with the unit (the Studio's documented fixed scales), cell values and units, the meaning phrase and badge ("… compared with this dataset"), a short scientific explanation (what it is, what high and low mean, why regions differ, how it sounds with the documented thresholds), comparison of two places (bars, difference, higher one, hear A then B), the recordings chosen by the real value (pan west to east) with a live waveform.
-- Rain rule "< 0.1 mm/h = no measurable rain" (silent, faint on the map) and the dry-date suggestions (same logic as the Studio). 13 sampled dates.
-- Spoiler rules: the page is locked until Decode level 1 is completed once (`earthpulse.decode.completed.v1`, or "Show it anyway" for the current tab). The dust dates 2025-08-15 and 2025-08-19 stay locked until all five levels are completed (`earthpulse.decode.finished.v1`).
-- No levels, scores or profiles; it ends with "Ready? Test yourself in Decode".
-- Keyboard: focus the map, arrow keys move, Enter/Space plays, B chooses the second place. A live region reads the value in the same order as Guided Voice.
+## Explore Earth (the original globe page, plus the Dust / Rainfall / Wind switch)
+- `web/pages/explore.html` · `web/cinematic/site/explore.js`, `explore-copy.js` (restored from `feat/final-ui`, copy unchanged), `explore-data-copy.js` (the new words), `explore.css` (the original plus a few lines).
+- **Kept as it was:** the 3D globe and its fly-in to the region, the grid registered on the globe (Quick 3×4 / Advanced 6×8), the floating selected-cell card, the compare drawer, the listen panel with the live waveform, the left-hand dataset panel and the zoom tools.
+- **Added only:** (1) a one-row switch Dust · Rainfall · Wind on top of the globe view with the date control next to it (13 real dates; rain shows the dry-date notice and the wetter-date buttons; the dust dates 2025-08-15 and 2025-08-19 stay locked until all five Decode levels are done); (2) in the selected-cell card, the value with its unit, the meaning phrase ("high compared with this dataset") and a two-sentence explanation, plus the wind direction; (3) a "Ready? Test yourself in Decode" button at the end.
+- Switching changes the real dataset (the Studio's loaders), the cell colours on the globe (the phenomenon's own scale, soft), the legend, the values, the explanation and the sound (the user's recordings by the real value, pan by longitude). The dust particles of the globe follow the dust values; rain and wind show their colours on the cells.
+- Each cell is the area-weighted mean of the real 25×40 cells it covers (the same method as Decode, see `GRIDS.md`).
+- Spoiler rules: the page is locked until Decode level 1 is completed once (`earthpulse.decode.completed.v1`, or "Show it anyway" for the current tab); no levels, scores or profiles.
 
 ## Decode (five levels)
 - `web/pages/decode.html` · `web/cinematic/site/decode-game.js`, `decode-game-copy.js`, `decode-game.css`; logic in `web/experiences/levels/` (`aggregate.js`, `levels.js`, `engine.js`, `profiles.js`, `award.js`).
@@ -60,7 +59,7 @@ After level 5 the result screen offers "See my award": a personalised celebratio
 
 ## Verified in real Edge (headless) and by tests
 - Decode flow on desktop and 390 px, English and Arabic: create profile, play all five levels end to end to 500/500, wrong answer, hint, show-answer, wrong marks feedback, reload and resume, replay keeps the best score, two independent profiles, deletion with confirmation, award page; no console errors.
-- Explore: lock page, the three tabs with real values and Arabic, compare, dry-date notice, locked dust dates, keyboard.
+- Explore (restored globe page): at 1366×768 and 390×844, English and Arabic, all three phenomena: the fly-in plays (hero, flying, done), nothing is cut, switching changes the dataset, scale and card, the recordings start (the sound engine is running with the matching level), the dry-date notice and the wetter-date buttons work, the Decode button is at the end, no console errors.
 - Not done: nobody listened to the audio; no screen reader run; no Safari/Firefox.
 
 ## Local URLs (after `npm start`, default port)

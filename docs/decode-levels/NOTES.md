@@ -12,14 +12,14 @@ Nothing here edits a teammate's file. Where a change would be needed in one, it 
 - The new five-level game is a separate page, `web/pages/decode.html`, built in our own files (`web/experiences/levels/**`, `web/cinematic/site/decode-game*.js`). It does **not** use `createDecodeSession` or `scoreGuesses`: the v2 contract limits a session to one case with quick/advanced levels, and the levels need growing grids, several objectives and two-date comparisons. The mission engine follows the same redaction idea (no value readable before the reveal) and its own F1 scoring.
 - Shared flag: `earthpulse.decode.completed.v1` is now also set when **Level 1** is completed (it opens Explore Earth). A new flag `earthpulse.decode.finished.v1` is set when all five levels are completed (it opens the two dust dates of the original challenge in Explore Earth).
 - The nav's Decode link (`web/cinematic/site/nav.js`) now points to `pages/decode.html`. The home page stays the cinematic page. If you prefer the home page to link into the game, that is a one-line change in your files.
-- The old Explore page (3D globe + the case session) was replaced by a data-colour map of the three phenomena; the globe scene is not used there any more.
+- The Explore page is the original globe page. It no longer runs the Decode case session; it feeds the same 3D scene (`createScene`, `setSnapshot`) from the package data for Dust, Rainfall and Wind. `web/cinematic/scene.js` and `particles.js` are untouched.
 
 ## Andreh (`web/audio/**`)
 - `web/audio/**` is untouched. Decode and Explore play the user's nine recordings through `web/studio/recordings.js` (our file). To give Decode its spatial cues, `recordings.slice()` gained an optional `rate` (playback rate 0.85 in the south to 1.25 in the north) next to the existing `pan` (west to east). Nothing else changed in the sound engine.
 - The shared transport (`web/audio/transport.js`) is not used by the new Decode.
 
 ## Known limits (honest list)
-- The new Decode and Explore use the flat Blue Marble map with a grid/colour overlay, not the 3D globe scene.
+- The new Decode uses the flat Blue Marble map with a grid overlay, not the 3D globe scene (Explore Earth keeps the globe).
 - The recordings have three levels, so every question is decided at the level of low / mid / high. The dust threshold is therefore the "high" level (above 0.1247), not 0.20 (see `GRIDS.md`).
 - Sound was exercised in a real browser (no errors, the recordings are requested and decoded) but not listened to by a person.
 - Humidity: not part of the product. No sound slot, no tab, no request.
