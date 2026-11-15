@@ -102,6 +102,6 @@ export function toHunterData(phen, { excludeDates = [], percentBaseFraction = 0.
   const spec = phen.spec;
   return {
     phenomenon: phen.id, unit: spec.unitLabel || spec.unit, ratio: phen.id !== "temperature", percentBase: percentBaseFraction * (spec.max - spec.min), rows: phen.grid.rows, cols: phen.grid.cols,
-    snapshots: phen.list.filter((s) => !excludeDates.includes(s.date)).map((s) => ({ id: s.id, date: s.date, build: s.source.modelSource, values: Array.from(s.values), timeStart: s.time.start, timeEnd: s.time.end, granule: s.source.granule })),
+    snapshots: phen.list.filter((s) => !excludeDates.includes(s.date)).map((s) => ({ id: s.id, date: s.date, build: phen.groupOf?.(s.id) ?? s.source.modelSource, values: Array.from(s.values), timeStart: s.time.start, timeEnd: s.time.end, granule: s.source.granule })),
   };
 }

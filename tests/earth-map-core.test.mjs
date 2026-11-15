@@ -62,7 +62,7 @@ test("build groups: the same two groups for all four phenomena, so cross-build d
     const jan = p.byDate("2025-01-15").id;
     const r = pkg.resolveComparison(p, jan, apr);
     assert.equal(r.status, "unavailable", id);
-    assert.equal(r.reason, BUILD_REASON);
+    assert.equal(r.reason, p.compatibilityPolicy ?? BUILD_REASON, id + ": the catalog policy text when the catalog has one");
     assert.equal(pkg.resolveComparison(p, apr, p.byDate("2025-07-15").id).status, id === "dust" ? "published" : "computed", id);
     assert.equal(comparability(p.snapshot(jan), p.snapshot(apr)).ok, false);
   }

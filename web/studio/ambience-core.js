@@ -6,6 +6,10 @@ export const AMBIENCE_PHENOMENA = Object.freeze(["dust", "rainfall", "wind"]);
 export const LEVELS = Object.freeze(["low", "mid", "high"]);
 export const LOW_PERCENTILE = 0.33;
 export const HIGH_PERCENTILE = 0.66;
+/** Below this rain rate there is no measurable rain: silence, and these values are left out of the rain breakpoints. */
+export const RAIN_MIN_MM_H = 0.1;
+/** Smallest value that counts, per phenomenon (rain only). */
+export const MIN_VALUE = Object.freeze({ rainfall: RAIN_MIN_MM_H });
 
 /** The recording for a phenomenon and level (the pack names rainfall "rain"). */
 export const fileFor = (phenomenon, level) => `${phenomenon === "rainfall" ? "rain" : phenomenon}-${level}.mp3`;
@@ -22,12 +26,13 @@ export function percentile(sorted, p) {
 const valid = (v) => typeof v === "number" && Number.isFinite(v);
 
 /**
- * Fixed breakpoints for one phenomenon: the 33rd and 66th percentiles of every valid value across all sampled dates.
+ * Fixed breakpoints for one phenomenon: the 33rd and 66th percentiles of every valid value across all sampled dates
+ * (for rain: of the values at or above 0.1 mm/h).
  * `snapshotValues` is an array of value arrays (one per date); null and NaN are ignored.
  */
-export function breakpoints(snapshotValues) {
+export function breakpoints(snapshotValues, { min = -Infinity } = {}) {
   const all = [];
-  for (const values of snapshotValues) for (const v of values) if (valid(v)) all.push(v);
+  for (const values of snapshotValues) for (const v of values) if (valid(v) && v >= min) all.push(v);
   all.sort((a, b) => a - b);
   return { low: percentile(all, LOW_PERCENTILE), high: percentile(all, HIGH_PERCENTILE), count: all.length };
 }
@@ -39,7 +44,7 @@ export function breakpoints(snapshotValues) {
 export function levelFor({ phenomenon, value, breakpoints: bp }) {
   if (!AMBIENCE_PHENOMENA.includes(phenomenon)) return null;
   if (!valid(value) || !bp || !valid(bp.low) || !valid(bp.high)) return null;
-  if (phenomenon === "rainfall" && value <= 0) return null;
+  if (value < (MIN_VALUE[phenomenon] ?? -Infinity)) return null;
   if (value <= bp.low) return "low";
   if (value <= bp.high) return "mid";
   return "high";

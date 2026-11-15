@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { PHENOMENON_IDS, openPackage } from "../web/studio/datasets.js";
-import { AMBIENCE_PHENOMENA, breakpoints, fileFor, levelFor, percentile } from "../web/studio/ambience-core.js";
+import { AMBIENCE_PHENOMENA, MIN_VALUE, RAIN_MIN_MM_H, breakpoints, fileFor, levelFor, percentile } from "../web/studio/ambience-core.js";
 import { CROSSFADE_S, LEVEL_FADE_S, UNDER_DATA_GAIN, createAmbience } from "../web/studio/ambience.js";
 import { defaults, sanitize } from "../web/cinematic/site/settings.js";
 
@@ -31,10 +31,12 @@ test("breakpoints are the 33rd and 66th percentiles of all valid values across t
   for (const id of AMBIENCE_PHENOMENA) {
     const phen = await pkg.openPhenomenon(id);
     assert.equal(phen.list.length, 13);
-    const bp = breakpoints(phen.list.map((s) => s.values));
-    assert.equal(bp.count, 13 * 1000);
+    const min = MIN_VALUE[id] ?? -Infinity;
+    const bp = breakpoints(phen.list.map((s) => s.values), { min });
+    const all = phen.list.flatMap((s) => [...s.values]).filter((v) => v >= min).sort((a, b) => a - b);
+    assert.equal(bp.count, all.length);
+    assert.equal(bp.count, id === "rainfall" ? 1074 : 13 * 1000);
     assert.ok(bp.low <= bp.high);
-    const all = phen.list.flatMap((s) => [...s.values]).sort((a, b) => a - b);
     assert.equal(bp.low, percentile(all, 0.33));
     assert.equal(bp.high, percentile(all, 0.66));
     assert.ok(doc.includes(bp.low.toPrecision(4)) && doc.includes(bp.high.toPrecision(4)), id + " breakpoints are documented");
@@ -51,8 +53,10 @@ test("the level follows the real value; none for temperature, missing values or 
   assert.equal(levelFor({ phenomenon: "temperature", value: 20, breakpoints: bp }), null);
   assert.equal(levelFor({ phenomenon: "wind", value: null, breakpoints: bp }), null);
   assert.equal(levelFor({ phenomenon: "wind", value: Number.NaN, breakpoints: bp }), null);
+  assert.equal(RAIN_MIN_MM_H, 0.1);
   assert.equal(levelFor({ phenomenon: "rainfall", value: 0, breakpoints: bp }), null);
-  assert.equal(levelFor({ phenomenon: "rainfall", value: 0.0001, breakpoints: bp }), "low");
+  assert.equal(levelFor({ phenomenon: "rainfall", value: 0.0999, breakpoints: bp }), null, "below 0.1 mm/h is no measurable rain");
+  assert.equal(levelFor({ phenomenon: "rainfall", value: 0.1, breakpoints: bp }), "low");
   // a real, higher value never plays a lower level
   const wind = await pkg.openPhenomenon("wind");
   const real = breakpoints(wind.list.map((s) => s.values));
@@ -98,4 +102,14 @@ test("the Studio labels the layer and keeps it off for temperature", async () =>
   assert.ok(copy.includes("Illustrative recording, not data. The level (low/mid/high) follows the real value."));
   assert.ok(copy.includes("تسجيل توضيحي وليس بيانات. المستوى يتبع القيمة الحقيقية."));
   assert.ok(copy.includes("Temperature has no ambience recording."));
+});
+
+test("rain: levels are the 33rd/66th percentiles of values >= 0.1 mm/h, silence below", async () => {
+  const rain = await pkg.openPhenomenon("rainfall");
+  const bp = breakpoints(rain.list.map((s) => s.values), { min: RAIN_MIN_MM_H });
+  assert.equal(bp.low.toPrecision(4), "0.1637");
+  assert.equal(bp.high.toPrecision(4), "0.3115");
+  assert.equal(levelFor({ phenomenon: "rainfall", value: 0.05, breakpoints: bp }), null);
+  assert.equal(levelFor({ phenomenon: "rainfall", value: 0.2, breakpoints: bp }), "mid");
+  assert.equal(levelFor({ phenomenon: "rainfall", value: 1, breakpoints: bp }), "high");
 });

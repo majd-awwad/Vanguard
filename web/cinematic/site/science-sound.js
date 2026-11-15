@@ -12,8 +12,8 @@ const words = {
 };
 const DATE = "2025-04-15";
 const credits = {
-  en: { title: "Ambient recordings (optional layer in the Studio)", note: "Illustrative recording, not data. The level (low/mid/high) follows the real value.", licence: "Licence: to verify. Not confirmed yet.", failed: "The credits list could not be loaded." },
-  ar: { title: "تسجيلات الأجواء (طبقة اختيارية في الاستوديو)", note: "تسجيل توضيحي وليس بيانات. المستوى يتبع القيمة الحقيقية.", licence: "الترخيص: قيد التحقق. لم يُؤكَّد بعد.", failed: "تعذّر تحميل قائمة الاعتمادات." },
+  en: { title: "Ambient recordings (optional layer in the Studio)", note: "Illustrative recording, not data. The level (low/mid/high) follows the real value. Rain below 0.1 mm per hour counts as no measurable rain (silence); the rain levels use the 33rd and 66th percentiles of the values at or above 0.1 mm per hour.", licence: "Licence: to verify. Not confirmed yet.", failed: "The credits list could not be loaded." },
+  ar: { title: "تسجيلات الأجواء (طبقة اختيارية في الاستوديو)", note: "تسجيل توضيحي وليس بيانات. المستوى يتبع القيمة الحقيقية. المطر الأقل من 0.1 ملم في الساعة يُعدّ بلا مطر قابل للقياس (صمت)، وتستخدم مستويات المطر المئين 33 و66 للقيم التي تساوي 0.1 ملم في الساعة أو أكثر.", licence: "الترخيص: قيد التحقق. لم يُؤكَّد بعد.", failed: "تعذّر تحميل قائمة الاعتمادات." },
 };
 
 export function howItSounds(document, language) {
