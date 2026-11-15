@@ -89,3 +89,11 @@
 .sound-how .sound-row p { margin: 0; }
 .sound-row-actions { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 @media (max-width: 700px) { .sound-how .sound-row { grid-template-columns: 1fr; } }
+
+/* Spacing between the full-width sections and the card grid; cards never push past their column */
+.sound-how { margin: var(--s-4) 0 var(--s-5); }
+.science-grid { margin-top: var(--s-4); }
+.science-grid > * { min-width: 0; }
+.science-grid .panel > h2 { flex-wrap: wrap; justify-content: space-between; }
+.sound-how .sound-row { grid-template-columns: 8rem minmax(0, 1fr) auto; }
+@media (max-width: 900px) { .sound-how .sound-row { grid-template-columns: 1fr; } }
