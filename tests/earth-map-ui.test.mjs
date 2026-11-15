@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { REQUIRED_FIELDS, buildManifest } from "../scripts/earth-map/provenance.mjs";
-import { TARGET, toLF } from "../scripts/earth-map/copy-package.mjs";
+import { EXCLUDED_PHENOMENA, TARGET, toLF } from "../scripts/earth-map/copy-package.mjs";
 import { analysisCopy } from "../web/studio/analysis-copy.js";
 import { mapCopy } from "../web/studio/earthmap-copy.js";
 import { PHENOMENA } from "../web/studio/datasets.js";
@@ -15,14 +15,14 @@ const keys = (o) => Object.keys(o).sort().map((k) => (o[k] && typeof o[k] === "o
 test("SOURCE: the provenance manifest has every spec 09.2 field for every dataset, all model data", async () => {
   const master = await json("catalog.json");
   const catalogs = {}; const snapshots = {}; const grids = {};
-  for (const id of Object.keys(master.phenomena)) {
+  for (const id of Object.keys(master.phenomena).filter((phenomenon) => !EXCLUDED_PHENOMENA.includes(phenomenon))) {
     catalogs[id] = await json(`${id}/catalog.json`);
     grids[id] = await json(`${id}/grid.json`);
     snapshots[id] = [];
     for (const entry of catalogs[id].snapshots) snapshots[id].push({ ...(await json(`${id}/${entry.path}`)), date: entry.date });
   }
   const manifests = buildManifest({ master, catalogs, snapshots, grids, verifiedAt: "2026-11-15" });
-  assert.deepEqual(manifests.map((m) => m.phenomenon), ["dust", "rainfall", "temperature", "wind"]);
+  assert.deepEqual(manifests.map((m) => m.phenomenon), ["dust", "rainfall", "wind"]);
   for (const m of manifests) {
     for (const field of REQUIRED_FIELDS) assert.ok(field in m, `${m.phenomenon}.${field}`);
     assert.equal(m.sourceType, "model");

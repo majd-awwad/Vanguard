@@ -299,8 +299,5 @@ details.st-how[open] summary { margin-bottom: var(--s-2); }
 .st-badge[data-level="mid"] { background: #f1dfa6; color: #3a2c00; }
 .st-badge[data-level="high"] { background: #e9b48f; color: #3b1700; }
 .st-badge[data-level="none"], .st-badge[data-level="missing"] { background: #dde2e8; color: #2a3440; }
-.st-badge[data-kind="temperature"][data-level="low"] { background: #bcd8f2; color: #0b2a47; }
-.st-badge[data-kind="temperature"][data-level="mid"] { background: #e3e6ea; color: #222c36; }
-.st-badge[data-kind="temperature"][data-level="high"] { background: #f2c19b; color: #4a1c00; }
 .st-hovertip { white-space: normal; max-width: 17rem; }
 .st-hovertip .st-badge { display: block; width: fit-content; margin-top: .25rem; }

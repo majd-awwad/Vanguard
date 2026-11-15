@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { PHENOMENON_IDS, openPackage } from "../web/studio/datasets.js";
-import { breakpoints, levelFor } from "../web/studio/ambience-core.js";
-import { MEANING_BREAKPOINTS, MEANING_PHENOMENA, TEMPERATURE_BREAKPOINTS, meaningCopy, meaningLevel, meaningPhrase, spokenNumber } from "../web/studio/meaning.js";
+import { AMBIENCE_PHENOMENA, DOCUMENTED_BREAKPOINTS, levelFor } from "../web/studio/ambience-core.js";
+import { meaningCopy, meaningLevel, meaningPhrase, spokenNumber } from "../web/studio/meaning.js";
 import { GUIDED, createSpeech } from "../web/studio/speech.js";
 
 const base = new URL("../web/assets/earthpulse-json/", import.meta.url);
@@ -12,16 +12,10 @@ const fetchImpl = async (u) => { const b = await readFile(new URL(u)); return { 
 const pkg = await openPackage({ baseUrl: base, fetchImpl, digest: async (b) => createHash("sha256").update(b).digest("hex") });
 const read = (p) => readFile(new URL("../" + p, import.meta.url), "utf8");
 
-test("temperature breakpoints are the 33rd / 66th percentiles of all values across the 13 dates and are documented", async () => {
-  const phen = await pkg.openPhenomenon("temperature");
-  assert.equal(phen.list.length, 13);
-  const bp = breakpoints(phen.list.map((s) => s.values));
-  assert.equal(bp.count, 13000);
-  assert.equal(bp.low, TEMPERATURE_BREAKPOINTS.low);
-  assert.equal(bp.high, TEMPERATURE_BREAKPOINTS.high);
-  const doc = await read("docs/earth-map/SONIFICATION_MAPPING.md");
-  assert.ok(doc.includes(bp.low.toFixed(2)) && doc.includes(bp.high.toFixed(2)));
-  assert.ok(MEANING_PHENOMENA.every((id) => PHENOMENON_IDS.includes(id) && MEANING_BREAKPOINTS[id]));
+test("the meaning phrases cover exactly the phenomena of the app, with the documented breakpoints", () => {
+  assert.deepEqual(Object.keys(meaningCopy.en).filter((k) => k !== "missing").sort(), [...PHENOMENON_IDS].sort());
+  assert.deepEqual(Object.keys(meaningCopy.ar).filter((k) => k !== "missing").sort(), [...PHENOMENON_IDS].sort());
+  assert.deepEqual([...AMBIENCE_PHENOMENA], [...PHENOMENON_IDS]);
 });
 
 const WORDS = {
@@ -29,14 +23,12 @@ const WORDS = {
     dust: ["Dust: low compared with this dataset", "Dust: moderate compared with this dataset", "Dust: high compared with this dataset"],
     rainfall: ["Rain: light compared with this dataset", "Rain: moderate compared with this dataset", "Rain: high compared with this dataset"],
     wind: ["Wind: low compared with this dataset", "Wind: moderate compared with this dataset", "Wind: high compared with this dataset"],
-    temperature: ["Temperature: cooler compared with this dataset", "Temperature: middle compared with this dataset", "Temperature: warmer compared with this dataset"],
     none: "Rain: no measurable rain", missing: "no data here",
   },
   ar: {
     dust: ["غبار منخفض مقارنة ببقية البيانات", "غبار متوسط مقارنة ببقية البيانات", "غبار مرتفع مقارنة ببقية البيانات"],
     rainfall: ["مطر قليل مقارنة ببقية البيانات", "مطر متوسط مقارنة ببقية البيانات", "مطر مرتفع مقارنة ببقية البيانات"],
     wind: ["رياح ضعيفة مقارنة ببقية البيانات", "رياح متوسطة مقارنة ببقية البيانات", "رياح قوية مقارنة ببقية البيانات"],
-    temperature: ["حرارة أبرد مقارنة ببقية البيانات", "حرارة متوسطة مقارنة ببقية البيانات", "حرارة أدفأ مقارنة ببقية البيانات"],
     none: "لا يوجد مطر يُقاس", missing: "لا توجد بيانات هنا",
   },
 };
@@ -44,8 +36,8 @@ const WORDS = {
 test("every phenomenon, every level, English and Arabic: the exact wording, from the documented breakpoints", () => {
   const rank = ["low", "mid", "high"];
   for (const language of ["en", "ar"]) {
-    for (const id of MEANING_PHENOMENA) {
-      const bp = MEANING_BREAKPOINTS[id];
+    for (const id of AMBIENCE_PHENOMENA) {
+      const bp = DOCUMENTED_BREAKPOINTS[id];
       const probes = [[bp.low, "low"], [bp.low - 0.01 > 0.1 || id !== "rainfall" ? bp.low - 0.01 : bp.low, "low"], [(bp.low + bp.high) / 2, "mid"], [bp.high, "mid"], [bp.high + 0.01, "high"]];
       for (const [value, level] of probes) {
         assert.equal(meaningLevel({ phenomenon: id, value }), level, id + " " + value);
@@ -66,7 +58,7 @@ test("the phrase level is the level of the recording: same breakpoints, same bin
   for (const id of ["dust", "rainfall", "wind"]) {
     const phen = await pkg.openPhenomenon(id);
     for (const v of phen.list[3].values) {
-      const recording = levelFor({ phenomenon: id, value: v, breakpoints: MEANING_BREAKPOINTS[id] });
+      const recording = levelFor({ phenomenon: id, value: v, breakpoints: DOCUMENTED_BREAKPOINTS[id] });
       const said = meaningLevel({ phenomenon: id, value: v });
       if (Number.isFinite(v)) assert.equal(said, recording ?? "none", id + " " + v); else assert.equal(said, "missing");
     }
@@ -82,10 +74,8 @@ test("wording is relative, never a weather claim", () => {
 
 test("spoken numbers are rounded sensibly: 0.17, 23, 4.1", () => {
   assert.equal(spokenNumber("rainfall", 0.1737), "0.17");
-  assert.equal(spokenNumber("temperature", 23.4), "23");
   assert.equal(spokenNumber("wind", 4.0999), "4.1");
   assert.equal(spokenNumber("dust", 0.537), "0.54");
-  assert.equal(spokenNumber("temperature", -0.3), "0");
 });
 
 test("spoken order and badges are wired into the Studio: phrase, value, place, date only when changed; badge in the card and the tooltip", async () => {

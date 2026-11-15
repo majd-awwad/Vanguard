@@ -13,13 +13,13 @@ const words = {
     title: "How it sounds",
     lede: "Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative. Press a button to hear the recording for the lowest or the highest real value on the sampled date {date}.",
     low: "Hear low", high: "Hear high", loading: "Loading the data…", playing: "Playing {name}: the {which} recording for a real value of {value}.", error: "Could not load this example.", lowName: "low", highName: "high",
-    rule: "Low up to {low}, mid up to {high}, high above ({unit}).", rain: " Below 0.1 mm per hour there is no measurable rain: silence.", none: "No recording for temperature.",
+    rule: "Low up to {low}, mid up to {high}, high above ({unit}).", rain: " Below 0.1 mm per hour there is no measurable rain: silence.",
   },
   ar: {
     title: "كيف يبدو الصوت",
     lede: "الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية. اضغط زرًا لتسمع التسجيل الموافق لأدنى أو أعلى قيمة حقيقية في التاريخ المأخوذ {date}.",
     low: "اسمع الأدنى", high: "اسمع الأعلى", loading: "جارٍ تحميل البيانات…", playing: "يُشغَّل {name}: تسجيل المستوى {which} لقيمة حقيقية قدرها {value}.", error: "تعذّر تحميل هذا المثال.", lowName: "المنخفض", highName: "المرتفع",
-    rule: "منخفض حتى {low}، ومتوسط حتى {high}، ومرتفع فوق ذلك ({unit}).", rain: " أقل من 0.1 ملم في الساعة لا مطر قابل للقياس: صمت.", none: "لا يوجد تسجيل لدرجة الحرارة.",
+    rule: "منخفض حتى {low}، ومتوسط حتى {high}، ومرتفع فوق ذلك ({unit}).", rain: " أقل من 0.1 ملم في الساعة لا مطر قابل للقياس: صمت.",
   },
 };
 const credits = {
@@ -67,15 +67,13 @@ export function howItSounds(document, language) {
   }
   const rows = PHENOMENON_IDS.map((id) => {
     const bp = DOCUMENTED_BREAKPOINTS[id];
-    const text = bp ? w.rule.replace("{low}", Number(bp.low.toPrecision(4))).replace("{high}", Number(bp.high.toPrecision(4))).replace("{unit}", m.phen.unitName[id]) + (id === "rainfall" ? w.rain : "") : w.none;
+    const text = w.rule.replace("{low}", Number(bp.low.toPrecision(4))).replace("{high}", Number(bp.high.toPrecision(4))).replace("{unit}", m.phen.unitName[id]) + (id === "rainfall" ? w.rain : "");
     const actions = h(document, "div", { class: "sound-row-actions" });
-    if (bp) {
-      const low = h(document, "button", { type: "button", class: "button ghost small-button", text: w.low, "aria-label": w.low + " · " + m.phen[id] });
-      const high = h(document, "button", { type: "button", class: "button small-button", text: w.high, "aria-label": w.high + " · " + m.phen[id] });
-      low.addEventListener("click", () => play(id, "low", low));
-      high.addEventListener("click", () => play(id, "high", high));
-      actions.append(low, high);
-    }
+    const low = h(document, "button", { type: "button", class: "button ghost small-button", text: w.low, "aria-label": w.low + " · " + m.phen[id] });
+    const high = h(document, "button", { type: "button", class: "button small-button", text: w.high, "aria-label": w.high + " · " + m.phen[id] });
+    low.addEventListener("click", () => play(id, "low", low));
+    high.addEventListener("click", () => play(id, "high", high));
+    actions.append(low, high);
     return h(document, "div", { class: "sound-row" }, h(document, "h3", { text: m.phen[id] }), h(document, "p", { text }), actions);
   });
   const cr = credits[language];

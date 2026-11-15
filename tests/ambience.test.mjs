@@ -40,12 +40,11 @@ test("breakpoints are the 33rd and 66th percentiles across the 13 dates (rain: v
   assert.equal(DUST_BREAKPOINTS, DOCUMENTED_BREAKPOINTS.dust);
 });
 
-test("the level is chosen from the REAL value; silence below the threshold, for missing values and for temperature", async () => {
+test("the level is chosen from the REAL value; silence below the threshold, and for missing values", async () => {
   const bp = { low: 1, high: 2 };
   assert.equal(levelFor({ phenomenon: "wind", value: 0.5, breakpoints: bp }), "low");
   assert.equal(levelFor({ phenomenon: "wind", value: 1.5, breakpoints: bp }), "mid");
   assert.equal(levelFor({ phenomenon: "dust", value: 2.1, breakpoints: bp }), "high");
-  assert.equal(levelFor({ phenomenon: "temperature", value: 20, breakpoints: bp }), null, "temperature has no recording");
   assert.equal(levelFor({ phenomenon: "wind", value: null, breakpoints: bp }), null);
   assert.equal(levelFor({ phenomenon: "wind", value: Number.NaN, breakpoints: bp }), null);
   assert.equal(RAIN_MIN_MM_H, 0.1);
@@ -56,7 +55,7 @@ test("the level is chosen from the REAL value; silence below the threshold, for 
   const rank = { low: 0, mid: 1, high: 2 };
   let last = -1;
   for (const v of [...wind.byDate("2025-04-15").values].sort((a, b) => a - b)) { const r = rank[levelFor({ phenomenon: "wind", value: v, breakpoints: real })]; assert.ok(r >= last, "a higher real value never plays a lower level"); last = r; }
-  assert.ok(!AMBIENCE_PHENOMENA.includes("temperature") && PHENOMENON_IDS.includes("temperature"));
+  assert.deepEqual([...AMBIENCE_PHENOMENA], [...PHENOMENON_IDS], "every phenomenon of the app has its three recordings");
 });
 
 test("the engine: nothing before the user gesture, the specified fades, one volume", () => {
@@ -92,8 +91,6 @@ test("no synthetic data tones in the Studio, Explore Earth, Science examples or 
   assert.ok(!/createStudioAudio\(\{[^}]*hover/.test(studio) && !/audio\.hover\(/.test(studio));
   assert.ok(!/st-amb|ambToggle/.test(studio), "no separate ambience toggle (Guided / Pure is the voice switch, not a sound-style selector)");
   assert.equal((studio.match(/id: "st-volume"/g) ?? []).length, 1, "one volume slider");
-  assert.ok(copy.includes("No recording for temperature"));
-  assert.ok(copy.includes("لا يوجد تسجيل لدرجة الحرارة"));
   assert.ok(copy.includes("Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative."));
   assert.ok(copy.includes("الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية."));
   assert.match(studio, /earthpulse\.sound\.v2/, "old stored sound settings are reset once");

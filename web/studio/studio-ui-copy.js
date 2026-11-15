@@ -4,7 +4,7 @@ import { mapCopy } from "./earthmap-copy.js";
 const ui = {
   en: {
     tools: { explore: "Explore", area: "Area", path: "Path", compare: "Compare", hunter: "Find signals", echo: "Find similar" },
-    phen: { short: { dust: "Dust", rainfall: "Rain", temperature: "Temperature", wind: "Wind", forests: "Forests" } },
+    phen: { short: { dust: "Dust", rainfall: "Rain", wind: "Wind", forests: "Forests" } },
     help: {
       mapping: "What the sound means",
       levelRule: "Plays the low, mid or high recording: low up to {low}, mid up to {high}, high above ({unit}).", rainRule: "Below 0.1 mm per hour: silence.",
@@ -19,11 +19,11 @@ const ui = {
     cards: { title: ["Earth", "Sound Studio"], eyebrow: "Real NASA model data", lede: "Explore real NASA model data as colour on the Earth and as sound: move over the map, play an area, draw a path, compare dates and find signals.", data: "Data", sound: "Sound", place: "Selected place", tools: "Tools", how: "How it works" },
     dry: { rainfall: { notice: "Little or no measurable rain on this date. Try a wetter date:", cell: "no measurable rain (< 0.1 mm/h)", unit: "mm/h" }, wind: { notice: "Almost no wind signal on this date. Try a windier date:", cell: "calm (< 0.3 m/s)", unit: "m/s" }, share: "{n}% of cells", pick: "{date}, {n}% of cells" },
     layer: { change: "change", clear: "Back to the snapshot", lockFoot: "Two dust dates stay locked until you finish Decode." },
-    sound: { timePlay: "Play through the dates", timePause: "Pause the date sequence", pill: "Sound", volume: "Sound volume", note: "Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative.", noRecording: "No recording for temperature", silence: "Silence", levelText: "Plays the {level} recording.", levelLine: "Recording level: {level}", levels: { low: "low", mid: "mid", high: "high" } },
+    sound: { timePlay: "Play through the dates", timePause: "Pause the date sequence", pill: "Sound", volume: "Sound volume", note: "Sounds are recordings chosen by the real value: low / mid / high. The level follows the data; the recordings themselves are illustrative.", silence: "Silence", levelText: "Plays the {level} recording.", levelLine: "Recording level: {level}", levels: { low: "low", mid: "mid", high: "high" } },
   },
   ar: {
     tools: { explore: "استكشاف", area: "منطقة", path: "مسار", compare: "مقارنة", hunter: "البحث عن إشارات", echo: "البحث عن أماكن مشابهة" },
-    phen: { short: { dust: "غبار", rainfall: "مطر", temperature: "حرارة", wind: "رياح", forests: "غابات" } },
+    phen: { short: { dust: "غبار", rainfall: "مطر", wind: "رياح", forests: "غابات" } },
     help: {
       mapping: "ماذا يعني الصوت",
       levelRule: "يُشغَّل تسجيل منخفض أو متوسط أو مرتفع: منخفض حتى {low}، ومتوسط حتى {high}، ومرتفع فوق ذلك ({unit}).", rainRule: "أقل من 0.1 ملم في الساعة: صمت.",
@@ -38,7 +38,7 @@ const ui = {
     cards: { title: ["استوديو", "صوت الأرض"], eyebrow: "بيانات نموذج ناسا الحقيقية", lede: "استكشف بيانات نموذج ناسا الحقيقية كلونًا على الأرض وكصوت: حرّك المؤشر فوق الخريطة، شغّل منطقة، ارسم مسارًا، قارن التواريخ وابحث عن الإشارات.", data: "البيانات", sound: "الصوت", place: "المكان المحدد", tools: "الأدوات", how: "كيف يعمل" },
     dry: { rainfall: { notice: "قلّما يوجد مطر قابل للقياس في هذا التاريخ. جرّب تاريخًا أكثر مطرًا:", cell: "لا مطر قابل للقياس (< 0.1 ملم/س)", unit: "ملم/س" }, wind: { notice: "لا إشارة رياح تُذكر في هذا التاريخ. جرّب تاريخًا أكثر رياحًا:", cell: "هدوء (< 0.3 م/ث)", unit: "م/ث" }, share: "{n}% من الخلايا", pick: "{date}، {n}% من الخلايا" },
     layer: { change: "تغيّر", clear: "العودة إلى اللقطة", lockFoot: "تاريخان للغبار يبقيان مقفلين حتى تنهي فك الشيفرة." },
-    sound: { timePlay: "تشغيل التواريخ بالتتابع", timePause: "إيقاف التتابع مؤقتًا", pill: "الصوت", volume: "مستوى الصوت", note: "الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية.", noRecording: "لا يوجد تسجيل لدرجة الحرارة", silence: "صمت", levelText: "يُشغَّل تسجيل المستوى {level}.", levelLine: "مستوى التسجيل: {level}", levels: { low: "منخفض", mid: "متوسط", high: "مرتفع" } },
+    sound: { timePlay: "تشغيل التواريخ بالتتابع", timePause: "إيقاف التتابع مؤقتًا", pill: "الصوت", volume: "مستوى الصوت", note: "الأصوات تسجيلات تُختار بالقيمة الحقيقية: منخفض / متوسط / مرتفع. المستوى يتبع البيانات؛ أما التسجيلات نفسها فتوضيحية.", silence: "صمت", levelText: "يُشغَّل تسجيل المستوى {level}.", levelLine: "مستوى التسجيل: {level}", levels: { low: "منخفض", mid: "متوسط", high: "مرتفع" } },
   },
 };
 
