@@ -3,6 +3,14 @@
 
 /** Phenomena that have a recording. Temperature has none. */
 export const AMBIENCE_PHENOMENA = Object.freeze(["dust", "rainfall", "wind"]);
+/** Dust breakpoints (33rd / 66th percentile of all 13,000 values), for pages that do not load the whole package. A test keeps them equal to the catalog. */
+export const DUST_BREAKPOINTS = Object.freeze({ low: 0.03822357523323673, high: 0.12473433711410145 });
+/** Documented breakpoints for every phenomenon that has recordings (rain: values at or above 0.1 mm/h). Tests keep them equal to the catalog. */
+export const DOCUMENTED_BREAKPOINTS = Object.freeze({
+  dust: DUST_BREAKPOINTS,
+  rainfall: Object.freeze({ low: 0.16371862264826748, high: 0.31151946194627594 }),
+  wind: Object.freeze({ low: 2.4772706374803968, high: 4.068306094632604 }),
+});
 export const LEVELS = Object.freeze(["low", "mid", "high"]);
 export const LOW_PERCENTILE = 0.33;
 export const HIGH_PERCENTILE = 0.66;

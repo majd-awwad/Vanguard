@@ -13,8 +13,8 @@ import { createAnalysisClient } from "./analysis-client.js";
 import { mountCompare } from "./compare.js";
 import { mountEcho } from "./echo-ui.js";
 import { mountHunter } from "./hunter-ui.js";
-import { changeSemitones, changeTones, hoverPlan as changeHoverPlan } from "./mapping.js";
-import { cellInfo, hoverPlan as valueHoverPlan, soundParams, stepTones } from "./sonify.js";
+import { lonPan } from "./mapping.js";
+import { cellInfo } from "./sonify.js";
 import { createCanvasRenderer } from "./renderer-2d.js";
 import { createGlRenderer } from "./renderer-gl.js";
 import { decodeShare, mountShare } from "./share.js";
@@ -22,8 +22,8 @@ import { GUIDED, PURE, createSpeech } from "./speech.js";
 import { AUDIO, SOUND_MODES, TOOLS, createAppState, createStore } from "./state.js";
 import { copyFor } from "./studio-ui-copy.js";
 import { ICON } from "./studio-icons.js";
-import { AMBIENCE_PHENOMENA, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
-import { createAmbience } from "./ambience.js";
+import { AMBIENCE_PHENOMENA, DOCUMENTED_BREAKPOINTS, MIN_VALUE, breakpoints, levelFor } from "./ambience-core.js";
+import { createRecordings } from "./recordings.js";
 import { SIGNAL, dryNotice, isDryValue } from "./signal-core.js";
 import { infoIcon } from "./studio-ui-kit.js";
 import { studioCopy } from "./studio-copy.js";
@@ -41,39 +41,7 @@ export const cardinal = (degrees, language = "en") => (language === "ar" ? CARDI
 export const chronological = (phen) => [...phen.list];
 
 // ---------------------------------------------------------------------------------------------------------------
-// Entry: one sentence, one button, no autoplay. Then the two-choice sound-mode dialog.
-export function openModeDialog(document, language, { current = null, dismissable = false, onChoose, onClose = () => {} }) {
-  const m = copyFor(language);
-  const overlay = h(document, "div", { class: "em-modal-backdrop" });
-  const dialog = h(document, "div", { class: "em-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "em-mode-title" });
-  const choice = (mode, title, text) => {
-    const art = h(document, "span", { class: "em-choice-art", "aria-hidden": "true" });
-    art.innerHTML = mode === GUIDED ? ICON.voice : ICON.waves;
-    const button = h(document, "button", { type: "button", class: "em-choice", "data-mode": mode, "aria-pressed": String(current === mode) }, art, h(document, "strong", { text: title }), h(document, "span", { text }));
-    button.addEventListener("click", () => { close(); onChoose(mode); });
-    return button;
-  };
-  const buttons = [choice(GUIDED, m.mode.guided, m.mode.guidedText), choice(PURE, m.mode.pure, m.mode.pureText)];
-  const closeButton = dismissable ? h(document, "button", { type: "button", class: "button ghost", text: m.mode.close }) : null;
-  dialog.append(h(document, "h2", { id: "em-mode-title", text: m.mode.title }), h(document, "div", { class: "em-choices" }, ...buttons), h(document, "p", { class: "small", text: m.mode.note }), ...(closeButton ? [closeButton] : []));
-  overlay.append(dialog);
-  const previous = document.activeElement;
-  function close() { overlay.remove(); document.removeEventListener("keydown", onKey, true); previous?.focus?.(); onClose(); }
-  function onKey(event) {
-    if (event.key === "Escape" && dismissable) { event.preventDefault(); close(); return; }
-    if (event.key !== "Tab") return;
-    const focusable = [...dialog.querySelectorAll("button")];
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  }
-  closeButton?.addEventListener("click", close);
-  document.addEventListener("keydown", onKey, true);
-  document.body.append(overlay);
-  (buttons.find((b) => b.dataset.mode === current) ?? buttons[0]).focus();
-  return { close };
-}
-
+// Entry: one sentence, one button, no autoplay. The recordings are the sound; spoken guidance is a setting.
 export function startStudio(document = globalThis.document) {
   const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages" });
   const m = copyFor(language);
@@ -87,7 +55,7 @@ export function startStudio(document = globalThis.document) {
   root.replaceChildren(h(document, "section", { class: "em-entry", "aria-labelledby": "em-entry-title" },
     h(document, "p", { class: "eyebrow", text: m.entry.eyebrow }), h(document, "h1", { id: "em-entry-title", text: m.entry.title }),
     h(document, "p", { class: "lede", text: m.entry.sentence }), start, h(document, "p", { class: "small", text: m.entry.note })));
-  start.addEventListener("click", () => openModeDialog(document, language, { onChoose: (mode) => mountApp(document, root, language, mode) }));
+  start.addEventListener("click", () => mountApp(document, root, language, loadSettings().guidance ? GUIDED : PURE));
   return Promise.resolve();
 }
 
@@ -99,6 +67,8 @@ async function mountApp(document, root, language, initialMode) {
   const params = new URL(document.URL).searchParams;
   const reduced = () => win.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   const T = (template, extra) => fillIso(template, extra, language);
+  // Old stored sound settings are reset once: the sound is now the recordings only.
+  try { if (win.localStorage.getItem("earthpulse.sound.v2") !== "1") { saveSettings({ volume: 0.72 }); win.localStorage.setItem("earthpulse.sound.v2", "1"); } } catch { /* storage unavailable */ }
   const settings = loadSettings();
   root.replaceChildren(h(document, "p", { class: "status", role: "status", text: m.entry.loading }));
 
@@ -291,10 +261,9 @@ async function mountApp(document, root, language, initialMode) {
 
   // ---- Audio, speech
   const audio = createStudioAudio({ volume: settings.volume });
-  const ambience = createAmbience({ baseUrl: new URL("../assets/ambient/", import.meta.url), reduced });
-  ambience.setDataVolume(settings.volume);
-  ambience.setVolume(settings.ambienceVolume);
-  const speech = createSpeech({ language: () => language, liveRegion: el.live, onState: (s) => store.dispatch("SET_SPEECH", { speech: s }), onDuck: (on) => { audio.setDuck(on); ambience.setDuck(on); } });
+  const rec = createRecordings({ baseUrl: new URL("../assets/ambient/", import.meta.url), reduced });
+  rec.setVolume(settings.volume);
+  const speech = createSpeech({ language: () => language, liveRegion: el.live, onState: (s) => store.dispatch("SET_SPEECH", { speech: s }), onDuck: (on) => { audio.setDuck(on); rec.setDuck(on); } });
   speech.setMode(initialMode);
   const speak = (text) => speech.say(text);
   const guided = (text) => speech.announce(text);
@@ -321,11 +290,9 @@ async function mountApp(document, root, language, initialMode) {
   };
   function soundText(d) {
     if (d.value === null) return c.understand.missingSound;
-    if (d.kind === "change") { const norm = changeNormalizer(spec()); return norm(d.value) === 0 ? c.understand.soundFlat : T(d.value > 0 ? c.understand.soundUp : c.understand.soundDown, { semi: changeSemitones(d.value, norm) }); }
-    const p = soundParams(phen.id, cellInfo(phen.id, state.snapshot, d.index));
-    const meaning = m.phen.soundMeaning[phen.id];
-    const part = p.silent ? "" : p.rate ? " ⁦" + trimNumber(p.rate, 1) + "/s⁩" : p.frequencyHz ? " ⁦" + trimNumber(p.frequencyHz, 0) + " Hz⁩" : "";
-    return meaning + (p.silent ? "" : "" + part);
+    if (!SOUND_PHENOMENA.includes(phen.id)) return m.sound.noRecording;
+    const level = levelAt(d.index);
+    return level ? T(m.sound.levelText, { level: m.sound.levels[level] }) : m.sound.silence;
   }
   function renderInfo() {
     const s = state.snapshot;
@@ -408,7 +375,7 @@ async function mountApp(document, root, language, initialMode) {
     store.dispatch("SELECT_SAMPLE", { sampleId: cell.index });
     renderInfo();
     invalidate();
-    updateAmbience();
+    updateSoundStatus();
     for (const hook of state.selectHooks ?? []) hook(cell, { user });
     if (user && typeof app !== "undefined" && app.dataset.flyout !== "open" && win.innerHeight >= 700) setInspectorCollapsed(false);
     if (play) soundForCursor(true);
@@ -416,40 +383,63 @@ async function mountApp(document, root, language, initialMode) {
   }
   const explain = () => { if (state.cursor) speech.say(readText(state.cursor)); else speech.say(m.info.none); };
 
-  // ---- Sound for the cursor
-  const slotFor = (kind) => (layerKind() === "change" ? 0.12 : kind === "area" ? 0.18 : 0.2);
-  function tonesFor(step, pan, { kind, slotS, compact }) {
-    if (kind === "change") return changeTones(step.value, pan, compact ? 0.05 : 0.09, changeNormalizer(spec()));
-    return stepTones(phen.id, state.snapshot, step, pan, Math.max(0.1, slotS * 0.9));
-  }
-  const cursorKey = () => [phen.id, state.snapshot.id, state.comparison?.id ?? "value", state.cursor?.index].join("|");
-  function planFor(cell) {
-    const centre = cellCenter(grid, cell.row, cell.col);
-    if (layerKind() === "change") return changeHoverPlan("change", cell, layerValues()[cell.index], grid, changeNormalizer(spec()));
-    return valueHoverPlan(phen.id, state.snapshot, cell, grid, centre.lon);
+  // ---- Sound: the user's recordings, chosen by the REAL value (low / mid / high). No synthesized tones.
+  const SOUND_PHENOMENA = AMBIENCE_PHENOMENA;
+  const slotFor = () => 0.3;
+  const tonesFor = () => [{ offsetS: 0, tone: undefined }]; // markers only: the recording slice plays when the step becomes active
+  const bpCache = new Map();
+  const bpFor = () => { if (!bpCache.has(phen.id)) bpCache.set(phen.id, breakpoints(phen.list.map((s) => s.values), { min: MIN_VALUE[phen.id] ?? -Infinity })); return bpCache.get(phen.id); };
+  const levelOfValue = (value) => levelFor({ phenomenon: phen.id, value, breakpoints: bpFor() });
+  const levelAt = (index) => levelOfValue(index >= 0 ? state.snapshot.values[index] : null);
+  const panOf = (cell) => lonPan(grid, cellCenter(grid, cell.row, cell.col).lon);
+  const soundCell = () => state.cursor ?? state.selected;
+  function updateSoundStatus() {
+    if (!el.soundLevel) return;
+    if (!SOUND_PHENOMENA.includes(phen.id)) { el.soundLevel.textContent = m.sound.noRecording; return; }
+    const cell = soundCell();
+    if (!cell) { el.soundLevel.textContent = ""; return; }
+    const level = levelAt(cell.index);
+    el.soundLevel.textContent = level ? T(m.sound.levelLine, { level: m.sound.levels[level] }) : m.sound.silence;
   }
   function soundForCursor(force = false) {
-    if (!audio.enabled || !state.cursor || state.busy) return;
-    const cell = state.cursor;
-    if (force) audio.play(planFor(cell)); else audio.hover(cursorKey(), () => planFor(cell));
+    updateSoundStatus();
+    if (!audio.enabled || state.busy) return;
+    const cell = soundCell();
+    if (!cell || !SOUND_PHENOMENA.includes(phen.id)) { rec.silence(); return; }
+    const level = levelAt(cell.index);
+    if (force) rec.preview(phen.id, level, panOf(cell)); else rec.hold(phen.id, level, panOf(cell));
   }
+  function refreshSound() {
+    if (!audio.enabled) { rec.stop(); updateSoundStatus(); return; }
+    if (state.busy) updateSoundStatus(); else soundForCursor();
+  }
+  // Scans, paths, comparisons and Echo: the clock reports each active step and a slice of the matching recording plays.
+  audio.onEvent = (event) => {
+    rec.silence();
+    if (!SOUND_PHENOMENA.includes(phen.id) || !(event.row >= 0)) return;
+    const value = event.evidence && event.evidence.recValue !== undefined ? event.evidence.recValue : state.snapshot.values[event.row * grid.cols + event.col];
+    const level = levelOfValue(value);
+    if (level) rec.slice(phen.id, level, { pan: event.pan ?? 0, offsetS: (event.step ?? 0) * 0.37 });
+  };
+  audio.onHalt = () => rec.stopSlices();
   state.onCursor = (cell) => {
-    updateAmbience();
+    updateSoundStatus();
     if (state.tool === "explore") soundForCursor();
     if (cell && state.tool === "explore" && store.state.tool === TOOLS.EXPLORE) guided(readText(cell));
   };
 
   const setSound = async (on) => {
+    const unlocking = on ? rec.unlock().catch(() => null) : null; // inside the click: the audio context is created and resumed here
     el.soundButton.setAttribute("aria-pressed", String(on));
     const soundLabel = on ? m.sound.disable : m.sound.enable;
     el.soundButton.setAttribute("aria-label", soundLabel);
     el.soundLabel.textContent = soundLabel;
     el.soundButton.setAttribute("data-tip", soundLabel);
-    if (on) { await audio.enable(); el.soundState.textContent = audio.unavailable ? c.sound.unavailable : m.sound.on; } else { audio.disable(); el.soundState.textContent = m.sound.off; }
+    if (on) { await audio.enable(); await unlocking; el.soundState.textContent = rec.state === "none" ? c.sound.unavailable : m.sound.on; } else { audio.disable(); audio.stop(); rec.stop(); el.soundState.textContent = m.sound.off; }
     store.dispatch("SET_AUDIO", { audio: on ? AUDIO.IDLE : AUDIO.MUTED });
-    updateAmbience();
     renderInfo();
-    if (on && state.cursor) soundForCursor();
+    refreshSound();
+    if (on) soundForCursor(true);
   };
 
   // ---- Pointer, wheel, touch
@@ -558,74 +548,29 @@ async function mountApp(document, root, language, initialMode) {
     state.onKey?.(event);
   });
 
-  // ---- Sound pill (top right over the map): on/off, Guided Voice | Pure Sonification, data volume
+  // ---- Sound card: one on/off button, one volume, the live waveform of the real output, and the honest note
   el.soundButton = h(document, "button", { type: "button", class: "icon-btn st-sound-toggle", "aria-pressed": "false", "aria-label": m.sound.enable, "data-tip": m.sound.enable, "data-tip-pos": "below" });
   el.soundButton.innerHTML = ICON.sound;
   el.soundLabel = h(document, "span", { text: m.sound.enable });
   el.soundButton.append(el.soundLabel);
   el.soundState = h(document, "p", { class: "visually-hidden", role: "status", "aria-live": "polite", text: m.sound.off });
-  el.volume = h(document, "input", { type: "range", id: "st-volume", min: 0, max: 100, step: 1, value: Math.round(settings.volume * 100), "aria-label": m.voice.dataVolume });
-  el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); ambience.setDataVolume(v); saveSettings({ volume: v }); });
+  el.volume = h(document, "input", { type: "range", id: "st-volume", min: 0, max: 100, step: 1, value: Math.round(settings.volume * 100), "aria-label": m.sound.volume });
+  el.volume.addEventListener("input", () => { const v = Number(el.volume.value) / 100; audio.setVolume(v); rec.setVolume(v); saveSettings({ volume: v }); });
   speech.setSpeechVolume(settings.speechVolume);
   el.soundButton.addEventListener("click", () => setSound(!audio.enabled));
   el.wave = h(document, "canvas", { width: 120, height: 36, role: "img", "aria-label": c.sound.wave });
-  el.modeSeg = h(document, "div", { class: "seg", role: "group", "aria-label": m.mode.title });
-  const modeButtons = {};
-  for (const [mode, label] of [[GUIDED, m.mode.guided], [PURE, m.mode.pure]]) {
-    const b = h(document, "button", { type: "button", "aria-pressed": String(mode === store.state.soundMode), text: label });
-    b.addEventListener("click", () => setSoundMode(mode));
-    modeButtons[mode] = b;
-    el.modeSeg.append(b);
-  }
-  function renderModeButton() { for (const [mode, b] of Object.entries(modeButtons)) b.setAttribute("aria-pressed", String(mode === store.state.soundMode)); }
-  el.soundMore = h(document, "div", { class: "st-sound-more" }, el.modeSeg, el.volume);
-  const soundPill = h(document, "div", { class: "st-tb-group st-sound", role: "group", "aria-label": c.sound.title }, el.soundButton, el.soundMore, el.wave, el.soundState);
-  el.soundPill = soundPill;
+  el.soundMore = h(document, "div", { class: "st-sound-more" }, el.volume);
+  el.soundLevel = h(document, "p", { class: "st-sound-level", role: "status", "aria-live": "polite" });
+  el.soundNote = h(document, "small", { class: "st-sound-note", text: m.sound.note });
+  el.soundPill = h(document, "div", { hidden: true });
   el.voiceNote = h(document, "p", { class: "small", hidden: true, text: m.voice.unavailable });
+  // Spoken guidance is a setting (the settings drawer); the Studio only follows it.
   function setSoundMode(mode) {
     store.dispatch("SET_SOUND_MODE", { mode });
     speech.setMode(mode);
     el.status.setAttribute("aria-live", mode === GUIDED ? "polite" : "off");
-    renderModeButton();
-    el.live.textContent = m.mode.switched[mode];
-    if (mode === GUIDED && state.cursor) speak(m.mode.switched[mode] + " " + readText(state.cursor));
   }
-
-  // ---- Ambience (optional, illustrative): OFF by default; the level follows the REAL value under the cursor
-  let ambienceOn = settings.ambience === true;
-  const bpCache = new Map();
-  const bpFor = () => { if (!bpCache.has(phen.id)) bpCache.set(phen.id, breakpoints(phen.list.map((s) => s.values), { min: MIN_VALUE[phen.id] ?? -Infinity })); return bpCache.get(phen.id); };
-  el.ambToggle = h(document, "button", { type: "button", class: "switch", role: "switch", "aria-checked": String(ambienceOn), "aria-label": m.ambience.label }, h(document, "span", { class: "knob" }));
-  el.ambVolume = h(document, "input", { type: "range", id: "st-amb-volume", min: 0, max: 100, step: 1, value: Math.round(settings.ambienceVolume * 100), "aria-label": m.ambience.volume });
-  el.ambInfo = h(document, "span", { class: "st-inline-info" });
-  el.ambStatus = h(document, "small", { class: "st-amb-status", role: "status", "aria-live": "polite" });
-  el.ambRow = h(document, "div", { class: "st-amb" },
-    h(document, "div", { class: "st-amb-row" }, h(document, "span", { class: "st-amb-label", text: m.ambience.label }), el.ambInfo, el.ambToggle),
-    h(document, "label", { class: "volume", for: "st-amb-volume" }, h(document, "span", { text: m.ambience.volume }), el.ambVolume),
-    h(document, "small", { class: "st-amb-note", text: m.ambience.note }), el.ambStatus);
-  el.ambToggle.addEventListener("click", () => {
-    if (el.ambToggle.disabled) return;
-    ambienceOn = !ambienceOn;
-    saveSettings({ ambience: ambienceOn });
-    updateAmbience();
-  });
-  el.ambVolume.addEventListener("input", () => { const v = Number(el.ambVolume.value) / 100; ambience.setVolume(v); saveSettings({ ambienceVolume: v }); });
-  function updateAmbience() {
-    if (!el.ambToggle) return;
-    const supported = AMBIENCE_PHENOMENA.includes(phen.id);
-    el.ambToggle.disabled = !supported;
-    el.ambToggle.setAttribute("aria-checked", String(ambienceOn && supported));
-    const tip = supported ? m.ambience.note : m.ambience.none;
-    el.ambToggle.title = tip;
-    el.ambInfo.replaceChildren(infoIcon(document, tip));
-    // No autoplay: nothing starts before the user has enabled sound.
-    if (!ambienceOn || !supported || !audio.enabled) { ambience.stop(); el.ambStatus.textContent = ""; return; }
-    const cell = state.cursor ?? state.selected;
-    const raw = cell ? state.snapshot.values[cell.index] : null;
-    const level = levelFor({ phenomenon: phen.id, value: raw, breakpoints: bpFor() });
-    ambience.setLevel(phen.id, level);
-    el.ambStatus.textContent = level ? m.ambience.levels[level] : m.ambience.silent;
-  }
+  const renderModeButton = () => {};
 
   // ---- Dry dates: explain a date with almost no signal and suggest the wettest real dates
   el.dryNotice = h(document, "div", { class: "st-dry", role: "status", "aria-live": "polite", hidden: true });
@@ -750,7 +695,7 @@ async function mountApp(document, root, language, initialMode) {
   }
   const openComputed = () => openSheet(m.info.how, [el.sourceStatus, info]);
   const helpNodes = () => {
-    const mapping = h(document, "ul", { class: "st-help-list" }, ...PHENOMENON_IDS.map((id) => h(document, "li", {}, h(document, "strong", { text: m.phen[id] + ": " }), m.phen.soundMeaning[id])));
+    const mapping = h(document, "ul", { class: "st-help-list" }, ...PHENOMENON_IDS.map((id) => h(document, "li", {}, h(document, "strong", { text: m.phen[id] + ": " }), DOCUMENTED_BREAKPOINTS[id] ? T(m.help.levelRule, { low: Number(DOCUMENTED_BREAKPOINTS[id].low.toPrecision(4)), high: Number(DOCUMENTED_BREAKPOINTS[id].high.toPrecision(4)), unit: m.phen.unitName[id] }) + (id === "rainfall" ? " " + m.help.rainRule : "") : m.sound.noRecording)));
     const keys = h(document, "ul", { class: "st-help-list" }, ...m.help.shortcuts.map(([key, text]) => h(document, "li", {}, h(document, "span", { class: "kbd", text: key }), " " + text)));
     const notes = h(document, "ul", { class: "st-help-list" }, ...m.help.notes.map((line) => h(document, "li", { text: T(line, { cellLat: trimNumber(size.lat), cellLon: trimNumber(size.lon) }) })));
     const actions = h(document, "div", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.explain }); b.addEventListener("click", explain); return b; })(), (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.help }); b.addEventListener("click", () => speech.say(m.voice.helpText[store.state.tool])); return b; })());
@@ -953,13 +898,13 @@ async function mountApp(document, root, language, initialMode) {
   el.timeButton.addEventListener("click", () => { const open = el.timePop.hidden; el.timePop.hidden = !open; el.timeButton.setAttribute("aria-expanded", String(open)); if (open) el.timePop.querySelector('[aria-pressed="true"]')?.focus?.(); });
   el.timePop.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); closeTimePop(true); } });
   document.addEventListener("pointerdown", (event) => { if (!el.timePop.hidden && !el.timePop.contains(event.target) && !el.timeButton.contains(event.target)) closeTimePop(false); });
-  let waveFrame = win.requestAnimationFrame(function loop() { if (audio.enabled) drawWaveform(el.wave, audio.tap.analyser, { color: "#68e0d0" }); waveFrame = win.requestAnimationFrame(loop); });
+  let waveFrame = win.requestAnimationFrame(function loop() { if (audio.enabled) drawWaveform(el.wave, rec.analyser, { color: "#68e0d0" }); waveFrame = win.requestAnimationFrame(loop); });
   audio.transport.subscribe((snap) => { store.dispatch("SET_AUDIO", { audio: !audio.enabled ? AUDIO.MUTED : snap.status === "playing" ? AUDIO.PLAYING : snap.status === "paused" ? AUDIO.PAUSED : AUDIO.IDLE }); });
 
   function onDataChanged() {
     renderLegend();
     renderDryNotice();
-    updateAmbience();
+    refreshSound();
     renderLayerChip();
     renderInfo();
     invalidate();
@@ -1012,12 +957,12 @@ async function mountApp(document, root, language, initialMode) {
   el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
   el.exploreHint = h(document, "p", { class: "st-hint", text: c.tools.help.explore });
   el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline);
-  el.soundMore.replaceChildren(el.modeSeg, h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.voice.dataVolume }), el.volume), el.ambRow);
+  el.soundMore.replaceChildren(h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.sound.volume }), el.volume));
   const title = (text) => h(document, "h2", { text });
   const head = h(document, "header", { class: "st-head" }, h(document, "p", { class: "eyebrow", text: m.cards.eyebrow }), h(document, "h1", {}, m.cards.title[0] + " ", h(document, "em", { text: m.cards.title[1] })), h(document, "p", { class: "lede", text: m.cards.lede }));
   const dataCard = h(document, "section", { class: "st-card", "aria-label": m.cards.data }, title(m.cards.data), el.phenGroup,
     h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.timewrap, h(document, "div", { class: "st-inline" }, el.layerChip, el.timePlay), el.lock, el.lockFoot);
-  const soundCard = h(document, "section", { class: "st-card st-sound", role: "group", "aria-label": c.sound.title }, title(m.cards.sound), el.soundButton, el.soundState, el.soundMore, el.wave);
+  const soundCard = h(document, "section", { class: "st-card st-sound", role: "group", "aria-label": c.sound.title }, title(m.cards.sound), el.soundButton, el.soundState, el.soundMore, el.wave, el.soundLevel, el.soundNote);
   const toolsCard = h(document, "section", { class: "st-card", "aria-label": m.cards.tools }, title(m.cards.tools), el.rail, el.exploreHint, el.flyout);
   let mapBoxEl;
   const how = h(document, "details", { class: "st-card st-how" }, h(document, "summary", { text: m.cards.how }), ...helpNodes());
@@ -1035,7 +980,7 @@ async function mountApp(document, root, language, initialMode) {
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
-  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); ambience.setDataVolume(s.volume); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
+  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); rec.setVolume(s.volume); if (typeof s.guidance === "boolean") setSoundMode(s.guidance ? GUIDED : PURE); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
 
 
   // First load: a real value is already in the inspector (nearest data cell to the centre of the coverage), sound off.
@@ -1057,7 +1002,7 @@ async function mountApp(document, root, language, initialMode) {
   }
 
   const api = {
-    ambience, vw, vh, panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
+    rec, vw, vh, panels: {}, toast, hoverPin, unitText, phenName: () => m.phen[phen.id], dateText: () => dateOf(state.snapshot), state, el, grid, bounds, c, T, document, win, audio, speech, store, pkg, language, setSound, setCursor, selectCell, setView, invalidate, toScreen, toGeo, fmt, fmtChange,
     layerValues, layerKind, applyLayer, onDataChanged, renderInfo, readText, tonesFor, slotFor, setTab, requestDate, switchPhenomenon, sampleName, explain, speak, guided,
     get phen() { return phen; }, get catalog() { return catalog(); }, get list() { return phen.list; }, get renderer() { return renderer; }, phenomenonId: () => phen.id,
     getSnapshot: async (id) => phen.snapshot(id),

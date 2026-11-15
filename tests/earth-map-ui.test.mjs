@@ -66,9 +66,10 @@ test("SAFETY: no autoplay, one AudioContext, sound only after an explicit action
   const audio = await text("web/studio/audio.js");
   assert.ok((studio.match(/audio\.enable\(/g) ?? []).length === 1, "audio.enable is called in exactly one place (the setSound handler)");
   assert.match(studio, /const setSound = async \(on\) => \{/);
-  assert.match(studio, /if \(!audio\.enabled \|\| !state\.cursor \|\| state\.busy\) return;/, "cursor sound needs enabled audio");
-  assert.match(studio, /start\.addEventListener\("click", \(\) => openModeDialog/, "the entry needs a click");
-  assert.ok(!/AudioContext\(/.test(studio + audio), "no second AudioContext: only the shared transport creates one");
+  assert.match(studio, /if \(!audio\.enabled \|\| state\.busy\) return;/, "cursor sound needs enabled audio");
+  assert.match(studio, /rec\.unlock\(\)/, "the audio context is created and resumed inside the sound button click");
+  assert.match(studio, /start\.addEventListener\("click", \(\) => mountApp/, "the entry needs a click");
+  assert.ok(!/AudioContext\(/.test(studio + audio), "the Studio creates no AudioContext itself: recordings.js (unlocked by the click) and the clock do");
   assert.ok(!/\.speak\(/.test(studio), "speech goes only through the speech manager");
   assert.equal((speech.match(/synth\.speak\(/g) ?? []).length, 1);
   assert.match(speech, /if \(mode !== GUIDED\) return false;/, "Pure Sonification never announces automatically");

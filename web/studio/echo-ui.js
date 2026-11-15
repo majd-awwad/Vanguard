@@ -6,7 +6,6 @@ import { DECODE_LOCKED_DATES, formatValue } from "./datasets.js";
 import { DEFAULT_SEPARATION, SIMILARITY_NOTE, monthlyGroup, toEchoData } from "./echo-core.js";
 import { cellCenter } from "./field.js";
 import { joinPlans, lonPan } from "./mapping.js";
-import { cellInfo, MAPPING_VERSION, valueTones } from "./sonify.js";
 import { allowSpoilersThisVisit } from "../cinematic/site/progress.js";
 import { analysisCopy } from "./analysis-copy.js";
 import { mapCopy } from "./earthmap-copy.js";
@@ -198,15 +197,13 @@ export function mountEcho(api, container) {
   el.cancel.addEventListener("click", () => controller?.abort());
 
   // ---- A match: the same map moves to it; two curves side by side; listen to source then match.
+  // The monthly series as markers: each month plays a slice of the recording for its real value (no synthesized tones).
   function seriesPlan(index, dates) {
-    const centre = cellCenter(api.grid, Math.floor(index / api.grid.cols), index % api.grid.cols);
-    const pan = lonPan(api.grid, centre.lon);
-    const events = [];
-    dates.forEach((date, i) => {
-      const snap = phenSnapshot(date);
-      valueTones(api.phen.id, cellInfo(api.phen.id, snap, index), { pan, eventS: 0.4 }).forEach(({ offsetS, tone }) => events.push({ id: `ev-${events.length}`, onsetS: i * 0.45 + offsetS, row: Math.floor(index / api.grid.cols), col: index % api.grid.cols, step: i, tone, evidence: { mappingVersion: MAPPING_VERSION } }));
-    });
-    return { caseId: "earthmap", level: "earthmap", mappingVersion: MAPPING_VERSION, mode: "echo", durationS: dates.length * 0.45 + 0.05, events };
+    const row = Math.floor(index / api.grid.cols);
+    const col = index % api.grid.cols;
+    const pan = lonPan(api.grid, cellCenter(api.grid, row, col).lon);
+    const events = dates.map((date, i) => ({ id: `ev-${i}`, onsetS: i * 0.5, row, col, step: i, pan, evidence: { recValue: phenSnapshot(date).values[index], date } }));
+    return { caseId: "earthmap", level: "earthmap", mappingVersion: "recordings-v1", mode: "echo", durationS: dates.length * 0.5 + 0.1, events };
   }
   function openMatch(sampleId) {
     const mt = store.state.echoMatches.find((x) => x.sampleId === sampleId);
