@@ -490,13 +490,22 @@ async function mountApp(document, root, language, initialMode) {
   el.voiceNote = h(document, "p", { class: "small", hidden: true, text: m.voice.unavailable });
   const explainButton = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.explain });
   const helpButton = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.help });
+  const lastButton = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.last });
+  lastButton.addEventListener("click", () => {
+    const cell = state.selected ?? state.cursor;
+    if (!cell) { speak(m.info.none); return; }
+    selectCell(cell, { play: false, say: false });
+    const centre = cellCenter(grid, cell.row, cell.col);
+    setView({ ...state.view, lon: centre.lon, lat: centre.lat });
+    speech.say(readText(cell));
+  });
   explainButton.addEventListener("click", explain);
   const toolIntro = () => speech.say(m.voice.helpText[store.state.tool]);
   helpButton.addEventListener("click", toolIntro);
   const soundPanel = h(document, "section", { class: "panel", "aria-labelledby": "st-sound-title" }, h(document, "h2", { id: "st-sound-title", text: c.sound.title }), el.soundButton, el.soundState,
     h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.voice.dataVolume }), el.volume),
     h(document, "label", { class: "volume", for: "st-voice-volume" }, h(document, "span", { text: m.voice.speechVolume }), el.voiceVolume), el.voiceNote,
-    h(document, "div", { class: "st-tools-row" }, explainButton, helpButton),
+    h(document, "div", { class: "st-tools-row" }, explainButton, helpButton, lastButton),
     h(document, "p", { class: "small", id: "em-sound-meaning" }));
   state.left = h(document, "div", { class: "em-col" }, viewPanel, soundPanel);
   state.right = h(document, "div", { class: "em-col" }, h(document, "div", { hidden: true }), h(document, "div", { hidden: true }));

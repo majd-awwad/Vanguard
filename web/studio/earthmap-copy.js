@@ -34,7 +34,7 @@ export const mapCopy = {
     },
     read: { cell: "{id}. {lat}, {lon}. {measure}: {value} {unit}. {date}. Model data.", missing: "{id}. {lat}, {lon}. {measure}: missing value. {date}.", change: "{id}. {lat}, {lon}. Change in {measure}: {value} {unit}, {direction}.", windExtra: "Wind from {dir}." },
     voice: {
-      explain: "Explain my position", help: "What can I do here?", speechVolume: "Voice volume", dataVolume: "Sound volume", unavailable: "No voice for this language is installed, so guidance appears as text.",
+      explain: "Explain my position", last: "Return to last position", help: "What can I do here?", speechVolume: "Voice volume", dataVolume: "Sound volume", unavailable: "No voice for this language is installed, so guidance appears as text.",
       welcome: { GUIDED_VOICE: "Guided Voice. Choose Dust, Rainfall, Temperature or Wind at the top, then move over the map with the pointer or the arrow keys. The value is read after you stop moving." },
       helpText: {
         EXPLORE: "Explore. Move over the map or use the arrow keys, which move one cell at a time. Cells are named by a letter for the row, counted from the north, and a number for the column, counted from the west. Enter selects a cell and plays it. R reads your position. Plus and minus zoom. Use the Select area and Draw path tools to hear many cells.",
@@ -82,7 +82,7 @@ export const mapCopy = {
     },
     read: { cell: "{id}. {lat}، {lon}. {measure}: {value} {unit}. {date}. بيانات نموذج.", missing: "{id}. {lat}، {lon}. {measure}: قيمة مفقودة. {date}.", change: "{id}. {lat}، {lon}. التغير في {measure}: {value} {unit}، {direction}.", windExtra: "الرياح من {dir}." },
     voice: {
-      explain: "اشرح موضعي", help: "ماذا يمكنني أن أفعل هنا؟", speechVolume: "مستوى صوت الكلام", dataVolume: "مستوى صوت البيانات", unavailable: "لا يوجد صوت لهذه اللغة على هذا الجهاز، لذلك يظهر الإرشاد نصًا.",
+      explain: "اشرح موضعي", last: "ارجع إلى آخر موضع", help: "ماذا يمكنني أن أفعل هنا؟", speechVolume: "مستوى صوت الكلام", dataVolume: "مستوى صوت البيانات", unavailable: "لا يوجد صوت لهذه اللغة على هذا الجهاز، لذلك يظهر الإرشاد نصًا.",
       welcome: { GUIDED_VOICE: "الإرشاد بالكلام. اختر الغبار أو الأمطار أو الحرارة أو الرياح من الأعلى، ثم تحرّك فوق الخريطة بالمؤشر أو بمفاتيح الأسهم. تُقرأ القيمة بعد أن تتوقف عن الحركة." },
       helpText: {
         EXPLORE: "استكشف. تحرّك فوق الخريطة أو استخدم مفاتيح الأسهم التي تنقلك خلية واحدة في كل مرة. تُسمّى الخلايا بحرف للصف يُعدّ من الشمال ورقم للعمود يُعدّ من الغرب. Enter يختار الخلية ويشغّلها. R يقرأ موضعك. زائد وناقص للتكبير. واستخدم أداتي تحديد منطقة ورسم مسار لسماع خلايا كثيرة.",

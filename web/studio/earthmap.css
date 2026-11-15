@@ -72,3 +72,9 @@
 .em-info .kv { grid-template-columns: 7.2rem minmax(0, 1fr); }
 @media (max-width: 1100px) { .em-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 900px) { .em-layout { grid-template-columns: 1fr; } }
+
+/* Touch targets: at least 44 x 44 CSS px for every control on this page. */
+#studio-root .button, #studio-root select, #studio-root summary, #studio-root .em-pill, #studio-root .em-tab, #studio-root .em-date { min-height: 2.75rem; }
+#studio-root input[type="range"] { min-height: 2.75rem; }
+#studio-root .button { min-width: 2.75rem; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+.site-menu-button { min-height: 2.75rem; }
