@@ -183,6 +183,7 @@ async function mountApp(document, root, language, initialMode) {
     renderer.setView(state.view, pixelsPerDegree(state.view, bounds, state.width, state.height), bounds);
     renderer.render();
     drawOverlay();
+    if (el.inspector) positionCard();
   }
   const toScreen = (lon, lat) => geoToScreen(state.view, bounds, state.width, state.height, lon, lat);
   const toGeo = (x, y) => screenToGeo(state.view, bounds, state.width, state.height, x, y);
@@ -204,6 +205,16 @@ async function mountApp(document, root, language, initialMode) {
   const visibleWindow = () => { const a = toGeo(0, 0); const b = toGeo(state.width, state.height); return { west: a.lon, east: b.lon, north: a.lat, south: b.lat }; };
   const zoomBy = (factor, x, y, animate = true) => setView(zoomAt(state.view, bounds, state.width, state.height, factor, x, y), animate);
   const svg = (name, attrs) => { const node = document.createElementNS("http://www.w3.org/2000/svg", name); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v)); return node; };
+  function hoverTip(p, cell) {
+    const tip = el.hoverTip;
+    if (!tip) return;
+    if (!cell || (state.selected && cell.index === state.selected.index)) { tip.hidden = true; return; }
+    const d = describeCell(cell);
+    tip.textContent = d.value === null ? m.info.missing : (d.kind === "change" ? fmtChange(d.value) : fmt(d.value)) + " " + unitText();
+    tip.hidden = false;
+    const x = Math.min(state.width - tip.offsetWidth - 6, p.x + 14);
+    tip.style.transform = `translate(${Math.max(6, Math.round(x))}px, ${Math.max(6, Math.round(p.y - 34))}px)`;
+  }
   function hoverPin(index) {
     if (state.hoverPin === index) return;
     state.hoverPin = index;
@@ -226,12 +237,21 @@ async function mountApp(document, root, language, initialMode) {
     };
     if (state.selected) cellBox(state.selected.index, "st-selected");
     if (state.cursor) cellBox(state.cursor.index, "st-cursor");
-    for (const pin of state.pins) {
-      const centre = cellCenter(grid, Math.floor(pin.index / grid.cols), pin.index % grid.cols);
-      const p = toScreen(centre.lon, centre.lat);
-      el.overlay.append(svg("circle", { cx: p.x, cy: p.y, r: pin.selected || state.hoverPin === pin.index ? 15 : 11, class: "st-pin st-pin-" + pin.kind + (pin.selected ? " active" : "") + (state.hoverPin === pin.index ? " hover" : "") }));
-      const label = svg("text", { x: p.x, y: p.y + 4, class: "st-pin-label", "text-anchor": "middle" });
-      label.textContent = String(pin.label);
+    const spots = state.pins.map((pin) => { const centre = cellCenter(grid, Math.floor(pin.index / grid.cols), pin.index % grid.cols); return { pin, p: toScreen(centre.lon, centre.lat) }; });
+    const clusters = [];
+    for (const spot of spots) {
+      const solo = spot.pin.selected || state.hoverPin === spot.pin.index;
+      const home = solo ? null : clusters.find((cl) => !cl.solo && Math.hypot(cl.p.x - spot.p.x, cl.p.y - spot.p.y) < 26);
+      if (home) home.items.push(spot); else clusters.push({ p: spot.p, items: [spot], solo });
+    }
+    for (const cl of clusters) {
+      const first = cl.items[0];
+      const many = cl.items.length > 1;
+      const active = cl.items.some((it) => it.pin.selected);
+      const hover = cl.items.some((it) => state.hoverPin === it.pin.index);
+      el.overlay.append(svg("circle", { cx: cl.p.x, cy: cl.p.y, r: active || hover ? 15 : many ? 13 : 11, class: "st-pin st-pin-" + first.pin.kind + (active ? " active" : "") + (hover ? " hover" : "") + (many ? " st-pin-cluster" : "") }));
+      const label = svg("text", { x: cl.p.x, y: cl.p.y + 4, class: "st-pin-label", "text-anchor": "middle" });
+      label.textContent = many ? "×" + cl.items.length : String(first.pin.label);
       el.overlay.append(label);
     }
     for (const extra of state.extraOverlay) extra(el.overlay, svg, toScreen);
@@ -407,7 +427,7 @@ async function mountApp(document, root, language, initialMode) {
   el.frame.addEventListener("pointermove", (event) => {
     const p = local(event);
     if (!pointers.has(event.pointerId)) {
-      if (event.pointerType === "mouse") { const cell = cursorAt(p.x, p.y); setCursor(cell, { outside: !cell }); pinHoverAt(p); }
+      if (event.pointerType === "mouse") { const cell = cursorAt(p.x, p.y); setCursor(cell, { outside: !cell }); pinHoverAt(p); hoverTip(p, cell); }
       state.onPointer?.("hover", event, p, pointers);
       return;
     }
@@ -429,6 +449,7 @@ async function mountApp(document, root, language, initialMode) {
     if (!dragging || dragging.id !== event.pointerId || dragging.pinch) return;
     if (!dragging.moved && Math.hypot(p.x - dragging.start.x, p.y - dragging.start.y) < 4) return;
     dragging.moved = true;
+    if (el.hoverTip) el.hoverTip.hidden = true;
     state.view = panBy(state.view, bounds, state.width, state.height, p.x - dragging.last.x, p.y - dragging.last.y);
     dragging.last = p;
     el.frame.dataset.dragging = "true";
@@ -444,6 +465,7 @@ async function mountApp(document, root, language, initialMode) {
     }
     if (pointers.size === 0) delete el.frame.dataset.dragging;
   };
+  el.frame.addEventListener("pointerleave", () => { if (el.hoverTip) el.hoverTip.hidden = true; });
   el.frame.addEventListener("pointerup", endPointer);
   el.frame.addEventListener("pointercancel", endPointer);
   let trackpadUntil = 0;
@@ -546,7 +568,7 @@ async function mountApp(document, root, language, initialMode) {
   el.lock = h(document, "div", { class: "callout warn st-lock floating", role: "alert", hidden: true });
   function fillDates() {
     const seasonLabel = (season) => m.date.seasons[season.name] + " " + season.seasonYear;
-    el.date.replaceChildren(...phen.seasons.map((season) => h(document, "optgroup", { label: seasonLabel(season) }, ...season.snapshotIds.map((id) => { const entry = phen.snapshot(id); return h(document, "option", { value: id, text: entry.date + (isLocked(phen.id, entry.date, unlocked()) ? " 🔒" : ""), selected: id === state.snapshot.id }); }))));
+    el.date.replaceChildren(...phen.seasons.map((season) => h(document, "optgroup", { label: seasonLabel(season) }, ...season.snapshotIds.map((id) => { const entry = phen.snapshot(id); return h(document, "option", { value: id, text: entry.date + (isLocked(phen.id, entry.date, unlocked()) ? " 🔒" : ""), selected: id === state.snapshot.id, disabled: isLocked(phen.id, entry.date, unlocked()), title: isLocked(phen.id, entry.date, unlocked()) ? m.date.locked : "" }); }))));
   }
   async function requestDate(id) {
     const entry = phen.snapshot(id);
@@ -576,9 +598,24 @@ async function mountApp(document, root, language, initialMode) {
   const stepDate = (delta) => { const i = phen.list.findIndex((s) => s.id === state.snapshot.id); const next = phen.list[Math.min(phen.list.length - 1, Math.max(0, i + delta))]; if (next) requestDate(next.id); };
   el.prev.addEventListener("click", () => stepDate(-1));
   el.next.addEventListener("click", () => stepDate(1));
+  el.layerText = h(document, "span", { class: "st-layer-text" });
+  el.layerClear = h(document, "button", { type: "button", class: "st-layer-clear", "aria-label": m.layer.clear, "data-tip": m.layer.clear, "data-tip-pos": "below", hidden: true });
+  el.layerClear.innerHTML = ICON.close;
+  el.layerClear.addEventListener("click", () => api.hideChange?.());
+  el.layerChip = h(document, "span", { class: "st-layer", role: "status", "aria-live": "polite" }, el.layerText, el.layerClear);
+  function renderLayerChip() {
+    const change = state.cmpSources;
+    const sameYear = change && change.a.date.slice(0, 4) === change.b.date.slice(0, 4);
+    const full = change ? m.phen.short[phen.id] + " " + m.layer.change + " · " + change.a.date + " → " + change.b.date : m.phen.short[phen.id] + " · " + state.snapshot.date;
+    el.layerText.textContent = change && sameYear ? m.phen.short[phen.id] + " " + m.layer.change + " · " + change.a.date.slice(5) + " → " + change.b.date.slice(5) : full;
+    el.layerChip.title = full;
+    el.layerClear.hidden = !change;
+    el.layerChip.dataset.kind = change ? "change" : "snapshot";
+    el.date.value = change ? change.b.id : state.snapshot.id;
+  }
   el.timeButton = h(document, "button", { type: "button", class: "icon-btn st-time-open", "aria-expanded": "false", "aria-haspopup": "dialog", "aria-label": m.date.timeline, "data-tip": m.date.timeline, "data-tip-pos": "below" });
   el.timeButton.innerHTML = ICON.calendar;
-  const topLeft = h(document, "div", { class: "st-tb-group st-tb-left" }, el.phenGroup, h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.dateInfo);
+  const topLeft = h(document, "div", { class: "st-tb-group st-tb-left" }, el.phenGroup, h(document, "div", { class: "st-datebox" }, el.prev, el.date, el.next, el.timeButton), el.layerChip);
 
   // ---- Toasts and sheets
   let toastTimer = 0;
@@ -618,7 +655,7 @@ async function mountApp(document, root, language, initialMode) {
     const keys = h(document, "ul", { class: "st-help-list" }, ...m.help.shortcuts.map(([key, text]) => h(document, "li", {}, h(document, "span", { class: "kbd", text: key }), " " + text)));
     const notes = h(document, "ul", { class: "st-help-list" }, ...m.help.notes.map((line) => h(document, "li", { text: T(line, { cellLat: trimNumber(size.lat), cellLon: trimNumber(size.lon) }) })));
     const actions = h(document, "div", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.explain }); b.addEventListener("click", explain); return b; })(), (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: m.voice.help }); b.addEventListener("click", () => speech.say(m.voice.helpText[store.state.tool])); return b; })());
-    return openSheet(m.help.title, [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, h(document, "p", { class: "small" }, m.credit), h(document, "p", { class: "small" }, h(document, "a", { href: "../atlas.html", text: language === "ar" ? "الأرشيف: أطلس الصوت v1" : "Archive: Sound Atlas v1" })), actions]);
+    return openSheet(m.help.title, [h(document, "h3", { text: m.help.mapping }), mapping, h(document, "h3", { text: m.help.keyboard }), keys, h(document, "h3", { text: m.help.data }), notes, h(document, "p", { class: "small" }, m.credit), h(document, "p", { class: "st-ins-actions" }, (() => { const b = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy }); b.addEventListener("click", () => api.copyLink?.()); return b; })()), h(document, "p", { class: "small" }, h(document, "a", { href: "../atlas.html", text: language === "ar" ? "الأرشيف: أطلس الصوت v1" : "Archive: Sound Atlas v1" })), actions]);
   };
 
   // ---- Inspector (right): value big, unit, location, time, model badge, one-line sound meaning
@@ -631,21 +668,22 @@ async function mountApp(document, root, language, initialMode) {
   el.insSound = h(document, "p", { class: "small st-ins-sound" });
   const insListen = h(document, "button", { type: "button", class: "button small-button", text: m.sound.replay });
   const insHow = h(document, "button", { type: "button", class: "button ghost small-button", text: m.info.how });
-  const insShare = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy });
-  insListen.addEventListener("click", async () => { if (!state.cursor) return; if (!audio.enabled) await setSound(true); soundForCursor(true); });
+  insListen.addEventListener("click", async () => { if (!state.selected) return; state.cursor = state.selected; if (!audio.enabled) await setSound(true); soundForCursor(true); });
   insHow.addEventListener("click", openComputed);
-  insShare.addEventListener("click", () => api.copyLink?.());
   el.insCollapse = h(document, "button", { type: "button", class: "icon-btn st-collapse", "aria-expanded": "true", "aria-label": m.info.collapse });
   el.insCollapse.innerHTML = ICON.chevron;
-  el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow, insShare));
+  el.insClose = h(document, "button", { type: "button", class: "icon-btn st-collapse st-ins-close", "aria-label": m.mode.close });
+  el.insClose.innerHTML = ICON.close;
+  el.insClose.addEventListener("click", () => { state.selected = null; renderInspector(); invalidate(); });
+  el.insBody = h(document, "div", { class: "st-ins-body" }, h(document, "div", { class: "st-ins-value" }, el.insValue, el.insUnit), el.insSub, el.insWhere, el.insWhen, el.insSound, h(document, "div", { class: "st-ins-actions" }, insListen, insHow));
   el.handle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand, "data-snap-control": "inspector" });
   el.inspector = h(document, "aside", { class: "st-inspector", "aria-labelledby": "st-ins-title", hidden: true, "data-snap": "peek" },
-    h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insCollapse), el.insBody);
+    h(document, "div", { class: "st-ins-head" }, el.insId, h(document, "span", { class: "chip" }, m.info.modelBadge), el.insCollapse, el.insClose), el.insBody);
   el.insCollapse.addEventListener("click", () => { const open = el.insBody.hidden; el.insBody.hidden = !open; el.insCollapse.setAttribute("aria-expanded", String(open)); });
   const snaps = ["peek", "half", "full"];
   const cycleSnap = (panel) => { panel.dataset.snap = snaps[(snaps.indexOf(panel.dataset.snap) + 1) % snaps.length]; };
   function renderInspector() {
-    const cell = state.cursor ?? state.selected;
+    const cell = state.selected;
     const d = cell ? describeCell(cell) : null;
     el.inspector.hidden = !d;
     if (!d) return;
@@ -660,6 +698,22 @@ async function mountApp(document, root, language, initialMode) {
     el.insSub.textContent = state.cmpSources ? state.cmpSources.a.date + " → " + state.cmpSources.b.date + ": " + fmt(state.cmpSources.a.values[d.index]) + " → " + fmt(state.cmpSources.b.values[d.index]) : phen.id === "wind" && d.value !== null ? windText(d.index) : "";
     el.insSound.textContent = soundText(d);
     el.handle.setAttribute("aria-label", m.mobile.expand);
+    positionCard();
+  }
+  function positionCard() {
+    const card = el.inspector;
+    if (card.hidden || !state.selected) return;
+    const r = cellCenter(grid, state.selected.row, state.selected.col);
+    const p = toScreen(r.lon, r.lat);
+    const W = card.offsetWidth;
+    const Hh = card.offsetHeight;
+    const pad = 8;
+    card.style.visibility = p.x > -10 && p.x < state.width + 10 && p.y > -10 && p.y < state.height + 10 ? "visible" : "hidden";
+    let x = p.x + 18;
+    if (x + W > state.width - pad) x = p.x - W - 18;
+    if (x < pad) x = Math.max(pad, Math.min(state.width - W - pad, p.x - W / 2));
+    const y = Math.max(pad, Math.min(state.height - Hh - pad, p.y - 28));
+    card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
 
   // ---- Tool rail and flyouts
@@ -696,7 +750,29 @@ async function mountApp(document, root, language, initialMode) {
     if (id === "echo") return [echoBox];
     return [];
   }
+  const memory = {};
+  function leaveTool(prev) {
+    if (prev === "area" || prev === "path") {
+      memory[prev] = { rect: state.rect, path: [...(state.path ?? [])] };
+      api.stopRun?.(true);
+      state.rect = null; state.cornerA = null; state.drawing = null; state.path = [];
+      api.refreshPath?.();
+    }
+    if (prev === "compare") { memory.compare = { places: state.places, pair: state.cmpSources ? [state.cmpSources.a.date, state.cmpSources.b.date] : null }; state.places = { a: null, b: null }; api.refreshPlaces?.(); }
+    if (state.comparison) api.hideChange?.();
+    state.pins = [];
+    state.hoverPin = null;
+  }
+  async function enterTool(id) {
+    const saved = memory[id];
+    if (!saved) return;
+    if (id === "area" || id === "path") { state.rect = saved.rect; state.path = saved.path; api.refreshPath?.(); }
+    if (id === "compare") { state.places = saved.places; api.refreshPlaces?.(); if (saved.pair) await api.showChangeFor(saved.pair[0], saved.pair[1]); }
+    invalidate();
+  }
   function openTool(id, { focus = false } = {}) {
+    const previous = currentTool;
+    if (previous !== id) leaveTool(previous);
     currentTool = id;
     state.compareActive = id === "compare";
     el.side.dataset.tool = id;
@@ -711,13 +787,17 @@ async function mountApp(document, root, language, initialMode) {
     el.frame.dataset.tool = mapTool;
     el.frame.dataset.tab = storeTool;
     if (nodes.length) {
-      el.flyoutTitle.textContent = m.tools[id];
+      const icon = h(document, "span", { class: "st-flyout-icon", "aria-hidden": "true" });
+      icon.innerHTML = ICON[id];
+      el.flyoutTitle.replaceChildren(icon, m.tools[id]);
       el.flyoutBody.replaceChildren(...nodes);
       el.flyout.dataset.snap = "half";
       if (focus) el.flyoutTitle.focus();
     } else if (focus) railButtons.explore.focus();
     el.rail.dataset.open = "false";
-    if (nodes.length) setSide(true);
+    setSide(nodes.length > 0);
+    el.sideToggle.hidden = nodes.length === 0;
+    if (previous !== id) enterTool(id);
     if (storeTool !== TOOLS.EXPLORE && !introduced.has(storeTool) && store.state.soundMode === GUIDED) { introduced.add(storeTool); speak(m.voice.toolIntro[storeTool]); }
     state.tabHooks?.[storeTool]?.();
     invalidate();
@@ -734,12 +814,13 @@ async function mountApp(document, root, language, initialMode) {
   el.cluster = h(document, "div", { class: "st-cluster", role: "group", "aria-label": c.zoom.label }, clusterButton(c.zoom.in, "+", () => zoomBy(1.5)), clusterButton(c.zoom.out, "−", () => zoomBy(1 / 1.5)), el.compassButton);
   el.timeline = h(document, "div", { class: "st-ticks-row", role: "group", "aria-label": m.date.timeline });
   function renderTimeline() {
+    if (el.lockFoot) el.lockFoot.hidden = !phen.list.some((s) => isLocked(phen.id, s.date, unlocked()));
     el.timeline.replaceChildren(...phen.seasons.map((season) => h(document, "div", { class: "st-season" }, h(document, "span", { class: "st-season-label", text: m.date.seasons[season.name] }),
       h(document, "div", { class: "st-season-dates" }, ...season.snapshotIds.map((id) => {
         const s = phen.snapshot(id);
         const locked = isLocked(phen.id, s.date, unlocked());
-        const b = h(document, "button", { type: "button", class: "st-date", "aria-pressed": String(s.id === state.snapshot.id), "aria-label": s.date + (locked ? " (" + m.date.locked + ")" : ""), "data-locked": String(locked), text: s.date.slice(5) });
-        b.addEventListener("click", () => { stopTime(); requestDate(s.id); });
+        const b = h(document, "button", { type: "button", class: "st-date", "aria-pressed": String(s.id === state.snapshot.id), "aria-label": s.date + (locked ? " (" + m.date.locked + ")" : ""), "data-locked": String(locked), "aria-disabled": locked ? "true" : null, title: locked ? m.date.locked : null, "data-tip": locked ? m.date.locked : null, text: (locked ? "🔒 " : "") + s.date.slice(5) });
+        b.addEventListener("click", () => { if (locked) return; stopTime(); requestDate(s.id); });
         return b;
       })))));
   }
@@ -760,7 +841,11 @@ async function mountApp(document, root, language, initialMode) {
     timeTimer = win.setInterval(advance, 1500);
   }
   el.timePlay.addEventListener("click", () => (timeTimer ? stopTime() : startTime()));
-  el.timePop = h(document, "div", { class: "st-timepop", role: "dialog", "aria-label": m.date.timeline, hidden: true }, el.timeline, el.timePlay);
+  el.lockFoot = h(document, "div", { class: "st-lockfoot", hidden: true }, h(document, "span", { text: m.layer.lockFoot }));
+  const lockShow = h(document, "button", { type: "button", class: "button ghost small-button", text: m.lock.show });
+  lockShow.addEventListener("click", () => { allowSpoilersThisVisit(); api.refreshLocks(); });
+  el.lockFoot.append(lockShow, h(document, "a", { class: "button ghost small-button", href: "../" + (language === "ar" ? "?lang=ar" : ""), text: m.lock.decode }));
+  el.timePop = h(document, "div", { class: "st-timepop", role: "dialog", "aria-label": m.date.timeline, hidden: true }, h(document, "div", { class: "st-timepop-row" }, el.timeline, el.timePlay), el.lockFoot);
   function closeTimePop(focus) { if (el.timePop.hidden) return; el.timePop.hidden = true; el.timeButton.setAttribute("aria-expanded", "false"); if (focus) el.timeButton.focus(); }
   el.timeButton.addEventListener("click", () => { const open = el.timePop.hidden; el.timePop.hidden = !open; el.timeButton.setAttribute("aria-expanded", String(open)); if (open) el.timePop.querySelector('[aria-pressed="true"]')?.focus?.(); });
   el.timePop.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); closeTimePop(true); } });
@@ -770,6 +855,7 @@ async function mountApp(document, root, language, initialMode) {
 
   function onDataChanged() {
     renderLegend();
+    renderLayerChip();
     renderInfo();
     invalidate();
     for (const hook of state.dataHooks) hook();
@@ -818,6 +904,7 @@ async function mountApp(document, root, language, initialMode) {
 
   // ---- Assemble: the map is the page; everything else floats over it
   el.hint = h(document, "p", { class: "visually-hidden", id: "st-map-hint", text: m.help.mapHint });
+  el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
   el.toolsMenuButton = h(document, "button", { type: "button", class: "button ghost small-button st-tools-open", "aria-expanded": "false", "aria-haspopup": "true", text: m.mobile.tools });
   el.toolsMenuButton.addEventListener("click", () => { const open = el.rail.dataset.open !== "true"; el.rail.dataset.open = String(open); el.toolsMenuButton.setAttribute("aria-expanded", String(open)); });
   el.rail.dataset.open = "false";
@@ -830,9 +917,9 @@ async function mountApp(document, root, language, initialMode) {
   el.sideToggle = h(document, "button", { type: "button", class: "icon-btn st-side-toggle", "aria-controls": "st-side" });
   el.sideToggle.innerHTML = ICON.chevron;
   el.sideHandle = h(document, "button", { type: "button", class: "st-handle", "aria-label": m.mobile.expand });
-  el.side = h(document, "aside", { class: "st-side", id: "st-side", "aria-label": m.info.title, "data-snap": "half" }, el.sideHandle, h(document, "div", { class: "st-side-scroll" }, el.inspector, el.flyout));
+  el.side = h(document, "aside", { class: "st-side", id: "st-side", "aria-label": m.info.title, "data-snap": "half" }, el.sideHandle, h(document, "div", { class: "st-side-scroll" }, el.flyout));
   const app = h(document, "div", { class: "st-app" }, toolbar,
-    h(document, "div", { class: "st-body" }, h(document, "div", { class: "st-mapzone" }, el.frame, el.hint, el.legend, el.cluster, el.sideToggle, el.lock, el.note), el.side), el.timePop);
+    h(document, "div", { class: "st-body" }, h(document, "div", { class: "st-mapzone" }, el.frame, el.hint, el.legend, el.cluster, el.sideToggle, el.inspector, el.hoverTip, el.lock, el.note), el.side), el.timePop);
   function setSide(open) {
     app.dataset.side = open ? "open" : "closed";
     el.side.dataset.open = String(open);
@@ -845,7 +932,7 @@ async function mountApp(document, root, language, initialMode) {
   }
   el.sideToggle.addEventListener("click", () => setSide(el.side.dataset.open !== "true"));
   el.sideHandle.addEventListener("click", () => { cycleSnap(el.side); app.dataset.snap = el.side.dataset.snap; });
-  setSide(win.innerWidth >= 1280 && win.innerHeight >= 700);
+  setSide(false);
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); else if (el.rail.dataset.open === "true") { el.rail.dataset.open = "false"; el.toolsMenuButton.focus(); } else if (el.side.dataset.open === "true" && el.side.contains(document.activeElement) && el.flyout.hidden) { setSide(false); el.sideToggle.focus(); } } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
@@ -876,7 +963,7 @@ async function mountApp(document, root, language, initialMode) {
     get phen() { return phen; }, get catalog() { return catalog(); }, get list() { return phen.list; }, get renderer() { return renderer; }, phenomenonId: () => phen.id,
     getSnapshot: async (id) => phen.snapshot(id),
     difference: (resolution) => pkg.difference(phen, resolution),
-    refreshDateInfo: () => { el.dateInfo.textContent = ""; },
+    refreshDateInfo: () => { el.dateInfo.textContent = ""; renderLayerChip(); },
     setPins: (pins) => { state.pins = pins; invalidate(); },
     reduced,
     analysis: createAnalysisClient(),

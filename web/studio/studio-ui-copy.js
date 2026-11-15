@@ -15,6 +15,7 @@ const ui = {
     },
     info: { how: "How was this computed?", collapse: "Collapse details", modelBadge: "model (GEOS-FP)", panelShow: "Show the side panel", panelHide: "Hide the side panel" },
     mobile: { expand: "Resize panel" },
+    layer: { change: "change", clear: "Back to the snapshot", lockFoot: "Two dust dates stay locked until you finish Decode." },
     sound: { timePlay: "Play through the dates", timePause: "Pause the date sequence", pill: "Sound" },
   },
   ar: {
@@ -30,6 +31,7 @@ const ui = {
     },
     info: { how: "كيف حُسبت هذه القيمة؟", collapse: "طيّ التفاصيل", modelBadge: "نموذج (GEOS-FP)", panelShow: "إظهار اللوحة الجانبية", panelHide: "إخفاء اللوحة الجانبية" },
     mobile: { expand: "تغيير حجم اللوحة" },
+    layer: { change: "تغيّر", clear: "العودة إلى اللقطة", lockFoot: "تاريخان للغبار يبقيان مقفلين حتى تنهي فك الشيفرة." },
     sound: { timePlay: "تشغيل التواريخ بالتتابع", timePause: "إيقاف التتابع مؤقتًا", pill: "الصوت" },
   },
 };

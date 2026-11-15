@@ -48,3 +48,26 @@ test("settings drawer values persist and sanitize (speech volume included)", () 
   assert.equal(sanitize({ speechVolume: 7 }).speechVolume, 1);
   assert.match(text("web/cinematic/site/nav.js"), /earthpulse:settings/);
 });
+
+test("one layer, one tool: layer chip, tool memory, map card, clustered pins", () => {
+  const studio = text("web/studio/studio.js");
+  assert.match(studio, /function renderLayerChip\(\)/);
+  assert.match(studio, /function leaveTool\(prev\)/);
+  assert.match(studio, /function enterTool\(id\)/);
+  assert.match(studio, /function positionCard\(\)/);
+  assert.match(studio, /st-pin-cluster/);
+  assert.match(studio, /setSide\(nodes\.length > 0\)/, "the side panel exists only for the active tool");
+});
+
+test("spoiler lock is enforced in the timeline, Compare and Find signals", () => {
+  assert.match(text("web/studio/studio.js"), /"aria-disabled": locked \? "true" : null/);
+  assert.match(text("web/studio/compare.js"), /disabled: locked\.has\(entry\.date\)/);
+  assert.match(text("web/studio/hunter-ui.js"), /disabled: lock\.has\(entry\.date\)/);
+});
+
+test("Find signals is a short question with human results and no anomaly option", () => {
+  const hunter = text("web/studio/hunter-ui.js");
+  assert.match(hunter, /const ORDER = \[QUERY\.HIGHEST, QUERY\.THRESHOLD, QUERY\.INCREASE, QUERY\.DECREASE\]/);
+  assert.match(hunter, /class: "em-result st-row"/);
+  assert.match(hunter, /s\.header/);
+});

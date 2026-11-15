@@ -30,3 +30,11 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 
 ## Tests
 `tests/final-ui.test.mjs` added (nav, redirect, home, Studio default state, single flyout, settings). Two old Studio UI tests updated to the new structure.
+
+## Studio interaction model (second pass)
+- One layer, always stated: a layer chip in the toolbar ("Dust · 2025-04-15" or "Dust change · 04-15 → 07-15" with an × back to the snapshot); the date control matches the layer shown.
+- One active tool. Switching tools clears the previous tool's drawings (area box, path, pins, change layer) and coming back restores that tool's own state. Explore has no panel.
+- Selected place = a card anchored on the map next to the cell (value, unit, coordinates, one-line sound meaning, Replay, How computed). Hover shows a value-only tooltip. The side panel is only for the active tool, with icon, name and close.
+- Find signals: one sentence ("Show the 10 highest Dust values on 2025-04-15"), kinds highest / above threshold / biggest rises / biggest drops (anomaly only explained in the info icon), human rows (rank, value with a bar, coordinates, code small), one header line with an info icon, clustered pins, designed empty / loading / unavailable / error states. Find similar, Area, Path and Compare follow the same pattern.
+- Spoiler lock: dust 2025-08-15 and 2025-08-19 are disabled (lock + tooltip) in the date select, the timeline, Compare and Find signals until Decode is finished or "Show anyway".
+- Fixed a latent bug: a published date comparison (for example dust 15 Apr to 15 Jul) failed to load because its file path was dropped.

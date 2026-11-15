@@ -84,8 +84,8 @@ test("ACCESS-A: every main tool is a real control with a role and a name", async
   const tools = await text("web/studio/tools.js");
   assert.match(tools, /event\.key === "Enter"/);
   const hunter = await text("web/studio/hunter-ui.js");
-  assert.match(hunter, /type: "radio"/);
-  assert.match(hunter, /aria-live/);
+  assert.match(hunter, /id: "hunter-type"/);
+  assert.match(await text("web/studio/studio-ui-kit.js"), /aria-live/);
 });
 
 test("RESPONSIVE: 44px targets, one bottom sheet with three snap points, icon bar on phones, geography never mirrors", async () => {

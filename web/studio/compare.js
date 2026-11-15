@@ -1,6 +1,7 @@
 import { cellId, formatLat, formatLon } from "../cinematic/site/cells.js";
 import { h } from "../cinematic/site/dom.js";
 import { cellCenter, cellRect, rectCells, summarize } from "./field.js";
+import { infoIcon } from "./studio-ui-kit.js";
 import { compareCopy } from "./compare-copy.js";
 import { joinPlans, scanSteps, sequencePlan, strideFor } from "./mapping.js";
 
@@ -21,7 +22,7 @@ export function resolveComparison(catalog, idA, idB) {
   const dates = Object.fromEntries(catalog.snapshots.map((s) => [s.id, s.date]));
   const [first, second] = dates[idA] <= dates[idB] ? [idA, idB] : [idB, idA];
   const published = catalog.comparisons.find((p) => p.first === first && p.second === second);
-  if (published) return { status: "published", first, second, id: published.id };
+  if (published) return { status: "published", first, second, id: published.id, path: published.path };
   if (groupOf(catalog, first) && groupOf(catalog, first) === groupOf(catalog, second)) return { status: "computed", first, second };
   const known = catalog.unavailableComparisons.find((p) => p.first === first && p.second === second);
   return { status: "unavailable", first, second, reason: known?.reason ?? DEFAULT_REASON };
@@ -57,22 +58,27 @@ export function mountCompare(api) {
   el.cmpA = select("st-cmp-a", c.compare.first);
   el.cmpB = select("st-cmp-b", c.compare.second);
   function fillSelects() {
-    const defaultA = api.list.find((s) => s.date === "2025-04-15")?.id ?? api.list[0].id;
-    const defaultB = api.list.find((s) => s.date === "2025-07-15")?.id ?? api.list.at(-1).id;
+    const locked = new Set(api.lockedDates());
+    const open = api.list.filter((s) => !locked.has(s.date));
+    const defaultA = open.find((s) => s.date === "2025-04-15")?.id ?? open[0].id;
+    const defaultB = open.find((s) => s.date === "2025-07-15")?.id ?? open.at(-1).id;
     for (const [node, value] of [[el.cmpA, defaultA], [el.cmpB, defaultB]]) {
-      node.replaceChildren(...api.list.map((entry) => h(document, "option", { value: entry.id, text: entry.date, selected: entry.id === value })));
+      node.replaceChildren(...api.list.map((entry) => h(document, "option", { value: entry.id, text: entry.date + (locked.has(entry.date) ? " 🔒" : ""), selected: entry.id === value, disabled: locked.has(entry.date), title: locked.has(entry.date) ? api.language === "ar" ? "مقفل حتى تنهي فك الشيفرة" : "Locked until you finish Decode" : "" })));
     }
   }
   fillSelects();
   el.cmpStatus = h(document, "p", { class: "callout", role: "status", "aria-live": "polite" });
   el.cmpButton = h(document, "button", { type: "button", class: "button", text: c.compare.show });
   el.cmpInfo = h(document, "p", { class: "small" });
+  el.cmpHelp = h(document, "span", { class: "st-inline-info" });
 
   function describe() {
     const r = resolveComparison(api.catalog, el.cmpA.value, el.cmpB.value);
     state.pending = r;
     el.cmpButton.disabled = r.status === "same" || r.status === "unavailable";
     el.cmpStatus.className = r.status === "unavailable" ? "callout warn" : "callout";
+    el.cmpStatus.hidden = r.status === "published" || r.status === "computed";
+    el.cmpHelp.replaceChildren(infoIcon(document, (r.status === "published" ? c.compare.published : r.status === "computed" ? c.compare.computed : "") + " " + c.compare.noMissing + " " + c.compare.sound));
     el.cmpStatus.textContent = r.status === "same" ? c.compare.same : r.status === "published" ? c.compare.published : r.status === "computed" ? c.compare.computed : c.compare.unavailable + ". " + T(c.compare.reasonBuild, { reason: r.reason === DEFAULT_REASON ? c.compare.reasonDefault : r.reason });
     el.cmpInfo.textContent = r.status !== "same" && el.cmpA.value !== r.first ? c.compare.chrono : "";
   }
@@ -94,7 +100,7 @@ export function mountCompare(api) {
       api.stopRun?.(true);
       api.applyLayer();
       api.onDataChanged();
-      el.dateInfo.textContent = c.legend.changeTitle + ": " + datesOf()[state.cmpSources.b.id] + " − " + datesOf()[state.cmpSources.a.id];
+      api.refreshDateInfo?.();
     } catch (error) {
       console.error(error);
       el.cmpStatus.textContent = c.compare.unavailable;
@@ -316,7 +322,7 @@ export function mountCompare(api) {
     h(document, "div", { class: "st-tools-row cmp-actions" }, playBoth, swapButton, clearButton), el.placeNote, h(document, "p", { class: "small", text: k.listenHint }),
     h(document, "h3", { text: c.compare.time }),
     h(document, "label", { class: "st-pick", for: "st-cmp-a" }, h(document, "span", { text: c.compare.first }), el.cmpA), h(document, "label", { class: "st-pick", for: "st-cmp-b" }, h(document, "span", { text: c.compare.second }), el.cmpB),
-    el.cmpStatus, el.cmpInfo, el.cmpButton, h(document, "p", { class: "small", text: c.compare.noMissing }), h(document, "p", { class: "small", text: c.compare.sound }),
+    el.cmpStatus, el.cmpInfo, h(document, "div", { class: "st-question-actions" }, el.cmpButton, el.cmpHelp),
     h(document, "details", { class: "cmp-more" }, h(document, "summary", { text: k.more }),
       h(document, "div", { class: "st-tools-row" }, ...placeButtons("a")), h(document, "div", { class: "st-tools-row" }, ...placeButtons("b")),
       h(document, "p", { class: "small", text: c.compare.fingerprint + " " + c.compare.pointFp + " " + T(c.compare.areaFp, { n: FINGERPRINT_CELLS }) })));
@@ -324,6 +330,7 @@ export function mountCompare(api) {
   api.panels.compare = panel;
   describe();
   refreshPlaces();
+  state.lockHooks = [...(state.lockHooks ?? []), () => { fillSelects(); describe(); }];
   api.phenomenonHooks = api.phenomenonHooks ?? [];
   api.phenomenonHooks.push(() => {
     if (state.comparison) hideChange();
