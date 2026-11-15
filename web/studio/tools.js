@@ -72,8 +72,8 @@ export function mountTools(api) {
     if (!steps.length) return;
     if (!audio.enabled) await api.setSound(true);
     stopRun(false);
-    const slot = kind === "area" ? (api.layerKind() === "change" ? SLOT.change : SLOT.dust) : SLOT.path;
-    const plan = sequencePlan(api.layerKind(), steps, grid, { slotS: slot, tag: kind });
+    const slot = api.slotFor ? api.slotFor(kind) : kind === "area" ? (api.layerKind() === "change" ? SLOT.change : SLOT.dust) : SLOT.path;
+    const plan = sequencePlan(api.layerKind(), steps, grid, { slotS: slot, tag: kind, tonesFor: api.tonesFor });
     const stats = summarize(api.layerValues(), steps.filter((s) => s.index >= 0));
     const outside = steps.filter((s) => s.index < 0).length;
     state.run = { kind, steps, plan, stats: { ...stats, missing: stats.missing + outside, count: stats.count + outside }, current: null, ...extra };

@@ -1,4 +1,3 @@
-import { compareDustSnapshots, loadDustComparison } from "../sources/decode/dust-visual.js";
 import { cellId, formatLat, formatLon } from "../cinematic/site/cells.js";
 import { h } from "../cinematic/site/dom.js";
 import { cellRect, rectCells, summarize } from "./field.js";
@@ -35,38 +34,40 @@ export function placeSummary(place, values, grid) {
 }
 
 /** Sound fingerprint of a place: a cell repeats its tone three times; an area plays up to 24 of its cells west to east. */
-export function fingerprintPlan(place, values, kind, grid) {
+export function fingerprintPlan(place, values, kind, grid, tonesFor = null) {
   if (place.type === "cell") {
     const step = { row: place.cell.row, col: place.cell.col, index: place.cell.index, value: values[place.cell.index] ?? null };
-    return sequencePlan(kind, [step, step, step], grid, { slotS: 0.24, tag: "fingerprint", compact: false });
+    return sequencePlan(kind, [step, step, step], grid, { slotS: 0.24, tag: "fingerprint", compact: false, tonesFor });
   }
   const cells = rectCells(grid, place.rect);
   const steps = scanSteps(cells, values, strideFor(cells.length, FINGERPRINT_CELLS));
-  return sequencePlan(kind, steps, grid, { slotS: 0.1, tag: "fingerprint" });
+  return sequencePlan(kind, steps, grid, { slotS: 0.1, tag: "fingerprint", tonesFor });
 }
 
 export function mountCompare(api) {
-  const { state, el, grid, catalog, list, c, T, document, audio } = api;
+  const { state, el, grid, c, T, document, audio } = api;
   const transport = audio.transport;
   state.places = { a: null, b: null };
   state.cmpSources = null;
 
-  const select = (id, label, value) => {
-    const node = h(document, "select", { id, "aria-label": label });
-    for (const entry of list) node.append(h(document, "option", { value: entry.id, text: entry.date, selected: entry.id === value }));
-    return node;
-  };
-  const dates = Object.fromEntries(list.map((s) => [s.id, s.date]));
-  const defaultA = list.find((s) => s.date === "2025-04-15")?.id ?? list[0].id;
-  const defaultB = list.find((s) => s.date === "2025-07-15")?.id ?? list.at(-1).id;
-  el.cmpA = select("st-cmp-a", c.compare.first, defaultA);
-  el.cmpB = select("st-cmp-b", c.compare.second, defaultB);
+  const select = (id, label) => h(document, "select", { id, "aria-label": label });
+  const datesOf = () => Object.fromEntries(api.list.map((s) => [s.id, s.date]));
+  el.cmpA = select("st-cmp-a", c.compare.first);
+  el.cmpB = select("st-cmp-b", c.compare.second);
+  function fillSelects() {
+    const defaultA = api.list.find((s) => s.date === "2025-04-15")?.id ?? api.list[0].id;
+    const defaultB = api.list.find((s) => s.date === "2025-07-15")?.id ?? api.list.at(-1).id;
+    for (const [node, value] of [[el.cmpA, defaultA], [el.cmpB, defaultB]]) {
+      node.replaceChildren(...api.list.map((entry) => h(document, "option", { value: entry.id, text: entry.date, selected: entry.id === value })));
+    }
+  }
+  fillSelects();
   el.cmpStatus = h(document, "p", { class: "callout", role: "status", "aria-live": "polite" });
   el.cmpButton = h(document, "button", { type: "button", class: "button", text: c.compare.show });
   el.cmpInfo = h(document, "p", { class: "small" });
 
   function describe() {
-    const r = resolveComparison(catalog, el.cmpA.value, el.cmpB.value);
+    const r = resolveComparison(api.catalog, el.cmpA.value, el.cmpB.value);
     state.pending = r;
     el.cmpButton.disabled = r.status === "same" || r.status === "unavailable";
     el.cmpStatus.className = r.status === "unavailable" ? "callout warn" : "callout";
@@ -83,7 +84,7 @@ export function mountCompare(api) {
     el.cmpButton.disabled = true;
     try {
       const [a, b] = await Promise.all([api.getSnapshot(r.first), api.getSnapshot(r.second)]);
-      state.comparison = r.status === "published" ? await loadDustComparison(r.id) : compareDustSnapshots(a, b);
+      state.comparison = await api.difference(r);
       state.cmpSources = { a, b };
       el.cmpButton.textContent = c.compare.hide;
       el.cmpA.disabled = el.cmpB.disabled = true;
@@ -91,7 +92,7 @@ export function mountCompare(api) {
       api.stopRun?.(true);
       api.applyLayer();
       api.onDataChanged();
-      el.dateInfo.textContent = c.legend.changeTitle + ": " + dates[state.cmpSources.b.id] + " − " + dates[state.cmpSources.a.id];
+      el.dateInfo.textContent = c.legend.changeTitle + ": " + datesOf()[state.cmpSources.b.id] + " − " + datesOf()[state.cmpSources.a.id];
     } catch (error) {
       console.error(error);
       el.cmpStatus.textContent = c.compare.unavailable;
@@ -123,8 +124,8 @@ export function mountCompare(api) {
     for (const node of [first.dt, first.dd, second.dt, second.dd]) node.hidden = !show;
     if (!show) return;
     const index = state.cursor.index;
-    first.dd.textContent = `${dates[state.cmpSources.a.id]}: ${api.fmt(state.cmpSources.a.values[index])}`;
-    second.dd.textContent = `${dates[state.cmpSources.b.id]}: ${api.fmt(state.cmpSources.b.values[index])}`;
+    first.dd.textContent = `${datesOf()[state.cmpSources.a.id]}: ${api.fmt(state.cmpSources.a.values[index])}`;
+    second.dd.textContent = `${datesOf()[state.cmpSources.b.id]}: ${api.fmt(state.cmpSources.b.values[index])}`;
   });
   for (const node of [first.dt, first.dd, second.dt, second.dd]) node.hidden = true;
 
@@ -173,7 +174,7 @@ export function mountCompare(api) {
     api.stopRun?.(true);
     const values = api.layerValues();
     const kind = api.layerKind();
-    const plan = joinPlans(fingerprintPlan(a, values, kind, grid), fingerprintPlan(b, values, kind, grid));
+    const plan = joinPlans(fingerprintPlan(a, values, kind, grid, api.tonesFor), fingerprintPlan(b, values, kind, grid, api.tonesFor));
     state.busy = true;
     playing = { plan, revision: null, place: "a" };
     audio.play(plan);
@@ -214,6 +215,8 @@ export function mountCompare(api) {
   state.right.insertBefore(panel, state.right.children[state.right.children.length - 1]);
   describe();
   refreshPlaces();
+  api.phenomenonHooks = api.phenomenonHooks ?? [];
+  api.phenomenonHooks.push(() => { if (state.comparison) hideChange(); fillSelects(); describe(); });
   Object.assign(api, { showChange, hideChange, describeComparison: describe, refreshPlaces, state });
   return api;
 }

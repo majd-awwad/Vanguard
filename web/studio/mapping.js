@@ -33,24 +33,24 @@ export function valueTone(value, pan, durationS = HOVER_S) {
 export const missingTone = (pan) => crackleVoice({ eventCount: 1, frequencyHz: 700, gain: 0.07, pan });
 
 /** Semitone step for a change: 1 to 12 semitones, larger change = wider step. */
-export const changeSemitones = (change) => 1 + Math.round(11 * Math.abs(diffS(change)));
+export const changeSemitones = (change, norm = diffS) => 1 + Math.round(11 * Math.abs(norm(change)));
 
 /**
  * Tones for a change between two dates: a rising two-note step for an increase, a falling step for a decrease, one
  * steady note near zero, a click for missing. Returns [{ offsetS, tone }].
  */
-export function changeTones(change, pan, noteS = HOVER_S / 2) {
+export function changeTones(change, pan, noteS = HOVER_S / 2, norm = diffS) {
   if (change === null || change === undefined) return [{ offsetS: 0, tone: missingTone(pan) }];
   const note = (hz, offsetS) => ({ offsetS, tone: shaped(continuousVoice({ frequencyHz: hz, gain: TONE_GAIN, pan }), noteS, 0.008, Math.min(0.03, noteS / 3)) });
-  const s = diffS(change);
+  const s = norm(change);
   if (s === 0) return [note(CHANGE_BASE_HZ, 0)];
-  const top = CHANGE_BASE_HZ * 2 ** (changeSemitones(change) / 12);
+  const top = CHANGE_BASE_HZ * 2 ** (changeSemitones(change, norm) / 12);
   return s > 0 ? [note(CHANGE_BASE_HZ, 0), note(top, noteS)] : [note(top, 0), note(CHANGE_BASE_HZ, noteS)];
 }
 
 /** Tones for one cell of the current layer. */
-export function cellTones(kind, value, pan, { compact = false } = {}) {
-  if (kind === "change") return changeTones(value, pan, compact ? 0.05 : HOVER_S / 2);
+export function cellTones(kind, value, pan, { compact = false, norm } = {}) {
+  if (kind === "change") return changeTones(value, pan, compact ? 0.05 : HOVER_S / 2, norm);
   if (value === null || value === undefined) return [{ offsetS: 0, tone: missingTone(pan) }];
   return [{ offsetS: 0, tone: valueTone(value, pan, compact ? SLOT.dust * 0.9 : HOVER_S) }];
 }
@@ -58,11 +58,11 @@ export function cellTones(kind, value, pan, { compact = false } = {}) {
 const planOf = (events, durationS, tag) => ({ caseId: "studio", level: "studio", mappingVersion: MAPPING_VERSION, mode: tag, durationS, events });
 
 /** Plan for a sequence of cells (area scan, path, fingerprint). Each step is `slotS` long; `onset` offsets add a gap. */
-export function sequencePlan(kind, steps, grid, { slotS, tag = "scan", startS = 0, compact = true } = {}) {
+export function sequencePlan(kind, steps, grid, { slotS, tag = "scan", startS = 0, compact = true, tonesFor = null } = {}) {
   const events = [];
   steps.forEach((step, i) => {
     const pan = lonPan(grid, step.lon ?? cellCenter(grid, step.row, step.col).lon);
-    cellTones(kind, step.value, pan, { compact }).forEach(({ offsetS, tone }, j) => {
+    (tonesFor ? tonesFor(step, pan, { kind, slotS, compact }) : cellTones(kind, step.value, pan, { compact })).forEach(({ offsetS, tone }, j) => {
       events.push({ id: `ev-${events.length}`, onsetS: startS + i * slotS + offsetS, row: step.row, col: step.col, step: i, tone, evidence: { value: step.value, mappingVersion: MAPPING_VERSION, part: j } });
     });
   });
@@ -70,9 +70,9 @@ export function sequencePlan(kind, steps, grid, { slotS, tag = "scan", startS = 
 }
 
 /** One-tone plan for hovering/reading a single cell. */
-export function hoverPlan(kind, cell, value, grid) {
+export function hoverPlan(kind, cell, value, grid, norm) {
   const pan = lonPan(grid, cellCenter(grid, cell.row, cell.col).lon);
-  const events = cellTones(kind, value, pan).map(({ offsetS, tone }, i) => ({ id: `ev-${i}`, onsetS: offsetS, row: cell.row, col: cell.col, step: 0, tone, evidence: { value, mappingVersion: MAPPING_VERSION } }));
+  const events = cellTones(kind, value, pan, { norm }).map(({ offsetS, tone }, i) => ({ id: `ev-${i}`, onsetS: offsetS, row: cell.row, col: cell.col, step: 0, tone, evidence: { value, mappingVersion: MAPPING_VERSION } }));
   return planOf(events, events.length ? events.at(-1).onsetS + events.at(-1).tone.durationS + 0.02 : 0.1, "hover");
 }
 

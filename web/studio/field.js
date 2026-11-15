@@ -86,7 +86,7 @@ export function layerT(values, grid, mode) {
   const { rows, cols } = grid;
   const t = new Float32Array(rows * cols);
   const mask = new Uint8Array(rows * cols);
-  const convert = mode === "diff" ? (v) => 0.5 + 0.5 * diffS(v) : valueT;
+  const convert = typeof mode === "function" ? mode : mode === "diff" ? (v) => 0.5 + 0.5 * diffS(v) : valueT;
   for (let i = 0; i < values.length; i++) {
     if (values[i] === null || values[i] === undefined) mask[i] = 255; else t[i] = convert(values[i]);
   }

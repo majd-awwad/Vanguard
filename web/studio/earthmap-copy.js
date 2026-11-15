@@ -1,0 +1,101 @@
+// Words for the unified Earth Map (entry, modes, tabs, phenomena, info panel, speech scripts, Hunter, Echo).
+// Numbers are tokens filled from the loaded data, never typed.
+
+export const mapCopy = {
+  en: {
+    title: "Earth Map",
+    entry: { eyebrow: "EarthPulse", title: "Hear the unseen", sentence: "Explore Earth data, and hear the patterns the eye misses quickly.", start: "Start exploring", loading: "Preparing the data…", note: "Nothing plays until you choose to." },
+    mode: {
+      title: "How do you want to explore by sound?", note: "You can switch at any time without losing your place.", confirm: "Continue", close: "Close", button: "Sound mode: {mode}",
+      guided: "Guided Voice", guidedText: "The app tells you what you can choose, announces the value after you stop moving, and explains on request. The data sounds stay, with the voice kept low and adjustable.",
+      pure: "Pure Sonification", pureText: "No spoken guidance. You hear only the data sounds. Buttons, text and screen-reader labels stay, and you can turn speech on again anywhere.",
+      switched: { GUIDED_VOICE: "Guided Voice is on.", PURE_SONIFICATION: "Pure Sonification is on. No spoken guidance." },
+    },
+    phen: {
+      label: "Data", dust: "Dust", rainfall: "Rainfall", temperature: "Temperature", wind: "Wind", forests: "Forests",
+      forestsReason: "Forests: not available in this release. The forest data (GEDI) are six spatial footprints, not a time series.",
+      measure: { dust: "Dust optical depth at 550 nm", rainfall: "Rainfall, one-hour accumulation", temperature: "Air temperature at 2 m", wind: "Wind speed at 10 m" },
+      unitName: { dust: "unitless", rainfall: "mm per hour", temperature: "°C", wind: "m/s" },
+      soundMeaning: {
+        dust: "More dust makes the pulses denser and brighter.", rainfall: "More rain makes the pulses faster. No rain is silent.",
+        temperature: "A warmer place is a higher pitch.", wind: "Stronger wind makes the pulses faster. The sound moves left or right with the east-west part of the wind; calm stays centred.",
+      },
+      loading: "Loading {name}…", error: "Could not load this data.", retry: "Try again",
+    },
+    date: { label: "Date", prev: "Previous date", next: "Next date", timeline: "Sampled dates", seasons: { winter: "Winter", spring: "Spring", summer: "Summer", autumn: "Autumn" }, locked: "Locked: this date is part of the Decode challenge." },
+    lock: { text: "Dust for {date} is hidden until you finish the Decode challenge once, because it would give away the answers.", show: "Show anyway (spoils the challenge)", decode: "Go to Decode" },
+    tabs: { label: "Tools", explore: "Explore", hunter: "Find signals", echo: "Find similar" },
+    status: { source: "NASA GMAO GEOS-FP, model data", verified: "{n} files verified with SHA-256", verifyOff: "File verification is not available in this browser", loading: "Loading…" },
+    info: {
+      title: "Information", none: "Move over the map or press the arrow keys to pick a place.", outside: "Outside the data coverage.", sample: "Sample", dataType: "Data type", dataTypeValue: "Model (GEOS-FP), not a direct observation",
+      window: "Time window", source: "Source", sourceValue: "NASA GMAO GEOS-FP {short}, {variable}", value: "Value", unit: "Unit", sound: "What the sound means", coverage: "Coverage", coverageValue: "North Africa and the Mediterranean only ({west} to {east}, {south} to {north}). One selected snapshot, not an average.",
+      wind: "Wind direction", windFrom: "From {dir} ({deg}°)", windCalm: "Calm: no direction", windTo: "blowing toward", provenance: "Provenance and related context", related: "Related NASA visualization (context only, never drawn on this map): {label}",
+      files: "Files checked: {n}", build: "Model build: {build}", missing: "No value for this cell.",
+    },
+    read: { cell: "{id}. {lat}, {lon}. {measure}: {value} {unit}. {date}. Model data.", missing: "{id}. {lat}, {lon}. {measure}: missing value. {date}.", change: "{id}. {lat}, {lon}. Change in {measure}: {value} {unit}, {direction}.", windExtra: "Wind from {dir}." },
+    voice: {
+      explain: "Explain my position", help: "What can I do here?", speechVolume: "Voice volume", dataVolume: "Sound volume", unavailable: "No voice for this language is installed, so guidance appears as text.",
+      welcome: { GUIDED_VOICE: "Guided Voice. Choose Dust, Rainfall, Temperature or Wind at the top, then move over the map with the pointer or the arrow keys. The value is read after you stop moving." },
+      helpText: {
+        EXPLORE: "Explore. Move over the map or use the arrow keys, which move one cell at a time. Cells are named by a letter for the row, counted from the north, and a number for the column, counted from the west. Enter selects a cell and plays it. R reads your position. Plus and minus zoom. Use the Select area and Draw path tools to hear many cells.",
+        HUNTER: "Find signals. Pick a question: highest values, above a threshold, or largest increase or decrease between two dates. Press Search. Open a result to move the map to it and hear it.",
+        ECHO: "Find similar. Select a cell on the map, choose Shape or Level, then search. Results are cells whose monthly pattern is closest to the one you chose. Similar does not prove the same cause.",
+      },
+      toolIntro: { EXPLORE: "Explore.", HUNTER: "Find signals. Choose a question, then press Search.", ECHO: "Find similar. Pick a source cell on the map, then search." },
+      phenomenon: "{name}. {measure}, model data. {n} sampled dates.", dateChanged: "{date}.",
+    },
+    sound: { play: "Play area", stop: "Stop", replay: "Replay this sound", timeline: "Sound timeline", measure: "{name} ({unit})", enable: "Enable sound", disable: "Mute sound", on: "Sound is on.", off: "Sound is off. Press the button to turn it on." },
+    help: { title: "Help", close: "Close", keys: "Keyboard: Tab moves between controls. On the map, arrow keys move one cell (left is always west); Enter selects and plays; R reads; Space replays; plus and minus zoom; Home resets; Shift and arrows pan; Escape stops speech and closes panels." },
+    compass: "North is up, west is left",
+    mobile: { tools: "Tools", closeTools: "Close tools" },
+    credit: "Data: NASA GMAO GEOS-FP (model). Earth imagery: NASA Earth Observatory, Blue Marble. EARTHPULSE is a student project and is not endorsed by NASA.",
+  },
+  ar: {
+    title: "خريطة الأرض",
+    entry: { eyebrow: "EarthPulse", title: "اسمع ما لا يُرى", sentence: "استكشف بيانات الأرض، واسمع الأنماط التي لا تظهر بسرعة للعين.", start: "ابدأ الاستكشاف", loading: "جارٍ تجهيز البيانات…", note: "لا يبدأ أي صوت حتى تختار ذلك." },
+    mode: {
+      title: "كيف تريد أن تستكشف بالصوت؟", note: "يمكنك التبديل في أي وقت دون فقدان موضعك.", confirm: "متابعة", close: "إغلاق", button: "نمط الصوت: {mode}",
+      guided: "إرشاد بالكلام", guidedText: "يخبرك التطبيق بما يمكنك اختياره، ويعلن القيمة بعد أن تتوقف عن الحركة، ويشرح عند الطلب. تبقى أصوات البيانات، مع صوت الكلام منخفضًا وقابلًا للضبط.",
+      pure: "أصوات البيانات فقط", pureText: "لا إرشاد منطوق. تسمع أصوات البيانات فقط. تبقى الأزرار والنصوص وتسميات قارئ الشاشة، ويمكنك إعادة تفعيل الكلام من أي مكان.",
+      switched: { GUIDED_VOICE: "الإرشاد بالكلام مفعّل.", PURE_SONIFICATION: "أصوات البيانات فقط مفعّل. لا إرشاد منطوق." },
+    },
+    phen: {
+      label: "البيانات", dust: "الغبار", rainfall: "الأمطار", temperature: "الحرارة", wind: "الرياح", forests: "الغابات",
+      forestsReason: "الغابات: غير متاحة في هذا الإصدار. بيانات الغابات (GEDI) ست بصمات مكانية وليست سلسلة زمنية.",
+      measure: { dust: "العمق البصري للغبار عند 550 نانومتر", rainfall: "الأمطار، تراكم ساعة واحدة", temperature: "درجة حرارة الهواء على ارتفاع 2 م", wind: "سرعة الرياح على ارتفاع 10 م" },
+      unitName: { dust: "بلا وحدة", rainfall: "ملم في الساعة", temperature: "°م", wind: "م/ث" },
+      soundMeaning: {
+        dust: "كلما زاد الغبار صارت النبضات أكثف وأكثر سطوعًا.", rainfall: "كلما زاد المطر صارت النبضات أسرع. ولا مطر يعني صمتًا.",
+        temperature: "المكان الأدفأ نغمته أعلى.", wind: "كلما اشتدت الرياح صارت النبضات أسرع. ويتحرك الصوت يمينًا أو يسارًا مع المركّبة الشرقية الغربية للرياح؛ والهدوء يبقى في الوسط.",
+      },
+      loading: "جارٍ تحميل {name}…", error: "تعذّر تحميل هذه البيانات.", retry: "حاول مرة أخرى",
+    },
+    date: { label: "التاريخ", prev: "التاريخ السابق", next: "التاريخ التالي", timeline: "التواريخ المأخوذة", seasons: { winter: "الشتاء", spring: "الربيع", summer: "الصيف", autumn: "الخريف" }, locked: "مقفل: هذا التاريخ جزء من تحدي فك الشيفرة." },
+    lock: { text: "غبار {date} مخفي حتى تنهي تحدي فك الشيفرة مرة واحدة، لأنه يكشف الإجابات.", show: "أظهره على أي حال (يفسد التحدي)", decode: "اذهب إلى فك الشيفرة" },
+    tabs: { label: "الأدوات", explore: "استكشف", hunter: "اكتشف إشارات", echo: "ابحث عن شبيه" },
+    status: { source: "NASA GMAO GEOS-FP، بيانات نموذج", verified: "تم التحقق من {n} ملفًا بـ SHA-256", verifyOff: "التحقق من الملفات غير متاح في هذا المتصفح", loading: "جارٍ التحميل…" },
+    info: {
+      title: "المعلومات", none: "حرّك المؤشر فوق الخريطة أو اضغط مفاتيح الأسهم لاختيار مكان.", outside: "خارج تغطية البيانات.", sample: "العينة", dataType: "نوع البيانات", dataTypeValue: "نموذج (GEOS-FP)، وليس رصدًا مباشرًا",
+      window: "النافذة الزمنية", source: "المصدر", sourceValue: "NASA GMAO GEOS-FP {short}، {variable}", value: "القيمة", unit: "الوحدة", sound: "معنى الصوت", coverage: "التغطية", coverageValue: "شمال أفريقيا والمتوسط فقط (من {west} إلى {east}، ومن {south} إلى {north}). لقطة واحدة مختارة وليست متوسطًا.",
+      wind: "اتجاه الرياح", windFrom: "من {dir} ({deg}°)", windCalm: "هدوء: لا اتجاه", windTo: "تهب نحو", provenance: "المصدر والسياق ذو الصلة", related: "تصوير مرئي ذو صلة من ناسا (للسياق فقط ولا يُرسم على هذه الخريطة): {label}",
+      files: "الملفات المفحوصة: {n}", build: "إصدار النموذج: {build}", missing: "لا توجد قيمة لهذه الخلية.",
+    },
+    read: { cell: "{id}. {lat}، {lon}. {measure}: {value} {unit}. {date}. بيانات نموذج.", missing: "{id}. {lat}، {lon}. {measure}: قيمة مفقودة. {date}.", change: "{id}. {lat}، {lon}. التغير في {measure}: {value} {unit}، {direction}.", windExtra: "الرياح من {dir}." },
+    voice: {
+      explain: "اشرح موضعي", help: "ماذا يمكنني أن أفعل هنا؟", speechVolume: "مستوى صوت الكلام", dataVolume: "مستوى صوت البيانات", unavailable: "لا يوجد صوت لهذه اللغة على هذا الجهاز، لذلك يظهر الإرشاد نصًا.",
+      welcome: { GUIDED_VOICE: "الإرشاد بالكلام. اختر الغبار أو الأمطار أو الحرارة أو الرياح من الأعلى، ثم تحرّك فوق الخريطة بالمؤشر أو بمفاتيح الأسهم. تُقرأ القيمة بعد أن تتوقف عن الحركة." },
+      helpText: {
+        EXPLORE: "استكشف. تحرّك فوق الخريطة أو استخدم مفاتيح الأسهم التي تنقلك خلية واحدة في كل مرة. تُسمّى الخلايا بحرف للصف يُعدّ من الشمال ورقم للعمود يُعدّ من الغرب. Enter يختار الخلية ويشغّلها. R يقرأ موضعك. زائد وناقص للتكبير. واستخدم أداتي تحديد منطقة ورسم مسار لسماع خلايا كثيرة.",
+        HUNTER: "اكتشف إشارات. اختر سؤالًا: أعلى القيم، أو ما فوق عتبة، أو أكبر زيادة أو نقصان بين تاريخين. اضغط بحث. افتح نتيجة لتنتقل الخريطة إليها وتسمعها.",
+        ECHO: "ابحث عن شبيه. اختر خلية على الخريطة، ثم اختر الشكل أو المستوى، ثم ابحث. النتائج خلايا يقترب نمطها الشهري من النمط الذي اخترته. والتشابه لا يثبت السبب نفسه.",
+      },
+      toolIntro: { EXPLORE: "استكشف.", HUNTER: "اكتشف إشارات. اختر سؤالًا ثم اضغط بحث.", ECHO: "ابحث عن شبيه. اختر خلية مصدر على الخريطة ثم ابحث." },
+      phenomenon: "{name}. {measure}، بيانات نموذج. {n} تاريخًا مأخوذًا.", dateChanged: "{date}.",
+    },
+    sound: { play: "شغّل المنطقة", stop: "إيقاف", replay: "أعد هذا الصوت", timeline: "الخط الزمني للصوت", measure: "{name} ({unit})", enable: "فعّل الصوت", disable: "اكتم الصوت", on: "الصوت مفعّل.", off: "الصوت متوقف. اضغط الزر لتشغيله." },
+    help: { title: "مساعدة", close: "إغلاق", keys: "لوحة المفاتيح: يتنقل Tab بين عناصر التحكم. على الخريطة تنقلك الأسهم خلية واحدة (اليسار هو الغرب دائمًا)؛ Enter يختار ويشغّل؛ R يقرأ؛ المسافة تعيد التشغيل؛ زائد وناقص للتكبير؛ Home لإعادة الضبط؛ Shift مع الأسهم للتحريك؛ Escape يوقف الكلام ويغلق اللوحات." },
+    compass: "الشمال إلى الأعلى والغرب إلى اليسار",
+    mobile: { tools: "الأدوات", closeTools: "إغلاق الأدوات" },
+    credit: "البيانات: NASA GMAO GEOS-FP (نموذج). صور الأرض: مرصد الأرض التابع لناسا، Blue Marble. EARTHPULSE مشروع طلابي ولا تتبنّاه ناسا.",
+  },
+};

@@ -8,8 +8,9 @@ const round = (n) => Number(n.toFixed(3));
 const MAX_POINTS = 40;
 
 /** Query parameters for the current state. `dates` maps snapshot id -> ISO date. */
-export function encodeShare({ snapshotId, comparison, rect, path }, dates) {
+export function encodeShare({ phenomenon, snapshotId, comparison, rect, path }, dates) {
   const params = new URLSearchParams();
+  if (phenomenon) params.set("phen", phenomenon);
   params.set("date", dates[snapshotId]);
   if (comparison) params.set("cmp", `${dates[comparison.a]},${dates[comparison.b]}`);
   if (rect) params.set("rect", [rect.west, rect.south, rect.east, rect.north].map(round).join(","));
@@ -22,6 +23,8 @@ export function decodeShare(search, catalog, bounds) {
   const params = new URLSearchParams(search);
   const byDate = Object.fromEntries(catalog.snapshots.map((s) => [s.date, s.id]));
   const out = {};
+  const phen = params.get("phen");
+  if (["dust", "rainfall", "temperature", "wind"].includes(phen)) out.phenomenon = phen;
   const date = params.get("date");
   if (date && (byDate[date] || catalog.snapshots.some((s) => s.id === date))) out.snapshotId = byDate[date] ?? date;
   const cmp = params.get("cmp")?.split(",");
@@ -38,19 +41,19 @@ export function decodeShare(search, catalog, bounds) {
 }
 
 export function mountShare(api) {
-  const { state, el, c, document, win, catalog, list } = api;
-  const dates = Object.fromEntries(list.map((s) => [s.id, s.date]));
+  const { state, el, c, document, win } = api;
   const button = h(document, "button", { type: "button", class: "button ghost small-button", text: c.share.copy });
   const status = h(document, "p", { class: "small", role: "status", "aria-live": "polite", text: c.share.note });
   button.addEventListener("click", async () => {
-    const params = encodeShare({ snapshotId: state.snapshot.id, comparison: state.cmpSources ? { a: state.cmpSources.a.id, b: state.cmpSources.b.id } : null, rect: state.rect, path: state.path }, dates);
+    const dates = Object.fromEntries(api.list.map((s) => [s.id, s.date]));
+    const params = encodeShare({ phenomenon: api.phenomenonId(), snapshotId: state.snapshot.id, comparison: state.cmpSources ? { a: state.cmpSources.a.id, b: state.cmpSources.b.id } : null, rect: state.rect, path: state.path }, dates);
     const url = new URL(document.URL);
     url.search = params.toString() + (new URLSearchParams(url.search).get("lang") ? "&lang=" + new URLSearchParams(url.search).get("lang") : "");
     try { await win.navigator.clipboard.writeText(url.href); status.textContent = c.share.copied; } catch { status.textContent = url.href; }
   });
   state.right.append(h(document, "section", { class: "panel" }, button, status));
   // Apply a link on load.
-  const wanted = decodeShare(new URL(document.URL).search, catalog, api.bounds);
+  const wanted = decodeShare(new URL(document.URL).search, api.catalog, api.bounds);
   if (wanted.rect) { state.rect = wanted.rect; }
   if (wanted.path) { state.path = wanted.path; api.refreshPath?.(); }
   if (wanted.cmp) {

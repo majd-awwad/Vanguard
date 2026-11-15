@@ -106,6 +106,7 @@ export function createGlRenderer({ document, container, earthUrl, onReady = () =
   let height = 1;
   let dpr = 1;
   let layerTextures = [];
+  let customRamp = null;
   let state = { view: { lon: 0, lat: 0, zoom: 1 }, bounds: null };
 
   return {
@@ -130,11 +131,12 @@ export function createGlRenderer({ document, container, earthUrl, onReady = () =
       for (const tex of layerTextures) tex.dispose();
       layerTextures = [];
       if (!layer) { uniforms.uLayer.value = 0; return; }
-      const { t, mask } = layerT(layer.values, grid, layer.mode);
+      const { t, mask } = layerT(layer.values, grid, layer.normalize ?? layer.mode);
       layerTextures = [texture(t, grid.cols, grid.rows, RedFormat, FloatType, NearestFilter), texture(mask, grid.cols, grid.rows, RedFormat, UnsignedByteType, NearestFilter)];
       uniforms.uValues.value = layerTextures[0];
       uniforms.uMask.value = layerTextures[1];
-      uniforms.uRamp.value = rampTextures[layer.mode === "diff" ? "diff" : "value"];
+      if (customRamp) { customRamp.dispose(); customRamp = null; }
+      if (layer.ramp) { customRamp = texture(layer.ramp, 256, 1, RGBAFormat, UnsignedByteType, LinearFilter); uniforms.uRamp.value = customRamp; } else uniforms.uRamp.value = rampTextures[layer.mode === "diff" ? "diff" : "value"];
       uniforms.uGrid.value.set(grid.cols, grid.rows);
       uniforms.uLayer.value = 1;
     },

@@ -30,8 +30,8 @@ export function createCanvasRenderer({ document, container, earthUrl, onReady = 
     const ctx = off.getContext("2d");
     const data = ctx.createImageData(w, h);
     const { bounds } = grid;
-    const { t, mask } = layerT(layer.values, grid, layer.mode);
-    const table = rampTable(layer.mode === "diff" ? "diff" : "value");
+    const { t, mask } = layerT(layer.values, grid, layer.normalize ?? layer.mode);
+    const table = layer.ramp ?? rampTable(layer.mode === "diff" ? "diff" : "value");
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const lon = bounds.west + ((x + 0.5) / w) * (bounds.east - bounds.west);

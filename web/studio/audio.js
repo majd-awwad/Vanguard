@@ -17,13 +17,17 @@ export function confirmationPlan() {
 export function createStudioAudio({ volume = 0.72, now = () => performance.now(), setTimer = (f, ms) => setTimeout(f, ms), clearTimer = (id) => clearTimeout(id) } = {}) {
   const tap = createAudioTap();
   const transport = createTransport({ createContext: () => tap.createContext() });
-  transport.setVolume(volume);
   let enabled = false;
   let lastKey = null;
   let lastAt = -Infinity;
   let timer = null;
   let pending = null;
   let speed = 1;
+  let baseVolume = volume;
+  let duck = 1;
+  let rampTimer = null;
+  const applyVolume = () => transport.setVolume(baseVolume * duck);
+  applyVolume();
 
   async function start(plan) {
     transport.pause();
@@ -38,7 +42,18 @@ export function createStudioAudio({ volume = 0.72, now = () => performance.now()
     /** Must be called from a user gesture (click or key press). */
     async enable() { enabled = true; lastKey = null; await start(confirmationPlan()); return enabled; },
     disable() { enabled = false; clearTimer(timer); timer = null; pending = null; transport.pause(); },
-    setVolume(value) { transport.setVolume(value); },
+    setVolume(value) { baseVolume = value; applyVolume(); },
+    /** Lower the data sound while speech is speaking, then restore it smoothly (never silenced). */
+    setDuck(on, { factor = 0.35, rampMs = 300, stepMs = 30 } = {}) {
+      clearTimer(rampTimer);
+      const target = on ? factor : 1;
+      const steps = Math.max(1, Math.round(rampMs / stepMs));
+      const from = duck;
+      let i = 0;
+      const tick = () => { i++; duck = from + ((target - from) * i) / steps; applyVolume(); if (i < steps) rampTimer = setTimer(tick, stepMs); else rampTimer = null; };
+      rampTimer = setTimer(tick, stepMs);
+    },
+    get duck() { return duck; },
     setSpeed(value) { speed = value; transport.setSpeed(value); },
     get speed() { return speed; },
     /** Immediate play of a plan (explicit actions: Space, area, path, fingerprints). */
