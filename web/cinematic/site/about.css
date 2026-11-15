@@ -39,3 +39,14 @@
 .about-flow li + li::before { content: "→"; margin-inline-end: .6rem; color: var(--teal); }
 :root[dir="rtl"] .about-flow li + li::before { content: "←"; }
 .about-flow li + li { position: relative; }
+
+/* Meet the team: the real photo, large, with the six names beside it */
+.panel.about-team { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--s-5); align-items: center; padding: var(--s-5); }
+.team-photo { margin: 0; display: grid; gap: var(--s-2); min-width: 0; }
+.team-photo img { width: 100%; height: auto; aspect-ratio: 1600 / 1066; object-fit: cover; border-radius: 20px; border: 1px solid var(--line-strong); box-shadow: 0 24px 60px rgb(0 0 0 / .5), 0 0 90px rgb(104 224 208 / .14); background: var(--surface-2); }
+.team-photo figcaption { color: var(--muted); font-size: var(--fs-small); text-align: center; }
+.team-info { display: grid; gap: var(--s-3); align-content: center; min-width: 0; }
+.team-info h2 { margin: 0; }
+.team-info p { margin: 0; }
+.team-info .members { justify-content: flex-start; }
+@media (max-width: 900px) { .panel.about-team { grid-template-columns: minmax(0, 1fr); padding: var(--s-4); } }

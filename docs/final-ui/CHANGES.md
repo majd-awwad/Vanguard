@@ -49,3 +49,8 @@ Branch `feat/final-ui` (from `feat/earth-map`). No science, data, audio-engine, 
 - Reference: the first Studio (b932dc9) was served from a temporary worktree and screenshotted at 1366x768 and 1440x900; the worktree was deleted afterwards.
 - Layout: desktop = a sticky map on the left (the whole coverage fitted, contain) and a scrolling column of cards on the right: Data (phenomenon, date, season timeline, layer chip), Sound, Selected place, Tools (one tab bar, only the active tool's question and results), How it works (collapsed). Phones = one column with a 55 vh sticky map on top. Footer at the end.
 - Same rhythm on every page: 96 px between sections on desktop, 56 px on phones, and a next-step button at the end.
+
+## About: the real team photo
+- `web/assets/team/team-vanguard-nablus-2026.jpg` (1600x1066, 275,264 bytes, SHA-256 `4678b1c455435ce8334ed90c83cd115225b9f3ad4516f686606d3c23ce9a8ac0`) and `web/assets/team/team-vanguard-nablus-2026-800.jpg` (800x533, 78,929 bytes, SHA-256 `9cfd8ffb1f26ff4bfae9d6404e25f4f7824ae4d72d30cf4b7283cc89a8be5af5`, used through `srcset` on phones).
+- Re-encoded from the original in a canvas, so no EXIF or GPS metadata is carried over. The original (2048x1365) stays outside the repo.
+- Shown in "Meet the team" with the EN/AR caption and alt text, `loading="lazy"`, width/height set, rounded corners and a soft glow; the six names sit beside it (below it on phones). No one in the photo is labelled. The footer keeps the "not endorsed by NASA" note.
