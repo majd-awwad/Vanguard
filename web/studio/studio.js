@@ -41,7 +41,39 @@ export const cardinal = (degrees, language = "en") => (language === "ar" ? CARDI
 export const chronological = (phen) => [...phen.list];
 
 // ---------------------------------------------------------------------------------------------------------------
-// Entry: one sentence, one button, no autoplay. The recordings are the sound; spoken guidance is a setting.
+// Entry: one sentence, one button, no autoplay. Then the two-choice sound-mode dialog.
+export function openModeDialog(document, language, { current = null, dismissable = false, onChoose, onClose = () => {} }) {
+  const m = copyFor(language);
+  const overlay = h(document, "div", { class: "em-modal-backdrop" });
+  const dialog = h(document, "div", { class: "em-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "em-mode-title" });
+  const choice = (mode, title, text) => {
+    const art = h(document, "span", { class: "em-choice-art", "aria-hidden": "true" });
+    art.innerHTML = mode === GUIDED ? ICON.voice : ICON.waves;
+    const button = h(document, "button", { type: "button", class: "em-choice", "data-mode": mode, "aria-pressed": String(current === mode) }, art, h(document, "strong", { text: title }), h(document, "span", { text }));
+    button.addEventListener("click", () => { close(); onChoose(mode); });
+    return button;
+  };
+  const buttons = [choice(GUIDED, m.mode.guided, m.mode.guidedText), choice(PURE, m.mode.pure, m.mode.pureText)];
+  const closeButton = dismissable ? h(document, "button", { type: "button", class: "button ghost", text: m.mode.close }) : null;
+  dialog.append(h(document, "h2", { id: "em-mode-title", text: m.mode.title }), h(document, "div", { class: "em-choices" }, ...buttons), h(document, "p", { class: "small", text: m.mode.note }), ...(closeButton ? [closeButton] : []));
+  overlay.append(dialog);
+  const previous = document.activeElement;
+  function close() { overlay.remove(); document.removeEventListener("keydown", onKey, true); previous?.focus?.(); onClose(); }
+  function onKey(event) {
+    if (event.key === "Escape" && dismissable) { event.preventDefault(); close(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = [...dialog.querySelectorAll("button")];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+  closeButton?.addEventListener("click", close);
+  document.addEventListener("keydown", onKey, true);
+  document.body.append(overlay);
+  (buttons.find((b) => b.dataset.mode === current) ?? buttons[0]).focus();
+  return { close };
+}
+
 export function startStudio(document = globalThis.document) {
   const language = mountNav(document, document.getElementById("site-nav"), { active: "studio", from: "pages" });
   const m = copyFor(language);
@@ -55,7 +87,8 @@ export function startStudio(document = globalThis.document) {
   root.replaceChildren(h(document, "section", { class: "em-entry", "aria-labelledby": "em-entry-title" },
     h(document, "p", { class: "eyebrow", text: m.entry.eyebrow }), h(document, "h1", { id: "em-entry-title", text: m.entry.title }),
     h(document, "p", { class: "lede", text: m.entry.sentence }), start, h(document, "p", { class: "small", text: m.entry.note })));
-  start.addEventListener("click", () => mountApp(document, root, language, loadSettings().guidance ? GUIDED : PURE));
+  // The entry asks how to explore by sound. The choice is the "Spoken instructions" setting (guidance), the one source of truth.
+  start.addEventListener("click", () => openModeDialog(document, language, { current: loadSettings().guidance ? GUIDED : PURE, onChoose: (mode) => { const next = saveSettings({ guidance: mode === GUIDED }); document.defaultView?.dispatchEvent(new document.defaultView.CustomEvent("earthpulse:settings", { detail: next })); mountApp(document, root, language, mode); } }));
   return Promise.resolve();
 }
 
@@ -559,18 +592,32 @@ async function mountApp(document, root, language, initialMode) {
   speech.setSpeechVolume(settings.speechVolume);
   el.soundButton.addEventListener("click", () => setSound(!audio.enabled));
   el.wave = h(document, "canvas", { width: 120, height: 36, role: "img", "aria-label": c.sound.wave });
+  el.modeSeg = h(document, "div", { class: "seg", role: "group", "aria-label": m.mode.title });
+  const modeButtons = {};
+  for (const [mode, label] of [[GUIDED, m.mode.guided], [PURE, m.mode.pure]]) {
+    const b = h(document, "button", { type: "button", "aria-pressed": String(mode === store.state.soundMode), text: label });
+    b.addEventListener("click", () => setSoundMode(mode));
+    modeButtons[mode] = b;
+    el.modeSeg.append(b);
+  }
+  function renderModeButton() { for (const [mode, b] of Object.entries(modeButtons)) b.setAttribute("aria-pressed", String(mode === store.state.soundMode)); }
   el.soundMore = h(document, "div", { class: "st-sound-more" }, el.volume);
   el.soundLevel = h(document, "p", { class: "st-sound-level", role: "status", "aria-live": "polite" });
   el.soundNote = h(document, "small", { class: "st-sound-note", text: m.sound.note });
   el.soundPill = h(document, "div", { hidden: true });
   el.voiceNote = h(document, "p", { class: "small", hidden: true, text: m.voice.unavailable });
-  // Spoken guidance is a setting (the settings drawer); the Studio only follows it.
-  function setSoundMode(mode) {
+  // Guided Voice (spoken guidance plus the recordings, ducked while speaking) or Pure Sonification (the recordings only, no automatic speech).
+  // The mode is the "Spoken instructions" setting (guidance): switching here saves it and tells the drawer; changing it there switches here.
+  function setSoundMode(mode, { persist = true } = {}) {
+    if (store.state.soundMode === mode) { renderModeButton(); return; }
     store.dispatch("SET_SOUND_MODE", { mode });
     speech.setMode(mode);
     el.status.setAttribute("aria-live", mode === GUIDED ? "polite" : "off");
+    renderModeButton();
+    el.live.textContent = m.mode.switched[mode];
+    if (persist) { const next = saveSettings({ guidance: mode === GUIDED }); win.dispatchEvent(new win.CustomEvent("earthpulse:settings", { detail: next })); }
+    if (mode === GUIDED && state.cursor) speak(m.mode.switched[mode] + " " + readText(state.cursor));
   }
-  const renderModeButton = () => {};
 
   // ---- Dry dates: explain a date with almost no signal and suggest the wettest real dates
   el.dryNotice = h(document, "div", { class: "st-dry", role: "status", "aria-live": "polite", hidden: true });
@@ -957,7 +1004,7 @@ async function mountApp(document, root, language, initialMode) {
   el.hoverTip = h(document, "div", { class: "st-hovertip", hidden: true, "aria-hidden": "true" });
   el.exploreHint = h(document, "p", { class: "st-hint", text: c.tools.help.explore });
   el.timewrap = h(document, "div", { class: "st-timewrap" }, el.timeline);
-  el.soundMore.replaceChildren(h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.sound.volume }), el.volume));
+  el.soundMore.replaceChildren(el.modeSeg, h(document, "label", { class: "volume", for: "st-volume" }, h(document, "span", { text: m.sound.volume }), el.volume));
   const title = (text) => h(document, "h2", { text });
   const head = h(document, "header", { class: "st-head" }, h(document, "p", { class: "eyebrow", text: m.cards.eyebrow }), h(document, "h1", {}, m.cards.title[0] + " ", h(document, "em", { text: m.cards.title[1] })), h(document, "p", { class: "lede", text: m.cards.lede }));
   const dataCard = h(document, "section", { class: "st-card", "aria-label": m.cards.data }, title(m.cards.data), el.phenGroup,
@@ -980,7 +1027,7 @@ async function mountApp(document, root, language, initialMode) {
   root.replaceChildren(el.live, app, holder);
   holder.append(info);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") { speech.cancel(); if (!el.timePop.hidden) closeTimePop(true); } if (event.key === "?" && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? "")) { event.preventDefault(); openHelp(); } });
-  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); rec.setVolume(s.volume); if (typeof s.guidance === "boolean") setSoundMode(s.guidance ? GUIDED : PURE); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
+  win.addEventListener("earthpulse:settings", (event) => { const s = event.detail; audio.setVolume(s.volume); rec.setVolume(s.volume); if (typeof s.guidance === "boolean") setSoundMode(s.guidance ? GUIDED : PURE, { persist: false }); speech.setSpeechVolume(s.speechVolume); el.volume.value = String(Math.round(s.volume * 100)); });
 
 
   // First load: a real value is already in the inspector (nearest data cell to the centre of the coverage), sound off.

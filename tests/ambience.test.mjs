@@ -90,7 +90,7 @@ test("no synthetic data tones in the Studio, Explore Earth, Science examples or 
     assert.ok(!/valueTones|stepTones|changeTones|valueHoverPlan|continuousVoice|crackleVoice|confirmationPlan|makeSpatialPlan\(/.test(src.replace(/import .*makeSpatialPlan.*/g, "")), name + " uses no synthetic tone builders");
   }
   assert.ok(!/createStudioAudio\(\{[^}]*hover/.test(studio) && !/audio\.hover\(/.test(studio));
-  assert.ok(!/modeSeg|st-amb|ambToggle|openModeDialog\(/.test(studio), "no sound-style selector and no separate ambience toggle");
+  assert.ok(!/st-amb|ambToggle/.test(studio), "no separate ambience toggle (Guided / Pure is the voice switch, not a sound-style selector)");
   assert.equal((studio.match(/id: "st-volume"/g) ?? []).length, 1, "one volume slider");
   assert.ok(copy.includes("No recording for temperature"));
   assert.ok(copy.includes("لا يوجد تسجيل لدرجة الحرارة"));
