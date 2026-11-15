@@ -282,3 +282,12 @@ details.st-how[open] summary { margin-bottom: var(--s-2); }
 .st-amb-note, .st-amb-status { color: var(--muted); font-size: var(--fs-caption); }
 .st-amb-status:empty { display: none; }
 .switch:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Dry-date notice on the map */
+.st-dry { position: absolute; z-index: 5; top: 10px; left: 50%; transform: translateX(-50%); width: min(30rem, calc(100% - 20px)); padding: .6rem .8rem; display: grid; gap: .5rem; background: var(--surface-solid); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow-float); font-size: var(--fs-small); text-align: center; }
+.st-dry[hidden] { display: none; }
+.st-dry p { margin: 0; }
+.st-dry-dates { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
+.st-dry .button { min-height: var(--target); direction: ltr; font-family: var(--mono); }
+
+.st-card .st-dry { position: static; transform: none; width: auto; box-shadow: none; background: var(--surface); }
