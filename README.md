@@ -2,6 +2,8 @@
 
 Team Vanguard's bilingual (English / Arabic) sonification platform for NASA Earth data, built at the NASA Space Apps Challenge 2026 (Nablus, An-Najah National University).
 
+**Try it live:** <https://majd-awwad.github.io/Vanguard/>. Use headphones or speakers; sound starts only when you turn it on.
+
 EARTHPULSE turns real NASA GMAO GEOS-FP model data into sound: **dust, rainfall and wind** over North Africa and the Mediterranean (20°W–50°E, 15°N–45°N), on a 25 × 40 grid of 1,000 cells and 13 real dates (the 15th of each month from December 2024 to November 2025, plus 2025-08-19). Every number and sound on the site comes from that data or from documented rules that turn it into sound. The browser uses only packaged assets and needs no account or network connection for playback.
 
 ## What you can do
